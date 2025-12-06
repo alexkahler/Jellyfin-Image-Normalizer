@@ -1,0 +1,93 @@
+# Jellyfin Image Normalizer configuration (TOML)
+
+[SERVER]
+# Required Jellyfin base URL including protocol (e.g. https://media.example.com). Default: placeholder.
+jf_url = "https://your-jellyfin-url-here"
+# Required Jellyfin API key with library access. Default: placeholder.
+jf_api_key = "YOUR_API_KEY_HERE"
+
+[API]
+# Verify TLS certificates for HTTPS connections (bool). Default: True.
+verify_tls = true
+# HTTP timeout in seconds for Jellyfin requests. Default: 15.0 seconds.
+timeout = 15
+# Delay between API calls in milliseconds. Default: 100 ms.
+jf_delay_ms = 100
+# Number of retry attempts for GET/POST operations. Default: 3.
+api_retry_count = 3
+# Initial retry backoff in milliseconds (doubles each attempt). Default: 500 ms.
+api_retry_backoff_ms = 500
+# Raise immediately when uploads fail instead of continuing. Default: False.
+fail_fast = false
+# When true, no POST/PUT/DELETE calls are issued (safety). Default: True.
+dry_run = true
+
+[BACKUP]
+# Save originals to backup_dir before uploads. Default: True.
+backup = true
+# partial backs up only scaled images; full backs up all images. Default: partial.
+backup_mode = "partial"
+# Root folder for backups (relative or absolute). Default: backup.
+backup_dir = "backup"
+# Re-upload originals even when no resize is needed. Default: False.
+force_upload_noscale = false
+
+[MODES]
+# Modes to run (logo|thumb|profile). Accepts a pipe-separated string or a string array. Default: logo|thumb|profile.
+operations = ["logo", "thumb", "profile"]
+
+[logging]
+# Path to log file. Default: jfin.log.
+file_path = "jfin.log"
+# Write logs to file. Default: True.
+file_enabled = true
+# File log level (INFO, DEBUG, etc.). Default: INFO.
+file_level = "INFO"
+# CLI log level. Default: INFO.
+cli_level = "INFO"
+# Suppress CLI logging except critical errors. Default: False.
+silent = false
+
+[operator]
+# Optional operator username used for discovery; defaults to first active user if unset.
+username = "your_jellyfin_admin_username_here"
+
+[libraries]
+# Optional library name filters (list/pipe/comma). Default: empty (all movie/tv libraries).
+names = []
+
+[logo]
+# Canvas width for logos (pixels). Default: 800.
+width = 800
+# Canvas height for logos (pixels). Default: 310.
+height = 310
+# Block upscaling logos. Default: False.
+no_upscale = false
+# Block downscaling logos. Default: False.
+no_downscale = false
+# Skip transparent padding; resize only. Default: False.
+no_padding = false
+
+[thumb]
+# Canvas width for thumbs/posters (pixels). Default: 1000.
+width = 1000
+# Canvas height for thumbs/posters (pixels). Default: 562.
+height = 562
+# Block upscaling thumbs. Default: False.
+no_upscale = false
+# Block downscaling thumbs. Default: False.
+no_downscale = false
+# JPEG quality (1-95) for thumbs. Default: 85.
+jpeg_quality = 85
+
+[profile]
+# Canvas width for profile images (pixels). Default: 256.
+width = 256
+# Canvas height for profile images (pixels). Default: 256.
+height = 256
+# Block upscaling profiles. Default: False.
+no_upscale = false
+# Block downscaling profiles. Default: False.
+no_downscale = false
+# WebP quality (1-100) for profiles. Default: 80.
+webp_quality = 80
