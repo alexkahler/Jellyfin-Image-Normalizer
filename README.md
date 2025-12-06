@@ -187,15 +187,15 @@ This gives you:
 
 ### Quick Start
 
-1. **Create an API Key in Jellyfin** (requires admin rights)
+1. **Create an API key in Jellyfin** (requires admin rights)
 
    - Go to `JELLYFIN_URL/web/#/dashboard/keys`
    
    - Click on `New API Key`
 
-   - Give the API Key a name, e.g., `JFIN`, and click `Create`
+   - Give the API key a name, e.g., `JFIN`, and click `Create`
 
-   - Save the API Key for later use in the `config.toml`
+   - Save the API key for later use in the `config.toml`
 
 2. **Generate a config template**
 
@@ -402,6 +402,4 @@ More details about the processing pipeline, classes, config TOML, and CLI entryp
 
 ## License
 
-This project is licensed. See the `LICENSE` file for details.
-
-````
+This project is licensed under GPL-3.0. See the `LICENSE` file for details.
