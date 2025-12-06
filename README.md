@@ -175,15 +175,19 @@ At a glance, JFIN gives you:
 Requires **Python 3.11+**.
 
 ```bash
-git clone https://github.com/your-user/jellyfin-image-normalizer.git
+git clone https://github.com/alexkahler/Jellyfin-Image-Normalizer.git
 cd jellyfin-image-normalizer
 pip install -r requirements.txt
 ````
+
+Or download the ZIP directly from GitHub.
 
 This gives you:
 
 * `jfin.py` – the CLI entry point
 * `jfin_core/` – the overengineered engine room
+
+You can ignore the other files in the folder if you only plan to run the script.
 
 ### Quick Start
 
