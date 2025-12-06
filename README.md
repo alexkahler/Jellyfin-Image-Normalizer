@@ -72,7 +72,7 @@ Jellyfin already does a lot of smart caching and resizing. But a few specific im
 Logos from TheMovieDatabase come in every size and ratio imaginable:
 
 - `150 x 2000`, `750 x 90`, and everything in between  
-- CSS skins like **ElegantFin** do their best, but wildly different aspect ratios still mean:
+- CSS skins like **[ElegantFin](https://github.com/lscambo13/ElegantFin)** do their best, but wildly different aspect ratios still mean:
   - Logos jumping up and down between titles  
   - Some logos stretching across half the screen, others look tiny  
 
@@ -360,7 +360,6 @@ Additional documentation lives in the `docs/` folder:
 * [Backups, UUIDs, and restore limitations](docs/backups-and-uuids.md)
 * [Advanced usage & tips](docs/advanced-usage.md)
 * [Cron, Docker, and LSIO container setups](docs/docker-and-cron.md)
-* [Provider behavior & canvas size choices](docs/provider-behavior.md)
 * [Technical notes and internals](docs/TECHNICAL_NOTES.md)
 
 
