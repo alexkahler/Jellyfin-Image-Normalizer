@@ -1,7 +1,5 @@
 # Changelog
 
-## 0.1.2
-
 ## 0.1.1
 * Added automatic pre-flight Jellyfin connectivity check before processing, with clear logging when unreachable.
 * Hardened connectivity checks: detect unauthorized/forbidden/503 responses and abort when Jellyfin reports it is shutting down during pre-flight or `--test-jf`.
