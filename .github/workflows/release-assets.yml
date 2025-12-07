@@ -40,5 +40,6 @@ jobs:
         with:
           files: |
             jfin-${{ github.ref_name }}.zip
+          draft: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
