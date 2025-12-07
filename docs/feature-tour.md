@@ -6,7 +6,6 @@ A very serious tool for a very specific job.
 
 - Talks only to Jellyfin’s HTTP API. No direct filesystem poking. *poke poke.*  
 - External library support. Your artwork cohabitates with your Scarlett Johansson? No problem!  
-- Uses an “operator” user to discover libraries and items. Yes, you're a Tier 1 Operator now.  
 - Filters by library names (`Movies`, `Shows`, etc.) when you want.  
 
 ## Three distinct modes

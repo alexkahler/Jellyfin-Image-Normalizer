@@ -9,7 +9,9 @@ class RunStats:
     """In-memory counters for a single JFIN run."""
 
     processed: int = 0
+    images_found: int = 0
     successes: int = 0
+    skipped: int = 0
     warnings: int = 0
     errors: int = 0
     failed_items: list[tuple[str, str]] = field(default_factory=list)
@@ -25,6 +27,18 @@ class RunStats:
             self.processed += 1
         self.warnings += 1
 
+    def record_skip(self, count_processed: bool = False) -> None:
+        """Count a skip separately from warnings; optionally treat it as processed."""
+        if count_processed:
+            self.processed += 1
+        self.skipped += 1
+
+    def record_images_found(self, count: int) -> None:
+        """Track how many images were discovered for this run."""
+        if count < 0:
+            return
+        self.images_found += count
+
     def record_error(self, path: str, reason: str) -> None:
         """Count an error and capture the failing item identifier and reason."""
         self.processed += 1
@@ -37,6 +51,7 @@ stats = RunStats()
 api_failures: list[dict[str, Any]] = []
 upscaled_images: list[tuple[str, int, int, int, int]] = []
 downscaled_images: list[tuple[str, int, int, int, int]] = []
+dry_run = False
 
 # Default logger; configured at runtime by logging_utils.setup_logging
 log: logging.LoggerAdapter = logging.LoggerAdapter(logging.getLogger("jfin"), {"run_id": run_id})
@@ -58,3 +73,4 @@ def reset_state() -> None:
     api_failures.clear()
     upscaled_images.clear()
     downscaled_images.clear()
+    globals()["dry_run"] = False

@@ -12,7 +12,7 @@ This document explains how the Jellyfin Image Normalizer CLI works so a new team
 - Core package `jfin_core/`:
   - `config.py`: TOML config loading/generation, CLI overrides, discovery settings, mode runtime settings, client factory.
   - `client.py`: `JellyfinClient` (requests + retry/backoff, dry-run/write gates, image uploads/downloads).
-  - `discovery.py`: operator resolution, library and item discovery, containers (`LibraryRef`, `DiscoveredItem`).
+  - `discovery.py`: library and item discovery (`/Library/MediaFolders` + `/Items`), containers (`LibraryRef`, `DiscoveredItem`).
   - `imaging.py`: resize planning (`ScalePlan`), EXIF handling, mode-specific builders, encoders, NO_SCALE handling.
   - `pipeline.py`: orchestrates library/profile processing, single-item/user runs, restore, and per-image normalization.
   - `backup.py`: backup path/content-type helpers and backup-mode enforcement.
@@ -22,14 +22,16 @@ This document explains how the Jellyfin Image Normalizer CLI works so a new team
 
 ## Configuration Model (`config.toml`)
 - Location: defaults to `config.toml` beside the repo root (`jfin_core/config.py:default_config_path`). Generate a starter file with `python jfin.py --generate-config` (optionally `--config <path>.toml`, no other operational flags allowed).
-- Format: TOML only. `.json` configs are rejected at load time. Comments are inline `#` entries; there is no `_comments` table. Deprecated keys such as `allow_writes`, `allow_uploads`, `operator.user_id`, or `libraries.name` are rejected during validation.
-- Sections: grouped defaults under `[SERVER]`, `[API]`, `[BACKUP]`, `[MODES]` (plus `[logging]`, `[operator]`, `[libraries]`, and mode sections). Keys are lifted to the root for runtime use; only the current schema is supported.
-- Required: `jf_url` (base URL) and `jf_api_key` (X-Emby-Token), non-empty strings.
+- Format: TOML only. `.json` configs are rejected at load time. Comments are inline `#` entries; there is no `_comments` table.
+- Sections: grouped defaults under `[server]`, `[api]`, `[backup]`, `[modes]` (plus `[logging]`, `[libraries]`, and mode sections). Keys are lifted to the root for runtime use; only the current schema is supported.
+- Required: `jf_url` (base URL) and `jf_api_key` (used in the MediaBrowser Authorization header), non-empty strings.
 - API behavior: `verify_tls` (bool), `timeout` (sec), `jf_delay_ms` (throttle between requests), `api_retry_count`, `api_retry_backoff_ms`, `fail_fast` (raise on API upload errors), `dry_run` (default true in generated config).
 - Operations: `operations` pipe-separated string or array of modes (`logo|thumb|profile`). CLI `--mode` still overrides.
+- Item types: `[modes].item_types` (pipe-separated string or array) controls Jellyfin `includeItemTypes` for `/Items` discovery. Supported values: `movies`, `series`, or both (default). Case-insensitive; stored as `Movie`/`Series`.
 - Backup: `backup` (bool), `backup_mode` (`partial` backs up only scaled images; `full` backs up everything), `backup_dir`, `force_upload_noscale` (re-upload even when no scaling applied).
 - Logging: `logging.file_path`, `file_enabled`, `file_level`, `cli_level`, `silent`. CLI `-s/--silent` and `-v/--verbose` override CLI logging.
-- Discovery: `operator.username` to choose the user for library queries; `libraries.names` to filter by name (normalized, movie/tv collection types only).
+- Optional: `version` (string) used for logging and sent in the MediaBrowser `Authorization` header.
+- Discovery: `libraries.names` to filter by normalized library names; `item_types` drives which Jellyfin item types (`Movie`/`Series`) are queried during discovery.
 - Mode sections (`logo`, `thumb`, `profile`):
   - Common: `width`, `height`, `no_upscale`, `no_downscale`.
   - Validation: widths/heights must be >0; CLI width/height overrides must also be positive, and a missing side is inferred from the configured aspect ratio (clamped to at least 1px).
@@ -56,10 +58,11 @@ no_padding = false
 ```
 
 ## CLI Entrypoints (`jfin.py:parse_args`)
-- Core flags: `--config`, `--generate-config`, `--test-jf`, `--mode`, `--single <user|itemId>`, `--restore`, `--restore-all` (must be used alone except logging/config flags), `--dry-run`, `--backup`.
+- Core flags: `--config`, `--generate-config`, `--test-jf`, `--mode` (logo|thumb|profile), `--single <user|itemId>`, `--restore`, `--restore-all` (must be used alone except logging/config flags), `--dry-run`, `--backup`.
 - Config path: `--config <file>.toml` (defaults to `config.toml` beside the repo). Non-TOML paths are rejected.
 - Imaging overrides: `--width/--height`, `--jpeg-quality`, `--webp-quality`, `--no-upscale`, `--no-downscale`, `--no-padding` (logo only), `--force-upload-noscale`. Width/height overrides must be positive; if only one side is provided, the other is inferred from the configured aspect ratio.
-- Jellyfin overrides: `--jf-url`, `--jf-api-key`, `--operator`, `--libraries`, `--jf-delay-ms`.
+- Discovery overrides: `--item-types` (movies|series) to override `[modes].item_types` for `/Items` discovery; values are case-insensitive and parsed like the config setting.
+- Jellyfin overrides: `--jf-url`, `--jf-api-key`, `--libraries`, `--item-types`, `--jf-delay-ms`.
 - Logging toggles: `--silent/-s`, `--verbose/-v`.
 - Exclusivity/validation: `--generate-config` rejects any operational flags; `--restore-all` rejects combinations except config/logging flags; `--test-jf` requires `--jf-url`/`--jf-api-key` overrides or populated config values.
 - No-op guards: CLI emits warnings when mode-specific flags have no effect (e.g., `--jpeg-quality` without `thumb`, `--webp-quality` without `profile`, `--no-padding` without `logo`).
@@ -71,20 +74,20 @@ no_padding = false
 3) Validate `--restore-all` exclusivity; normalize backup mode.  
 4) Determine operations: `test-jf` shortcut, `restore-all` runs all modes, otherwise `parse_operations` from CLI/config.  
 5) Build `JellyfinClient` from config (writes enabled when `dry_run=false`).  
-6) For each mode, validate required config and build `ModeRuntimeSettings` (width/height, scaling flags, qualities, padding).  
-7) Branches:
+6) Pre-flight connectivity check: call `/System/Info` once via `test_connection`; abort early with a logged critical if unreachable, unauthorized/forbidden, returning 503, or reporting `IsShuttingDown=true`.  
+7) For each mode, validate required config and build `ModeRuntimeSettings` (width/height, scaling flags, qualities, padding).  
+8) Branches:
    - `--single` + `logo|thumb`: call `process_single_item_api` (no discovery) with the provided item id.
    - `--single` + `profile`: call `process_single_profile` (username lookup).
    - `--restore` + `--mode`: restore backups for those modes; with `--single`, restore only the targeted item/user using backup file lookup.
    - `--restore-all`: reuses the same restore path with all modes selected.
    - Normal processing: library modes (`logo`/`thumb`) via discovery + normalize; `profile` via user list.
-8) Always log scale decisions, API failures, and run summary before exit.
+9) Always log scale decisions, API failures, and run summary before exit.
 
 ## Discovery and Library Processing (`pipeline.process_libraries_via_api`)
-- Build `DiscoverySettings` from config and requested operations; image types are derived from modes (`Logo`, `Thumb`).
-- Resolve operator (`resolve_operator_user`): prefer configured `username`, else first active user from `/Users?isDisabled=false`.
-- Discover libraries (`discover_libraries`): `/Users/<userId>/Items` filtered to collection types `movies`/`tvshows` and optional normalized name matches.
-- Discover items (`discover_library_items`): paginated `/Users/<userId>/Items` queries with params `ParentId=<libraryId>`, `IncludeItemTypes=Movie,Series,Season,Episode`, `Recursive=true`, `EnableImageTypes`, `ImageTypeLimit=1`. Collect items with requested image tags.
+- Build `DiscoverySettings` from config and requested operations; image types are derived from modes (`Logo`, `Thumb`) and `item_types` map to `IncludeItemTypes` (`Movie`/`Series`).
+- If `libraries.names` is defined, discover libraries (`discover_libraries`) via `/Library/MediaFolders`, normalize names, and filter to matches. When no filters are provided, skip `/Library/MediaFolders` entirely.
+- Discover items (`discover_library_items`): paginated `/Items` queries. When libraries were selected, call with `ParentId=<libraryId>` per library; when no library filters are present, call `/Items` once without `ParentId` and with `Recursive=true`. Always set `IncludeItemTypes` from `item_types`, `EnableImageTypes` from requested modes, and `ImageTypeLimit=1`, paging until no records remain. Collect items that already have the requested image tags.
 - Normalize images (`process_discovered_items` -> `normalize_item_image_api`):
   - Fetch original via `/Items/<itemId>/Images/<ImageType>`.
   - Apply EXIF orientation, plan resize (`fit` for logos, `cover` for thumbs), and decide SCALE_UP/DOWN/NO_SCALE based on `allow_upscale/allow_downscale`.
@@ -110,8 +113,8 @@ no_padding = false
 - Color stats: `get_palette_color_count` attempts to retain palette size for logos (used only when original mode is `P`).
 
 ## Jellyfin API Touchpoints (`jfin_core/client.py`)
-- GET helpers with retry/backoff: `_get`, `_get_json`; use `X-Emby-Token` header only.
-- Discovery: `/System/Info` (connectivity test), `/Users`, `/Users/<id>/Items`, `/Items/<id>/Images/<type>`, `/UserImage?userId=<id>`.
+- GET helpers with retry/backoff: `_get`, `_get_json`; use the MediaBrowser `Authorization` header (`Token`, `Client`, `Version`).
+- Discovery: `/System/Info` (connectivity test), `/Users` (profile mode), `/Library/MediaFolders`, `/Items` (library discovery), `/Items/<id>/Images/<type>`, `/UserImage?userId=<id>`.
 - Uploads:
   - Items: `set_item_image_bytes` POSTs base64 image to `/Items/<id>/Images/<type>` with `Content-Type` set from normalized format. Optional `set_item_image` reads from disk.
   - Profiles: `set_user_profile_image` DELETEs `/UserImage?userId=<id>` then POSTs base64 to the same endpoint. `delete_user_profile_image` treats 404 as success.
@@ -127,12 +130,12 @@ no_padding = false
 
 ## Logging, State, and Metrics
 - `logging_utils.setup_logging` configures CLI/file handlers with formatter `[run_id=<token>]`. `log_run_start` and `log_run_summary` wrap each run.
-- `state.RunStats` counts processed/success/warning/error and failed items (id + reason). Global lists `upscaled_images` / `downscaled_images` capture resizing actions for summary output. `api_failures` store structured upload failures.
+- `state.RunStats` counts images_found/processed/success/skipped/warning/error and failed items (id + reason). Global lists `upscaled_images` / `downscaled_images` capture resizing actions for summary output. `api_failures` store structured upload failures.
 - `--silent` suppresses stdout logs (critical still to stderr); verbose enables DEBUG for CLI handler.
 
 ## Key Data Classes and Helpers
 - `ModeRuntimeSettings` (`jfin_core/config.py`): resolved per-mode sizes, scaling flags, qualities, padding.
-- `OperatorSpec`, `DiscoverySettings` (`config.py`): operator + library filters and item/image query settings.
+- `DiscoverySettings` (`config.py`): library filters, item type filters, and image query settings.
 - `LibraryRef`, `DiscoveredItem` (`discovery.py`): carry ids, names, collection types, and discovered image types.
 - `ScalePlan` (`imaging.py`): resize decision, factors, and original/target dimensions; used for reporting and NO_SCALE handling.
 - `JellyfinClient` (`client.py`): API facade with request helpers, GET methods, upload/delete calls, dry-run gatekeeping.

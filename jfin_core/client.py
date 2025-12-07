@@ -17,6 +17,8 @@ class JellyfinClient:
 
     base_url: str
     api_key: str
+    client_name: str = "Jellyfin Image Normalizer"
+    client_version: str = "unknown"
     timeout: float = 15.0
     verify_tls: bool = True
     delay: float = 0.0
@@ -31,8 +33,13 @@ class JellyfinClient:
         self.base_url = self.base_url.rstrip("/")
 
     def _headers(self) -> dict[str, str]:
-        """Standard auth headers for Jellyfin requests."""
-        return {"X-Emby-Token": self.api_key}
+        """Standard auth headers for Jellyfin requests using MediaBrowser scheme."""
+        auth_value = (
+            f'MediaBrowser Token="{self.api_key}", '
+            f'Client="{self.client_name}", '
+            f'Version="{self.client_version}"'
+        )
+        return {"Authorization": auth_value}
 
     def _get(
         self,
@@ -113,15 +120,79 @@ class JellyfinClient:
         return "application/octet-stream"
 
     def test_connection(self) -> bool:
-        """Call /System/Info to validate connectivity and token."""
+        """
+        Call /System/Info to validate connectivity, API key, and server state.
+
+        Returns True when reachable and not shutting down. Logs specific failures for auth
+        errors (401/403), temporary unavailability (503), shutdown state, JSON decode issues,
+        or other HTTP/connection problems.
+        """
         url = f"{self.base_url}/System/Info"
 
-        resp = self._get(url, label="system info")
-        if resp is None:
-            return False
+        attempts = max(1, int(self.retry_count))
+        backoff = max(0.0, float(self.backoff_base))
+        last_error = "Unknown error"
 
-        self.logger.info("[API-TEST] Jellyfin connection OK.")
-        return True
+        for attempt in range(1, attempts + 1):
+            try:
+                self.logger.debug("Knock, knock.")
+                resp = requests.get(
+                    url,
+                    headers=self._headers(),
+                    timeout=self.timeout,
+                    verify=self.verify_tls,
+                )
+            except Exception as exc:
+                last_error = f"Exception: {exc}"
+                resp = None
+            else:
+                status = resp.status_code
+                if status == 401:
+                    self.logger.critical("[API-ERROR] Unauthorized (401) when calling /System/Info. Check API key.")
+                    return False
+                if status == 403:
+                    self.logger.critical("[API-ERROR] Forbidden (403) when calling /System/Info. Check Jellyfin permissions.")
+                    return False
+                if status == 503:
+                    last_error = "HTTP 503 Service Unavailable (server starting or temporarily unavailable). Try again later."
+                    resp = None
+                elif not resp.ok:
+                    snippet = (resp.text or "")[:200].replace("\n", " ")
+                    last_error = f"HTTP {status} {snippet}"
+                    resp = None
+                else:
+                    try:
+                        payload = resp.json()
+                    except Exception as exc:
+                        snippet = (resp.text or "")[:200].replace("\n", " ")
+                        self.logger.error(
+                            "[API-ERROR] Failed to decode JSON from /System/Info: %s (%s)",
+                            exc,
+                            snippet,
+                        )
+                        return False
+
+                    if isinstance(payload, dict) and payload.get("IsShuttingDown"):
+                        self.logger.error(
+                            "[API-ERROR] Jellyfin reported that it is shutting down; aborting to avoid data loss."
+                        )
+                        return False
+                    self.logger.debug("Who's there?")
+                    self.logger.info("[API-TEST] Jellyfin connection OK.")
+                    return True
+
+            self.logger.error(
+                "[API-ERROR] Attempt %s/%s failed for system info: %s.",
+                attempt,
+                attempts,
+                last_error,
+            )
+            if attempt < attempts and backoff > 0:
+                self.logger.debug("*Waiting for a response...*")
+                time.sleep(backoff)
+                backoff *= 2
+
+        return False
 
     def list_users(self, is_disabled: bool | None = None) -> list[dict[str, Any]]:
         """Return all users (optionally filtered by disabled flag)."""
@@ -140,22 +211,21 @@ class JellyfinClient:
 
         return data
 
-    def get_user_items(
-        self,
-        user_id: str,
-        params: dict[str, Any] | None = None,
-        label: str | None = None,
-    ) -> dict[str, Any] | None:
-        """Fetch items for a user; parentId omitted returns libraries."""
-        url = f"{self.base_url}/Users/{user_id}/Items"
-        request_label = label or f"user items for {user_id}"
-        return self._get_json(url, params=params, label=request_label)
+    def list_media_folders(self) -> dict[str, Any] | None:
+        """Fetch all media folders via /Library/MediaFolders."""
+        url = f"{self.base_url}/Library/MediaFolders"
+        data = self._get_json(url, label="list media folders")
+        if data is None:
+            return None
+        if not isinstance(data, dict):
+            self.logger.error("[API-ERROR] /Library/MediaFolders response is not an object")
+            return None
+        return data
 
-    def query_library_items(
+    def query_items(
         self,
-        user_id: str,
         *,
-        parent_id: str,
+        parent_id: str | None,
         include_item_types: list[str],
         enable_image_types: str | list[str],
         recursive: bool,
@@ -163,27 +233,31 @@ class JellyfinClient:
         start_index: int | None = None,
         limit: int | None = None,
     ) -> dict[str, Any] | None:
-        """Query a library for specific item/image types."""
+        """Query items within a parent folder for specific item/image types."""
         enable_types = (
             ",".join(enable_image_types) if isinstance(enable_image_types, list) else enable_image_types
         )
-        params = {
-            "ParentId": parent_id,
-            "IncludeItemTypes": ",".join(include_item_types),
+        params: dict[str, str] = {
             "Recursive": str(recursive).lower(),
-            "ImageTypeLimit": image_type_limit,
             "EnableImageTypes": enable_types,
         }
+        if parent_id:
+            params["ParentId"] = parent_id
+        if include_item_types:
+            params["IncludeItemTypes"] = ",".join(include_item_types)
+        if image_type_limit:
+            params["ImageTypeLimit"] = str(image_type_limit)
         if start_index is not None:
-            params["StartIndex"] = start_index
+            params["StartIndex"] = str(start_index)
         if limit is not None:
-            params["Limit"] = limit
+            params["Limit"] = str(limit)
 
         request_label = (
-            f"user items for {user_id} (parent={parent_id}, image_types={enable_types}, "
-            f"start={start_index}, limit={limit})"
+            f"/Items (parent={parent_id or 'ALL'}, image_types={enable_types}, "
+            f"types={params.get('IncludeItemTypes')}, start={start_index}, limit={limit})"
         )
-        return self.get_user_items(user_id, params=params, label=request_label)
+        url = f"{self.base_url}/Items"
+        return self._get_json(url, params=params, label=request_label)
 
     def get_item_image(self, item_id: str, image_type: str) -> tuple[bytes, str] | None:
         """Fetch raw image bytes and content type for an item image."""
@@ -287,10 +361,7 @@ class JellyfinClient:
         """Upload an image for an item using in-memory bytes."""
         url = f"{self.base_url}/Items/{item_id}/Images/{image_type}"
 
-        headers = {
-            "X-Emby-Token": self.api_key,
-            "Content-Type": content_type,
-        }
+        headers = {**self._headers(), "Content-Type": content_type}
 
         return self._post_image(
             url=url,
@@ -356,10 +427,7 @@ class JellyfinClient:
         """Upload an image for a user from in-memory bytes."""
         url = f"{self.base_url}/UserImage?userId={user_id}"
 
-        headers = {
-            "X-Emby-Token": self.api_key,
-            "Content-Type": content_type,
-        }
+        headers = {**self._headers(), "Content-Type": content_type}
 
         return self._post_image(
             url=url,
@@ -381,7 +449,7 @@ class JellyfinClient:
     def delete_user_profile_image(self, user_id: str) -> bool:
         """Delete a user's profile image; 404 is treated as success."""
         url = f"{self.base_url}/UserImage?userId={user_id}"
-        headers = {"X-Emby-Token": self.api_key}
+        headers = self._headers()
 
         if not self._writes_allowed(f"delete profile image for user {user_id}"):
             self.logger.info("DRY RUN - Would delete existing profile image for user %s.", user_id)
@@ -421,10 +489,7 @@ class JellyfinClient:
     ) -> bool:
         """Replace a user's profile image (delete existing then upload)."""
         url = f"{self.base_url}/UserImage?userId={user_id}"
-        headers = {
-            "X-Emby-Token": self.api_key,
-            "Content-Type": content_type,
-        }
+        headers = {**self._headers(), "Content-Type": content_type}
 
         if not self.delete_user_profile_image(user_id):
             failure_entry = {

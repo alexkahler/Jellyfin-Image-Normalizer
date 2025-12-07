@@ -8,6 +8,7 @@ from jfin_core.config import (
     ConfigError,
     generate_default_config,
     load_config_from_path,
+    parse_item_types,
     parse_operations,
     validate_config_types,
 )
@@ -126,18 +127,18 @@ def test_load_config_from_sections_lifts_keys(tmp_path):
     cfg_path = tmp_path / "config.toml"
     cfg_path.write_text(
         """
-        [SERVER]
+        [server]
         jf_url = "https://demo.example.com"
         jf_api_key = "token"
 
-        [API]
+        [api]
         timeout = 10
         dry_run = true
 
-        [BACKUP]
+        [backup]
         backup = true
 
-        [MODES]
+        [modes]
         operations = "logo|thumb"
 
         [logo]
@@ -168,13 +169,20 @@ def test_parse_operations_invalid_raises():
         parse_operations("poster", None)
 
 
+def test_parse_operations_empty_raises():
+    with pytest.raises(SystemExit):
+        parse_operations("", None)
+    with pytest.raises(SystemExit):
+        parse_operations(None, "")
+
+
 def test_build_discovery_settings_maps_modes_and_filters():
     cfg = {
-        "operator": {"username": "alex"},
         "libraries": {"names": ["Movies", "TV"]},
+        "item_types": "series",
     }
     settings = build_discovery_settings(cfg, ["logo", "profile"])
-    assert settings.include_item_types == ["Movie", "Series", "Season", "Episode"]
+    assert settings.include_item_types == ["Series"]
     assert settings.enable_image_types == ["Logo", "Primary"]
     assert settings.library_names == ["Movies", "TV"]
 
@@ -251,3 +259,16 @@ def test_build_mode_runtime_settings_rejects_non_positive_override():
     }
     with pytest.raises(ConfigError):
         build_mode_runtime_settings("logo", mode_cfg, args)
+
+
+def test_parse_item_types_supports_strings_and_arrays():
+    assert parse_item_types("movies|series") == ["Movie", "Series"]
+    assert parse_item_types(["Series"]) == ["Series"]
+    assert parse_item_types(None) == ["Movie", "Series"]
+
+
+def test_parse_item_types_rejects_invalid_values():
+    with pytest.raises(ConfigError):
+        parse_item_types("movies|books")
+    with pytest.raises(ConfigError):
+        parse_item_types(123)

@@ -13,7 +13,7 @@ except ModuleNotFoundError:  # pragma: no cover - fallback for Python <3.11
     import tomli as tomllib  # type: ignore[no-redef]
 
 from . import state
-from .constants import DEFAULT_CONFIG_NAME, INCLUDE_ITEM_TYPES, MODE_TO_IMAGE_TYPE, VALID_MODES
+from .constants import APP_VERSION, DEFAULT_CONFIG_NAME, DEFAULT_ITEM_TYPES, MODE_TO_IMAGE_TYPE, VALID_MODES
 
 
 @dataclass
@@ -30,17 +30,9 @@ class ModeRuntimeSettings:
 
 
 @dataclass
-class OperatorSpec:
-    """Operator user overrides used for discovery (by username)."""
-
-    username: str | None
-
-
-@dataclass
 class DiscoverySettings:
     """Resolved discovery parameters for listing libraries and items."""
 
-    operator: OperatorSpec
     library_names: list[str]
     include_item_types: list[str]
     enable_image_types: list[str]
@@ -56,13 +48,13 @@ DEFAULT_TOML_TEMPLATE = textwrap.dedent(
     """\
     # Jellyfin Image Normalizer configuration (TOML)
 
-    [SERVER]
+    [server]
     # Required Jellyfin base URL including protocol (e.g. https://media.example.com). Default: placeholder.
     jf_url = "https://your-jellyfin-url-here"
     # Required Jellyfin API key with library access. Default: placeholder.
     jf_api_key = "YOUR_API_KEY_HERE"
 
-    [API]
+    [api]
     # Verify TLS certificates for HTTPS connections (bool). Default: True.
     verify_tls = true
     # HTTP timeout in seconds for Jellyfin requests. Default: 15.0 seconds.
@@ -78,7 +70,7 @@ DEFAULT_TOML_TEMPLATE = textwrap.dedent(
     # When true, no POST/PUT/DELETE calls are issued (safety). Default: True.
     dry_run = true
 
-    [BACKUP]
+    [backup]
     # Save originals to backup_dir before uploads. Default: True.
     backup = true
     # partial backs up only scaled images; full backs up all images. Default: partial.
@@ -88,9 +80,11 @@ DEFAULT_TOML_TEMPLATE = textwrap.dedent(
     # Re-upload originals even when no resize is needed. Default: False.
     force_upload_noscale = false
 
-    [MODES]
+    [modes]
     # Modes to run (logo|thumb|profile). Accepts a pipe-separated string or a string array. Default: logo|thumb|profile.
     operations = ["logo", "thumb", "profile"]
+    # Jellyfin item types to process for logo/thumb discovery (movies|series). Accepts pipe-separated string or array. Default: movies|series.
+    item_types = "movies|series"
 
     [logging]
     # Path to log file. Default: jfin.log.
@@ -104,12 +98,8 @@ DEFAULT_TOML_TEMPLATE = textwrap.dedent(
     # Suppress CLI logging except critical errors. Default: False.
     silent = false
 
-    [operator]
-    # Optional operator username used for discovery; defaults to first active user if unset.
-    username = "your_jellyfin_admin_username_here"
-
     [libraries]
-    # Optional library name filters (list/pipe/comma). Default: empty (all movie/tv libraries).
+    # Optional library name filters (list/pipe/comma). Default: empty (all media folders; filtered by item_types).
     names = []
 
     [logo]
@@ -155,19 +145,19 @@ SECTION_KEY_MAP = {
     "server": ["jf_url", "jf_api_key"],
     "api": ["verify_tls", "timeout", "jf_delay_ms", "api_retry_count", "api_retry_backoff_ms", "fail_fast", "dry_run"],
     "backup": ["backup", "backup_mode", "backup_dir", "force_upload_noscale"],
-    "modes": ["operations"],
+    "modes": ["operations", "item_types"],
 }
 
 
 def _merge_section_keys(cfg: dict[str, Any]) -> dict[str, Any]:
-    """Lift known section keys (SERVER/API/BACKUP/MODES) to top-level if not already present."""
+    """Lift known section keys (server/api/backup/modes) to top-level if not already present."""
     normalized_sections = {name.lower(): value for name, value in cfg.items() if isinstance(value, dict)}
     for section, keys in SECTION_KEY_MAP.items():
         table = normalized_sections.get(section)
         if not isinstance(table, dict):
             continue
         for key in keys:
-            if key not in cfg and key in table:
+            if key in table and (key not in cfg or isinstance(cfg.get(key), dict)):
                 cfg[key] = table[key]
     return cfg
 
@@ -300,6 +290,10 @@ def validate_config_types(cfg: dict[str, Any]) -> None:
 
     if "operations" in cfg:
         expect_string_list(cfg["operations"], "config.operations")
+    try:
+        parse_item_types(cfg.get("item_types"))
+    except ConfigError as exc:
+        errors.append(str(exc))
 
     logging_cfg = cfg.get("logging")
     if logging_cfg is not None:
@@ -311,13 +305,6 @@ def validate_config_types(cfg: dict[str, Any]) -> None:
             expect_string(logging_cfg, "file_level", "config.logging")
             expect_string(logging_cfg, "cli_level", "config.logging")
             expect_bool(logging_cfg, "silent", "config.logging")
-
-    operator_cfg = cfg.get("operator")
-    if operator_cfg is not None:
-        if not isinstance(operator_cfg, dict):
-            errors.append("config.operator must be a table/object.")
-        else:
-            expect_string(operator_cfg, "username", "config.operator")
 
     libraries_cfg = cfg.get("libraries")
     if libraries_cfg is not None:
@@ -392,6 +379,39 @@ def parse_str_list(value: Any) -> list[str]:
     return result
 
 
+def parse_item_types(value: Any) -> list[str]:
+    """
+    Normalize item_types (movies/series) from string/array into canonical Jellyfin values.
+
+    Raises:
+        ConfigError: when an unsupported item type is provided.
+    """
+    if value is None:
+        raw_parts: list[str] = []
+    elif isinstance(value, (str, list)):
+        raw_parts = parse_str_list(value)
+    else:
+        raise ConfigError("item_types must be a string or a list of strings.")
+
+    if not raw_parts:
+        return list(DEFAULT_ITEM_TYPES)
+
+    canonical: list[str] = []
+    for part in raw_parts:
+        token = part.strip().lower()
+        if token in {"movie", "movies"}:
+            mapped = "Movie"
+        elif token == "series":
+            mapped = "Series"
+        else:
+            raise ConfigError("item_types must contain only movies and/or series.")
+
+        if mapped not in canonical:
+            canonical.append(mapped)
+
+    return canonical
+
+
 def parse_operations(arg_mode: str | None, cfg_ops: Any) -> list[str]:
     """Resolve operations from CLI or config and validate against known modes."""
     source = arg_mode if arg_mode else cfg_ops
@@ -442,15 +462,12 @@ def apply_cli_overrides(args: Any, cfg: dict[str, Any]) -> dict[str, Any]:
     if getattr(args, "jf_api_key", None):
         merged["jf_api_key"] = args.jf_api_key
 
-    if "operator" not in merged or merged["operator"] is None:
-        merged["operator"] = {}
-    if getattr(args, "operator", None):
-        merged["operator"]["username"] = args.operator
-
     if "libraries" not in merged or merged["libraries"] is None:
         merged["libraries"] = {}
     if getattr(args, "libraries", None):
         merged["libraries"]["names"] = parse_str_list(args.libraries)
+    if getattr(args, "item_types", None):
+        merged["item_types"] = args.item_types
 
     if getattr(args, "dry_run", False):
         merged["dry_run"] = True
@@ -568,9 +585,6 @@ def build_mode_runtime_settings(mode: str, mode_cfg: dict[str, Any], args: Any) 
 
 def build_discovery_settings(cfg: dict[str, Any], operations: list[str]) -> DiscoverySettings:
     """Build discovery settings including hardcoded item/image type filters."""
-    operator_cfg = cfg.get("operator", {}) or {}
-    operator = OperatorSpec(username=operator_cfg.get("username"))
-
     libraries_cfg = cfg.get("libraries")
     library_names: list[str] = []
     if isinstance(libraries_cfg, dict):
@@ -578,7 +592,7 @@ def build_discovery_settings(cfg: dict[str, Any], operations: list[str]) -> Disc
     else:
         library_names = parse_str_list(libraries_cfg)
 
-    include_item_types = list(INCLUDE_ITEM_TYPES)
+    include_item_types = parse_item_types(cfg.get("item_types"))
     enable_image_types = [
         MODE_TO_IMAGE_TYPE[op_mode]
         for op_mode in operations
@@ -586,7 +600,6 @@ def build_discovery_settings(cfg: dict[str, Any], operations: list[str]) -> Disc
     ]
 
     return DiscoverySettings(
-        operator=operator,
         library_names=library_names,
         include_item_types=include_item_types,
         enable_image_types=enable_image_types,
@@ -606,6 +619,7 @@ def build_jellyfin_client_from_config(cfg: dict[str, Any]):
     backoff_base = max(0.0, float(backoff_ms) / 1000.0)
     fail_fast = bool(cfg.get("fail_fast", False))
     dry_run = bool(cfg.get("dry_run", True))
+    version = str(cfg.get("version") or APP_VERSION)
 
     base_url = cfg.get("jf_url")
     api_key = cfg.get("jf_api_key")
@@ -613,6 +627,7 @@ def build_jellyfin_client_from_config(cfg: dict[str, Any]):
     return JellyfinClient(
         base_url=cast(str, base_url),
         api_key=cast(str, api_key),
+        client_version=version,
         timeout=float(cfg.get("timeout", 15.0)),
         verify_tls=bool(cfg.get("verify_tls", True)),
         delay=api_delay_sec,

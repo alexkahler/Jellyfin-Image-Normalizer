@@ -104,7 +104,7 @@ Jellyfin handles that… but:
 
 **JFIN’s thumb mode:**
 
-- Finds item thumbs via the API (respecting libraries, operator, and filters)
+- Finds item thumbs via the API (respecting libraries, item types, and filters)
 - Rescales them to something sane (e.g. width `1000`, preserving aspect ratio via cover+crop)
 - Re-uploads optimized JPEGs with configurable quality  
 - Often cuts your thumb storage roughly in half (*results may vary; claims made are not indicative of actual performance*) without you ever noticing visually.
@@ -142,7 +142,7 @@ You can see real-world comparisons for Desktop (QHD), Tablet (WQXGA), and Mobile
 At a glance, JFIN gives you:
 
 - 🔍 **API-only discovery**  
-  Talks only to Jellyfin’s HTTP API (no direct filesystem poking), using a dedicated operator user and optional library filters.
+  Talks only to Jellyfin’s HTTP API (no direct filesystem poking) with optional library filters and item types.
 
 - 🖼 **Three focused modes**  
   `logo`, `thumb`, and `profile` — each with its own canvas, format, and scaling rules tuned for Jellyfin’s UI.
@@ -165,7 +165,7 @@ At a glance, JFIN gives you:
 ### Prerequisites
 
 - A running Jellyfin server with API access
-- A Jellyfin API key for an operator/maintenance user
+- A Jellyfin API key
 - **Python 3.11+**
 
 ✨ A full example configuration is included as `config.example.toml`.
@@ -212,28 +212,28 @@ You can ignore the other files in the folder if you only plan to run the script.
    At minimum:
 
    ```toml
-   [SERVER]
+   [server]
    jf_url     = "https://your-jellyfin.example"
    jf_api_key = "YOUR_API_KEY"
 
-   [MODES]
-   operations = ["logo", "thumb", "profile"] # or a subset
-
-   [API]
+   [api]
    dry_run    = true        # keep this true until you’re happy
 
-   [BACKUP]
+   [backup]
    backup     = true
+
+   [modes]
+   operations = ["logo", "thumb", "profile"] # or a subset
    ```
 
-   Optional but recommended:
+   Optional:
 
    ```toml
-   [operator]
-   username = "your-jellyfin-username"
+   [modes]
+   item_types = ["Movies", "Series"] # or a  subset or nothing "[]" to limit processing to certain item types.
 
    [libraries]
-   names = ["Movies", "TV Shows"] # or nothing "[]" to process all movie and tv show libraries
+   names = ["My Favourite Movies", "Reality TV Shows"] # or nothing "[]" to process all movie and tv show libraries
    ```
 
 4. **Test connectivity (no images harmed)**
@@ -241,6 +241,8 @@ You can ignore the other files in the folder if you only plan to run the script.
    ```bash
    python jfin.py --test-jf
    ```
+
+   Every normal run now performs this pre-flight check automatically and will exit early with a clear error if Jellyfin is down, rejecting the API key, or reporting that it is shutting down.
 
 5. **Do a full dry-run**
 

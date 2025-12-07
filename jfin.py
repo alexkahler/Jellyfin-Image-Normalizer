@@ -165,13 +165,13 @@ def parse_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "--operator",
-        help="Operator username to run discovery as (overrides config.operator.username).",
+        "--libraries",
+        help="Comma- or pipe-separated library names to include. Overrides config.",
     )
 
     parser.add_argument(
-        "--libraries",
-        help="Comma- or pipe-separated library names to include (overrides config.libraries.names).",
+        "--item-types",
+        help="Item types to include for discovery (movies|series, pipe/comma-separated). Overrides config.",
     )
 
     parser.add_argument(
@@ -286,6 +286,28 @@ def warn_unused_cli_overrides(args: argparse.Namespace, operations: list[str]) -
     if args.no_padding and "logo" not in ops:
         state.log.warning("--no-padding has no effect because 'logo' mode is not selected.")
         state.stats.record_warning()
+    if getattr(args, "item_types", None) and not ({"logo", "thumb"} & ops):
+        state.log.warning("--item-types has no effect without 'logo' or 'thumb' modes selected.")
+        state.stats.record_warning()
+
+
+def run_preflight_check(jf_client: JellyfinClient) -> None:
+    """
+    Perform a single connectivity check against Jellyfin before any processing.
+
+    The check calls /System/Info via JellyfinClient.test_connection(). If the server is
+    unreachable, shutting down, or the API key is rejected, we log a critical error,
+    record the failure, and exit early to avoid kicking off discovery or uploads while
+    offline or unstable.
+    """
+    if jf_client.test_connection():
+        return
+
+    state.log.critical(
+        "Could not connect to Jellyfin server; aborting before processing."
+    )
+    state.stats.record_error("connectivity", "Pre-flight Jellyfin connection failed.")
+    raise SystemExit(1)
 
 
 def main() -> None:
@@ -368,7 +390,7 @@ def main() -> None:
             if ok:
                 state.stats.record_success()
             else:
-                state.stats.record_error("test-jf", "Connection test failed")
+                state.stats.record_error("test-jf", "Connection test failed.")
             raise SystemExit(0 if ok else 1)
 
         if args.single and len(operations) != 1:
@@ -389,6 +411,7 @@ def main() -> None:
             raise SystemExit(1)
 
         jf_client = build_jellyfin_client_from_config(cfg)
+        run_preflight_check(jf_client)
 
         settings_by_mode: dict[str, ModeRuntimeSettings] = {}
         for mode in operations:
@@ -479,8 +502,8 @@ def main() -> None:
             )
             raise SystemExit(0)
 
-        library_modes = [m for m in operations if m in ("logo", "thumb")]
-        if library_modes:
+        opeation_modes = [m for m in operations if m in ("logo", "thumb")]
+        if opeation_modes:
             if jf_client is None:
                 state.log.critical("Jellyfin client is required for library processing.")
                 state.stats.record_error("configuration", "Missing Jellyfin client")
@@ -488,8 +511,8 @@ def main() -> None:
 
             process_libraries_via_api(
                 cfg=cfg,
-                operations=library_modes,
-                mode_settings={mode: settings_by_mode[mode] for mode in library_modes},
+                operations=opeation_modes,
+                mode_settings={mode: settings_by_mode[mode] for mode in opeation_modes},
                 jf_client=jf_client,
                 dry_run=dry_run,
                 force_upload_noscale=force_upload_noscale,

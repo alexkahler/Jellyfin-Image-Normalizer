@@ -1,10 +1,37 @@
-from pathlib import Path
 import logging
+from pathlib import Path
 import sys
 from typing import Any
 
 from . import state
+from .constants import APP_VERSION
 from .state import RunStats
+
+
+class _ColorFormatter(logging.Formatter):
+    """Formatter that adds ANSI colors for CLI output."""
+
+    COLORS = {
+        logging.DEBUG: "\033[0m",  # grey
+        logging.INFO: "\033[37m",  # white
+        logging.WARNING: "\033[33m",  # yellow
+        logging.ERROR: "\033[31m",  # red
+        logging.CRITICAL: "\033[1;31m",  # bold red
+    }
+    RESET = "\033[0m"
+
+    def __init__(self, use_color: bool, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.use_color = use_color
+
+    def format(self, record: logging.LogRecord) -> str:
+        message = super().format(record)
+        if not self.use_color:
+            return message
+        color = self.COLORS.get(record.levelno)
+        if not color:
+            return message
+        return f"{color}{message}{self.RESET}"
 
 
 def _parse_log_level(name: str | None, default: str = "INFO") -> int:
@@ -43,11 +70,16 @@ def setup_logging(cfg: dict[str, Any], args: Any) -> tuple[logging.LoggerAdapter
         fmt="%(asctime)s.%(msecs)03d [%(levelname)s] [run_id=%(run_id)s] %(message)s",
         datefmt="%Y-%m-%dT%H:%M:%S",
     )
+    color_formatter = _ColorFormatter(
+        use_color=True,
+        fmt="%(asctime)s.%(msecs)03d [%(levelname)s] [run_id=%(run_id)s] %(message)s",
+        datefmt="%Y-%m-%dT%H:%M:%S",
+    )
 
     if not silent:
         ch = logging.StreamHandler(sys.stdout)
         ch.setLevel(cli_level)
-        ch.setFormatter(formatter)
+        ch.setFormatter(color_formatter)
         logger.addHandler(ch)
     else:
         err_handler = logging.StreamHandler(sys.stderr)
@@ -91,7 +123,8 @@ def log_run_start(
     file_level: str,
     log_file: Path,
 ) -> None:
-    version = cfg.get("version") or "unknown"
+    state.dry_run = dry_run
+    version = cfg.get("version") or APP_VERSION
     state.log.info(
         "Run started. version=%s, config=%s, operations=%s, dry_run=%s, writes_enabled=%s, backup=%s, "
         "cli_level=%s, file_level=%s, silent=%s, log_file=%s",
@@ -111,9 +144,11 @@ def log_run_start(
 def log_run_summary(stats: RunStats) -> None:
     state.log.info("Run completed.")
     state.log.info(
-        "Summary: processed=%s, success=%s, warnings=%s, errors=%s",
+        "Summary: items processed=%s, images found=%s, success=%s, skipped=%s, warnings=%s, errors=%s",
         stats.processed,
+        stats.images_found,
         stats.successes,
+        stats.skipped,
         stats.warnings,
         stats.errors,
     )
@@ -121,3 +156,7 @@ def log_run_summary(stats: RunStats) -> None:
         state.log.error("Failed items:")
         for path, reason in stats.failed_items:
             state.log.error(" - %s: %s", path, reason)
+    if state.dry_run:
+        state.log.info(
+            "DRY RUN ENABLED: No changes were made and no images were uploaded, deleted, or saved to backups. All actions were simulated only."
+        )

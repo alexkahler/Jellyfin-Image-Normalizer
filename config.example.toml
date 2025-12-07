@@ -1,12 +1,12 @@
 # Jellyfin Image Normalizer configuration (TOML)
 
-[SERVER]
-# Required Jellyfin base URL including protocol (e.g. https://media.example.com). Default: placeholder.
+[server]
+# Required Jellyfin base URL including protocol (e.g. https://media.example.com). Required. Default: placeholder.
 jf_url = "https://your-jellyfin-url-here"
-# Required Jellyfin API key with library access. Default: placeholder.
+# Required Jellyfin API key with library access. Required. Default: placeholder.
 jf_api_key = "YOUR_API_KEY_HERE"
 
-[API]
+[api]
 # Verify TLS certificates for HTTPS connections (bool). Default: True.
 verify_tls = true
 # HTTP timeout in seconds for Jellyfin requests. Default: 15.0 seconds.
@@ -22,7 +22,7 @@ fail_fast = false
 # When true, no POST/PUT/DELETE calls are issued (safety). Default: True.
 dry_run = true
 
-[BACKUP]
+[backup]
 # Save originals to backup_dir before uploads. Default: True.
 backup = true
 # partial backs up only scaled images; full backs up all images. Default: partial.
@@ -32,9 +32,11 @@ backup_dir = "backup"
 # Re-upload originals even when no resize is needed. Default: False.
 force_upload_noscale = false
 
-[MODES]
-# Modes to run (logo|thumb|profile). Accepts a pipe-separated string or a string array. Default: logo|thumb|profile.
+[modes]
+# Modes to run (logo|thumb|profile). Accepts a pipe-separated string or a string array. Required. Default: logo|thumb|profile.
 operations = ["logo", "thumb", "profile"]
+# Jellyfin item types to process for logo/thumb discovery (movies|series). Accepts pipe-separated string or array. Optional. Default: movies|series.
+item_types = "movies|series"
 
 [logging]
 # Path to log file. Default: jfin.log.
@@ -48,12 +50,8 @@ cli_level = "INFO"
 # Suppress CLI logging except critical errors. Default: False.
 silent = false
 
-[operator]
-# Optional operator username used for discovery; defaults to first active user if unset.
-username = "your_jellyfin_admin_username_here"
-
 [libraries]
-# Optional library name filters (list/pipe/comma). Default: empty (all movie/tv libraries).
+# Optional library name filters (list/pipe/comma). Default: empty (all media folders; filtered by item_types).
 names = []
 
 [logo]

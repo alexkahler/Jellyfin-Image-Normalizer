@@ -23,7 +23,6 @@ from .discovery import (
     profile_display_name,
     discover_all_library_items,
     discover_libraries,
-    resolve_operator_user,
 )
 from .imaging import (
     ScalePlan,
@@ -51,6 +50,7 @@ def _plan_and_backup_image(
     make_backup: bool,
     backup_root: Path,
     backup_mode: str,
+    dry_run: bool,
 ) -> ScalePlan:
     """
     Compute the resize plan, persist backups when applicable, and log the processing summary.
@@ -64,7 +64,7 @@ def _plan_and_backup_image(
         allow_downscale=settings.allow_downscale,
     )
 
-    if make_backup and should_backup_for_plan(plan.decision, backup_mode):
+    if make_backup and not dry_run and should_backup_for_plan(plan.decision, backup_mode):
         save_backup(
             backup_root=backup_root,
             item_id=item_id,
@@ -136,6 +136,7 @@ def normalize_item_image_api(
                 make_backup=make_backup,
                 backup_root=backup_root,
                 backup_mode=backup_mode,
+                dry_run=dry_run,
             )
 
             def upload_original() -> tuple[bool, str | None]:
@@ -157,6 +158,7 @@ def normalize_item_image_api(
                 record_label=label,
                 default_error="API upload failed for NO_SCALE image",
                 stats=state.stats,
+                skip_when_no_scale=bool(mode in ("logo", "thumb") and not force_upload_noscale),
             )
             if no_scale_result is not None:
                 return no_scale_result
@@ -223,6 +225,8 @@ def process_discovered_items(
     enabled_set = set(enabled_image_types)
     total_images = sum(len(item.image_types & enabled_set) for item in items)
     processed_images = 0
+
+    state.stats.record_images_found(total_images)
 
     if total_images == 0:
         state.log.info("No item images matched the requested types.")
@@ -433,19 +437,12 @@ def process_libraries_via_api(
         )
         return
 
-    operator_user = resolve_operator_user(jf_client, discovery)
-    user_id = operator_user.get("Id")
-    if not user_id:
-        state.log.critical("Resolved operator user has no Id; cannot continue.")
-        state.stats.record_error("discovery", "Resolved operator user missing Id")
-        raise SystemExit(1)
-
-    libraries = discover_libraries(jf_client, user_id, discovery)
-    if not libraries:
+    libraries = discover_libraries(jf_client, discovery)
+    if discovery.library_names and not libraries:
         state.log.warning("No libraries matched filters; nothing to do.")
         return
 
-    items = discover_all_library_items(jf_client, user_id, libraries, discovery)
+    items = discover_all_library_items(jf_client, libraries, discovery)
     if not items:
         state.log.info("No items found with requested images in selected libraries.")
         return
@@ -453,7 +450,7 @@ def process_libraries_via_api(
     state.log.info(
         "Processing %s items across %s libraries for image types: %s",
         len(items),
-        len(libraries),
+        len(libraries) if libraries else "all",
         ", ".join(enabled_image_types),
     )
     process_discovered_items(
@@ -489,7 +486,7 @@ def normalize_profile_user(
 
     if not user.get("PrimaryImageTag"):
         state.log.info("[SKIP] %s has no PrimaryImageTag; skipping profile image.", user_label)
-        state.stats.record_warning(count_processed=True)
+        state.stats.record_skip(count_processed=True)
         return False
 
     image_response = jf_client.get_user_image(user_id)
@@ -517,6 +514,7 @@ def normalize_profile_user(
                 make_backup=make_backup,
                 backup_root=backup_root,
                 backup_mode=backup_mode,
+                dry_run=dry_run,
             )
 
             def upload_original_profile() -> tuple[bool, str | None]:
@@ -601,6 +599,8 @@ def process_profiles(
         state.log.warning("[WARN] No active users returned from Jellyfin; skipping profile processing.")
         state.stats.record_warning()
         return
+    available_profiles = sum(1 for user in users if user.get("PrimaryImageTag"))
+    state.stats.record_images_found(available_profiles)
 
     for user in users:
         normalize_profile_user(
@@ -643,6 +643,7 @@ def process_single_item_api(
         library_name=None,
         image_types={image_type},
     )
+    state.stats.record_images_found(1)
     state.log.info("Processing single item %s as %s", item_id, mode)
     return normalize_item_image_api(
         item=dummy_item,
@@ -687,10 +688,11 @@ def process_single_profile(
         raise SystemExit(1)
 
     if not user.get("PrimaryImageTag"):
-        state.log.warning("User '%s' has no profile image to normalize.", username)
-        state.stats.record_warning(count_processed=True)
+        state.log.info("[SKIP] User '%s' has no profile image to normalize.", username)
+        state.stats.record_skip(count_processed=True)
         raise SystemExit(0 if dry_run else 1)
 
+    state.stats.record_images_found(1)
     state.log.info(
         "Processing profile for user '%s' - Target: %sx%s, Dry-run=%s",
         username,

@@ -1,3 +1,5 @@
+APP_VERSION = "0.1.1"
+
 MODE_CONFIG = {
     "logo": {
         "filename": "logo.png",
@@ -25,10 +27,8 @@ MODE_TO_IMAGE_TYPE = {
     "profile": "Primary",
 }
 
-# Discovery constraints: collection types and item/image mappings.
-ALLOWED_COLLECTION_TYPES = {"movies", "tvshows"}
-# Jellyfin item types intentionally limited for safety (movies/series only).
-INCLUDE_ITEM_TYPES = ["Movie", "Series", "Season", "Episode"]
+# Default item types for discovery (movies and series).
+DEFAULT_ITEM_TYPES = ["Movie", "Series"]
 
 # Pagination defaults for item discovery.
 DEFAULT_DISCOVERY_PAGE_SIZE = 200

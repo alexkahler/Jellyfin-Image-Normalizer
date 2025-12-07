@@ -22,56 +22,61 @@ class FakeResponse:
         return {}
 
 
-def test_query_library_items_builds_expected_params(monkeypatch):
+def test_query_items_builds_expected_params(monkeypatch):
     captured = {}
 
-    def fake_get_user_items(user_id, params=None, label=None):
-        captured["user_id"] = user_id
+    def fake_get_json(url, params=None, label=None):
+        captured["url"] = url
         captured["params"] = params
+        captured["label"] = label
         return {}
 
     client = JellyfinClient(base_url="http://example", api_key="token")
-    monkeypatch.setattr(client, "get_user_items", fake_get_user_items)
+    monkeypatch.setattr(client, "_get_json", fake_get_json)
 
-    client.query_library_items(
-        "user123",
+    client.query_items(
         parent_id="parent",
         include_item_types=["Movie", "Series"],
         enable_image_types="Logo",
         recursive=True,
         image_type_limit=1,
+        start_index=5,
+        limit=10,
     )
 
-    assert captured["user_id"] == "user123"
+    assert captured["url"].endswith("/Items")
     assert captured["params"] == {
         "ParentId": "parent",
-        "IncludeItemTypes": "Movie,Series",
         "Recursive": "true",
-        "ImageTypeLimit": 1,
+        "IncludeItemTypes": "Movie,Series",
+        "ImageTypeLimit": "1",
         "EnableImageTypes": "Logo",
+        "StartIndex": "5",
+        "Limit": "10",
     }
 
 
-def test_query_library_items_accepts_list(monkeypatch):
+def test_query_items_accepts_list(monkeypatch):
     captured = {}
 
-    def fake_get_user_items(user_id, params=None, label=None):
+    def fake_get_json(url, params=None, label=None):
         captured["params"] = params
         return {}
 
     client = JellyfinClient(base_url="http://example", api_key="token")
-    monkeypatch.setattr(client, "get_user_items", fake_get_user_items)
+    monkeypatch.setattr(client, "_get_json", fake_get_json)
 
-    client.query_library_items(
-        "user123",
+    client.query_items(
         parent_id="parent",
-        include_item_types=["Movie", "Series"],
+        include_item_types=["Movie"],
         enable_image_types=["Logo", "Thumb"],
-        recursive=True,
-        image_type_limit=1,
+        recursive=False,
+        image_type_limit=0,
     )
 
     assert captured["params"]["EnableImageTypes"] == "Logo,Thumb"
+    assert captured["params"]["Recursive"] == "false"
+    assert captured["params"]["IncludeItemTypes"] == "Movie"
 
 
 def test_post_image_base64_payload(monkeypatch):

@@ -6,12 +6,12 @@ from typing import Any, Iterable
 
 from . import state
 from .config import DiscoverySettings
-from .constants import ALLOWED_COLLECTION_TYPES, DEFAULT_DISCOVERY_PAGE_SIZE
+from .constants import DEFAULT_DISCOVERY_PAGE_SIZE
 
 
 @dataclass
 class LibraryRef:
-    """Lightweight reference to a Jellyfin library discovered for the operator."""
+    """Lightweight reference to a Jellyfin library discovered from Jellyfin."""
 
     id: str
     name: str
@@ -41,43 +41,22 @@ def _normalize_library_name(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", lowered)
 
 
-def resolve_operator_user(jf_client: Any, discovery: DiscoverySettings) -> dict[str, Any]:
-    """Resolve the operator user via username or default to first active."""
-    users = jf_client.list_users(is_disabled=False)
-    if not users:
-        state.log.critical("No active users returned from Jellyfin; cannot continue.")
-        state.stats.record_error("discovery", "No active users returned from Jellyfin")
-        raise SystemExit(1)
-
-    if discovery.operator.username:
-        user = find_user_by_name(users, discovery.operator.username)
-        if user:
-            return user
-        state.log.critical(
-            "Configured operator username '%s' not found among active users.",
-            discovery.operator.username,
-        )
-        state.stats.record_error("discovery", "Configured operator username not found")
-        raise SystemExit(1)
-
-    state.log.info("Operator not specified; defaulting to first active user from /Users.")
-    return users[0]
-
-
 def discover_libraries(
     jf_client: Any,
-    user_id: str,
     discovery: DiscoverySettings,
 ) -> list[LibraryRef]:
-    """List libraries for the operator and filter by allowed collection types/names."""
-    resp = jf_client.get_user_items(user_id)
+    """List media folders and optionally filter by name."""
+    if not discovery.library_names:
+        state.log.info("No library filters provided; skipping library lookup and querying all items.")
+        return []
+
+    resp = jf_client.list_media_folders()
     if not resp or "Items" not in resp:
-        state.log.critical("Could not list libraries for user %s.", user_id)
-        state.stats.record_error("discovery", "Failed to list libraries")
+        state.log.critical("Could not list media folders from Jellyfin.")
+        state.stats.record_error("discovery", "Failed to list media folders")
         raise SystemExit(1)
 
     items = resp.get("Items") or []
-
     names_filter = {_normalize_library_name(name) for name in discovery.library_names}
     if discovery.library_names:
         state.log.info(
@@ -86,7 +65,6 @@ def discover_libraries(
             sorted(names_filter),
         )
 
-    allowed_types = set(ALLOWED_COLLECTION_TYPES)
     libraries: list[LibraryRef] = []
     for item in items:
         lib_id = item.get("Id")
@@ -94,11 +72,9 @@ def discover_libraries(
             continue
         name = item.get("Name") or "<unknown>"
         collection_type_raw = item.get("CollectionType")
-        collection_type = collection_type_raw.lower() if collection_type_raw else None
+        collection_type = collection_type_raw.lower() if isinstance(collection_type_raw, str) else None
 
         if names_filter and _normalize_library_name(name) not in names_filter:
-            continue
-        if collection_type and collection_type not in allowed_types:
             continue
 
         libraries.append(
@@ -126,9 +102,8 @@ def discover_libraries(
         )
 
     state.log.info(
-        "Discovered %s libraries for user %s.",
+        "Discovered %s libraries via /Library/MediaFolders.",
         len(libraries),
-        user_id,
     )
     return libraries
 
@@ -140,31 +115,25 @@ def _item_has_image_type(item: dict[str, Any], image_type: str) -> bool:
 
 def discover_library_items(
     jf_client: Any,
-    user_id: str,
-    library: LibraryRef,
+    library: LibraryRef | None,
     discovery: DiscoverySettings,
 ) -> list[DiscoveredItem]:
     """Discover items inside a library that have any of the requested image types."""
     items: dict[str, DiscoveredItem] = {}
     enabled_types = list(discovery.enable_image_types)
     if not enabled_types:
-        state.log.info("No image types requested for library %s; skipping.", library.name)
+        state.log.info("No image types requested; skipping item discovery.")
         return []
 
     page_size = DEFAULT_DISCOVERY_PAGE_SIZE
     start_index = 0
     total_records: int | None = None
-    state.log.info(
-        "Scanning library '%s' for image types %s (page_size=%s)",
-        library.name,
-        ",".join(enabled_types),
-        page_size,
-    )
+    label = f"library '{library.name}'" if library else "all libraries"
+    state.log.info("Scanning %s for image types %s (page_size=%s)", label, ",".join(enabled_types), page_size)
 
     while True:
-        resp = jf_client.query_library_items(
-            user_id=user_id,
-            parent_id=library.id,
+        resp = jf_client.query_items(
+            parent_id=library.id if library else None,
             include_item_types=discovery.include_item_types,
             enable_image_types=",".join(enabled_types),
             recursive=discovery.recursive,
@@ -175,7 +144,7 @@ def discover_library_items(
 
         if resp is None:
             state.stats.record_error(
-                library.name,
+                label,
                 f"Failed to query items for image types {enabled_types} (page start {start_index})",
             )
             break
@@ -196,15 +165,15 @@ def discover_library_items(
                     name=raw.get("Name") or "<unknown>",
                     type=raw.get("Type") or "Unknown",
                     parent_id=raw.get("ParentId"),
-                    library_id=library.id,
-                    library_name=library.name,
+                    library_id=library.id if library else None,
+                    library_name=library.name if library else None,
                 )
             for image_type in matching_types:
                 items[item_id].add_image_type(image_type)
 
         state.log.info(
-            "Library '%s': fetched %s items (start=%s), unique with target images so far: %s",
-            library.name,
+            "%s: fetched %s items (start=%s), unique with target images so far: %s",
+            label,
             len(raw_items),
             start_index,
             len(items),
@@ -223,24 +192,22 @@ def discover_library_items(
             if len(raw_items) < page_size:
                 break
 
-    state.log.info(
-        "Library '%s': %s items with target images.",
-        library.name,
-        len(items),
-    )
+    state.log.info("%s: %s items with target images.", label, len(items))
     return list(items.values())
 
 
 def discover_all_library_items(
     jf_client: Any,
-    user_id: str,
-    libraries: list[LibraryRef],
+    libraries: list[LibraryRef] | None,
     discovery: DiscoverySettings,
 ) -> list[DiscoveredItem]:
     """Aggregate discovered items across all selected libraries."""
+    if not libraries:
+        return discover_library_items(jf_client, None, discovery)
+
     all_items: list[DiscoveredItem] = []
     for library in libraries:
-        library_items = discover_library_items(jf_client, user_id, library, discovery)
+        library_items = discover_library_items(jf_client, library, discovery)
         all_items.extend(library_items)
     return all_items
 

@@ -138,22 +138,32 @@ def handle_no_scale(
     record_label: str,
     default_error: str,
     stats: RunStats,
+    skip_when_no_scale: bool = False,
 ) -> bool | None:
     """Common NO_SCALE handler returning True/False or None to continue processing."""
     if not plan.is_no_scale:
         return None
 
     if dry_run:
-        stats.record_success()
+        if skip_when_no_scale:
+            stats.record_skip(count_processed=True)
+        else:
+            stats.record_success()
         return True
 
     if not force_upload or upload_fn is None:
-        stats.record_success()
+        if skip_when_no_scale:
+            stats.record_skip(count_processed=True)
+        else:
+            stats.record_success()
         return True
 
     upload_ok, upload_error = upload_fn()
     if upload_ok:
-        stats.record_success()
+        if skip_when_no_scale:
+            stats.record_skip(count_processed=True)
+        else:
+            stats.record_success()
         return True
 
     stats.record_error(record_label, upload_error or default_error)
