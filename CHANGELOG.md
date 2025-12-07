@@ -7,6 +7,10 @@
 * Changed: logo/thumb discovery now uses `/Items` with configurable item types via `[modes].item_types`/`--item-types`. When `libraries.names` is set, libraries are resolved via `/Library/MediaFolders` and `/Items` is called per library; when no filters are set, `/Items` is called once without `ParentId` (recursive).
 * Fixed logging behavior for better descriptive summary.
 * Chore/ci setup by @alexkahler in https://github.com/alexkahler/Jellyfin-Image-Normalizer/pull/1
+* fix: changed changelog order by @alexkahler in https://github.com/alexkahler/Jellyfin-Image-Normalizer/pull/2
+* fix: correct python version in ci workflow by @alexkahler in https://github.com/alexkahler/Jellyfin-Image-Normalizer/pull/3
+* fix/conftest by @alexkahler in https://github.com/alexkahler/Jellyfin-Image-Normalizer/pull/4
+* fix: removed incorrect v.0.1.2 message by @alexkahler in https://github.com/alexkahler/Jellyfin-Image-Normalizer/pull/5
 
 ## 0.1.0
 - Initial version
