@@ -1,6 +1,6 @@
 import textwrap
 
-APP_VERSION = "0.1.2"
+APP_VERSION = "0.2.0"
 
 MODE_CONFIG = {
     "logo": {
