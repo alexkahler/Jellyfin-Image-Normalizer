@@ -4,7 +4,7 @@ Because why *wouldn’t* you build a tiny CLI for image resizing and then wrap i
 
 JFIN (pronounced “jay-fin”, and absolutely *not* overthought) is a Python CLI that talks to the Jellyfin API, downloads your artwork, normalizes it, and uploads it back again — safely, cautiously, and with way more ceremony than strictly necessary.
 
-Think: Fiat 500 engine, bolted into a full DTM race chassis.
+Think: Fiat 500 engine, bolted into a full DTM race chassis. Completely unnecessary.
 
 > 🚧 **This is an early in-development project. Ensure that you run a complete back-up of your entire metadata library and images using Jellyfin's internal backup tool (introduced in v.10.11.0) before using this script.**
 
@@ -38,7 +38,7 @@ Think: Fiat 500 engine, bolted into a full DTM race chassis.
         <li><a href="#when-should-you-not-use-this">When should you not use this?</a></li>
       </ul>
     </li>
-    <li><a href="#and-the-obligatory-disclaimer-this-is-not-a-backup-system">Backup &amp; Restore Warning</a></li>
+    <li><a href="#%EF%B8%8F-and-the-obligatory-disclaimer-this-is-not-a-backup-system">Backup &amp; Restore Warning</a></li>
     <li><a href="#documentation">Documentation</a></li>
     <li><a href="#roadmap">Roadmap</a></li>
     <li><a href="#contributing">Contributing</a></li>
@@ -67,7 +67,7 @@ If your Jellyfin UI looks inconsistent across devices, this tool exists for you.
 
 Jellyfin already does a lot of smart caching and resizing. But a few specific image types still cause pain, especially in mixed-provider setups.
 
-> 📢 Want a full list of arguments of why not to use TMDb plugin's scaling (that I spent much time thinking of)? Check out [Why not just use TMDb scaling?](docs/why-not-tmdb.md)
+> 📢 Want a full list of arguments of why not to use TMDb plugin's scaling options (that I spent much time thinking of)? Check out [Why not just use TMDb scaling?](docs/why-not-tmdb.md)
 
 #### 1. Logos are chaos
 
@@ -300,7 +300,7 @@ Override logo size and disable padding (for the minimalists):
 
 ```bash
 python jfin.py --mode=logo \
-  --logo-target-size 500x200 --no-padding
+  --logo-target-size 500x200 --logo-padding none
 ```
 
 Override mode and fix thumbs (and resize those “4K thumbs”):

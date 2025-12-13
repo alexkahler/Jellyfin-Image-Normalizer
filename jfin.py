@@ -2,19 +2,19 @@
 import argparse
 import sys
 from pathlib import Path
-from typing import Any, cast, Tuple
+from typing import Any, cast
 
 
-def parse_size_pair(value: str) -> Tuple[int, int]:
+def parse_size_pair(value: str) -> tuple[int, int]:
     """Parse WIDTHxHEIGHT size strings into a positive integer tuple for argparse."""
     if not isinstance(value, str) or "x" not in value.lower():
         raise argparse.ArgumentTypeError(
             "Expected WIDTHxHEIGHT (e.g., 1000x562)."
         )
-    parts = value.lower().split("x", 1)
+    width_str, height_str = value.lower().split("x", 1)
     try:
-        width = int(parts[0])
-        height = int(parts[1])
+        width = int(width_str)
+        height = int(height_str)
     except ValueError:
         raise argparse.ArgumentTypeError(
             "Width and height must be integers (e.g., 1000x562)."
@@ -45,7 +45,12 @@ from jfin_core.config import (
     validate_config_types,
     validate_config_for_mode,
 )
-from jfin_core.constants import DEFAULT_CONFIG_NAME, VALID_MODES
+from jfin_core.constants import (
+    DEFAULT_CONFIG_NAME,
+    RECOMMENDED_ASPECT_LABEL_BY_MODE,
+    RECOMMENDED_CANVAS_BY_MODE,
+    VALID_MODES,
+)
 from jfin_core.discovery import find_user_by_name
 from jfin_core.logging_utils import log_run_start, log_run_summary, setup_logging
 from jfin_core.pipeline import (
@@ -193,9 +198,14 @@ def parse_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "--no-padding",
-        action="store_true",
-        help="Do not pad logos to canvas; output is resized only (logo mode).",
+        "--logo-padding",
+        choices=("add", "remove", "none"),
+        default=None,
+        help=(
+            "Logo padding policy: add (pad to canvas), remove (crop transparent "
+            "border before scaling; never pad), or none (no add/remove; only "
+            "scale). Overrides config logo.padding."
+        ),
     )
 
     parser.add_argument(
@@ -362,7 +372,7 @@ def warn_unused_cli_overrides(args: argparse.Namespace, operations: list[str]) -
     Emit warnings for CLI overrides that have no effect with the requested operations.
 
     Examples: --thumb-jpeg-quality without thumb mode, --profile-webp-quality without profile mode,
-    target-size flags without their mode, or --no-padding without logo mode.
+    target-size flags without their mode, or --logo-padding without logo mode.
     Each warning is logged and counted so the operator is aware that a flag was ignored.
     """
     ops = set(operations)
@@ -380,8 +390,10 @@ def warn_unused_cli_overrides(args: argparse.Namespace, operations: list[str]) -
     if args.profile_webp_quality is not None and "profile" not in ops:
         state.log.warning("--profile-webp-quality has no effect because 'profile' mode is not selected.")
         state.stats.record_warning()
-    if args.no_padding and "logo" not in ops:
-        state.log.warning("--no-padding has no effect because 'logo' mode is not selected.")
+    if getattr(args, "logo_padding", None) is not None and "logo" not in ops:
+        state.log.warning(
+            "--logo-padding has no effect because 'logo' mode is not selected."
+        )
         state.stats.record_warning()
     dim_warnings = [
         ("logo", args.logo_target_size, "--logo-target-size"),
@@ -396,6 +408,44 @@ def warn_unused_cli_overrides(args: argparse.Namespace, operations: list[str]) -
     if getattr(args, "item_types", None) and not ({"logo", "thumb", "backdrop"} & ops):
         state.log.warning(
             "--item-types has no effect without 'logo', 'thumb', or 'backdrop' modes selected."
+        )
+        state.stats.record_warning()
+
+
+def warn_unrecommended_aspect_ratios(
+    settings_by_mode: dict[str, ModeRuntimeSettings],
+) -> None:
+    """
+    Emit warnings when configured target sizes diverge from recommended ratios.
+
+    Aspect ratios are compared as `round(width / height, 2)` to tolerate common
+    "16:9-ish" rounded canvases like 1000x562.
+    """
+    for mode, settings in settings_by_mode.items():
+        recommended_canvas = RECOMMENDED_CANVAS_BY_MODE.get(mode)
+        if recommended_canvas is None:
+            continue
+
+        rec_width, rec_height = recommended_canvas
+        rec_ratio = round(rec_width / rec_height, 2)
+        actual_ratio = round(settings.target_width / settings.target_height, 2)
+        if actual_ratio == rec_ratio:
+            continue
+
+        label = RECOMMENDED_ASPECT_LABEL_BY_MODE.get(
+            mode, f"{rec_width}x{rec_height}"
+        )
+        state.log.warning(
+            "Unusual %s aspect ratio: configured %sx%s has %.2f (w/h); "
+            "recommended %s (~%.2f), e.g. %sx%s.",
+            mode,
+            settings.target_width,
+            settings.target_height,
+            actual_ratio,
+            label,
+            rec_ratio,
+            rec_width,
+            rec_height,
         )
         state.stats.record_warning()
 
@@ -539,6 +589,8 @@ def main() -> None:
                 state.log.critical(str(exc))
                 state.stats.record_error("configuration", str(exc))
                 raise SystemExit(1)
+
+        warn_unrecommended_aspect_ratios(settings_by_mode)
 
         if args.single:
             ops_set = set(operations)

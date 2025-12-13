@@ -18,6 +18,26 @@ This forces Jellyfin to associate the new file with the item, even if the size d
 
 ---
 
+## Remove transparent padding from logos
+
+If your logos are already at the canvas size (e.g. `800x310`) but include lots of transparent border padding, you can crop that border **before** any scale planning/resizing:
+
+```bash
+python jfin.py --mode logo --logo-padding remove
+```
+
+Config equivalent:
+
+```toml
+[logo]
+padding = "remove"
+padding_remove_sensitivity = 0
+```
+
+If you see warnings that removal may have failed due to non-obvious border pixels, increase `padding_remove_sensitivity` (it treats low-alpha pixels as padding).
+
+---
+
 ## Target only movies or series
 
 Use `--item-types` to constrain discovery to specific Jellyfin item types. This overrides the `[modes].item_types` config value for the run:

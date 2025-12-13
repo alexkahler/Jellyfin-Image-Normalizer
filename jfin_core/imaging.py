@@ -9,6 +9,8 @@ from PIL import Image, ImageOps
 from . import state
 from .state import RunStats
 
+LogoPadding = Literal["add", "remove", "none"]
+
 
 @dataclass
 class ScalePlan:
@@ -64,6 +66,7 @@ def make_scale_plan(
     fit_mode: str,
     allow_upscale: bool,
     allow_downscale: bool,
+    pad_to_canvas: bool = False,
 ) -> ScalePlan:
     """Return a ScalePlan describing how an image should be resized."""
     orig_w, orig_h = img.size
@@ -82,6 +85,16 @@ def make_scale_plan(
         decision = "SCALE_DOWN"
     else:
         decision = "NO_SCALE"
+
+    if (
+        pad_to_canvas
+        and fit_mode == "fit"
+        and decision == "NO_SCALE"
+        and orig_w <= target_w
+        and orig_h <= target_h
+        and (orig_w < target_w or orig_h < target_h)
+    ):
+        decision = "PAD_ONLY"
 
     return ScalePlan(
         decision=decision,
@@ -110,12 +123,14 @@ def log_processing_summary(
     plan: ScalePlan,
     target_width: int,
     target_height: int,
+    output_width: int,
+    output_height: int,
     orig_mode: str,
     img_format: Any,
 ) -> None:
     """Emit a concise summary for a processed image."""
     state.log.info(
-        "[PROCESS:%s] %s (%sx%s) -> %sx%s (canvas %sx%s, orig mode=%s, format=%s)",
+        "[PROCESS:%s] %s (%sx%s) -> %sx%s (target %sx%s, output %sx%s, orig mode=%s, format=%s)",
         plan.decision,
         label,
         plan.orig_width,
@@ -124,6 +139,8 @@ def log_processing_summary(
         plan.new_height,
         target_width,
         target_height,
+        output_width,
+        output_height,
         orig_mode,
         img_format,
     )
@@ -193,7 +210,7 @@ def apply_exif_orientation(img: Image.Image) -> Image.Image:
 
 
 def get_palette_color_count(img: Image.Image) -> int | None:
-    """Estimate number of colors used in a paletted image (up to 256)."""
+    """Estimate number of colors used in a paletted image (up to 256)."""  
     try:
         colors = img.getcolors(maxcolors=1 << 24)
         if colors is None:
@@ -201,6 +218,42 @@ def get_palette_color_count(img: Image.Image) -> int | None:
         return min(len(colors), 256)
     except Exception:
         return None
+
+
+def remove_padding_from_logo(
+    img: Image.Image, sensitivity: int | float = 0
+) -> tuple[Image.Image, bool]:
+    """
+    Crop transparent border padding from a logo image based on alpha values.
+
+    Pixels with alpha <= sensitivity are treated as padding. The returned image
+    is cropped to the bounding box of pixels whose alpha > sensitivity.
+
+    Args:
+        img: Source image (any Pillow mode). Converted to RGBA for alpha checks.
+        sensitivity: Alpha threshold (>= 0). Higher values treat faint/near-
+            transparent pixels as padding.
+
+    Returns:
+        (img_out, changed) where changed is True if the crop reduced width or
+        height.
+    """
+    if sensitivity < 0:
+        raise ValueError("sensitivity must be >= 0")
+
+    rgba = img if img.mode == "RGBA" else img.convert("RGBA")
+    alpha = rgba.getchannel("A")
+    # Build a LUT so Pillow's type hints match (avoids lambda param type ambiguity for Pylance)
+    mask = alpha.point([255 if a > sensitivity else 0 for a in range(256)])
+    bbox = mask.getbbox()
+    if bbox is None:
+        return img, False
+
+    full_bbox = (0, 0, rgba.width, rgba.height)
+    if bbox == full_bbox:
+        return img, False
+
+    return rgba.crop(bbox), True
 
 
 def fit_contain_and_pad_image(
@@ -292,7 +345,7 @@ def build_normalized_image(
     new_height: int,
     orig_mode: str,
     orig_color_count: int | None,
-    no_padding: bool = False,
+    logo_padding: LogoPadding = "add",
 ) -> tuple[Image.Image, str, str]:
     """Return normalized image plus content-type/format tuple for the requested mode."""
     if mode == "logo":
@@ -304,7 +357,7 @@ def build_normalized_image(
             orig_color_count,
             new_width,
             new_height,
-            no_padding=no_padding,
+            no_padding=logo_padding != "add",
         )
         state.log.debug("  -> Built normalized %s image in memory", "Logo")
         return normalized_img, "image/png", "PNG"

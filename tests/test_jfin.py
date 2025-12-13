@@ -9,9 +9,11 @@ from jfin import (
     validate_generate_config_args,
     validate_restore_all_args,
     validate_test_jf_args,
+    warn_unrecommended_aspect_ratios,
     warn_unused_cli_overrides,
 )
 from jfin_core import state
+from jfin_core.config import ModeRuntimeSettings
 
 
 @pytest.mark.parametrize(
@@ -116,7 +118,7 @@ def test_warn_unused_cli_overrides_flags_when_not_used(caplog):
         thumb_jpeg_quality=90,
         backdrop_jpeg_quality=None,
         profile_webp_quality=None,
-        no_padding=True,
+        logo_padding="none",
         no_upscale=False,
         no_downscale=False,
         item_types=None,
@@ -146,7 +148,7 @@ def test_warn_unused_cli_overrides_incompatible_flags(mode, kwargs, expected_sub
         thumb_jpeg_quality=None,
         backdrop_jpeg_quality=None,
         profile_webp_quality=None,
-        no_padding=False,
+        logo_padding=None,
         no_upscale=False,
         no_downscale=False,
         item_types=None,
@@ -166,13 +168,62 @@ def test_warns_when_no_upscale_and_no_downscale_both_set(caplog):
         thumb_jpeg_quality=None,
         backdrop_jpeg_quality=None,
         profile_webp_quality=None,
-        no_padding=False,
+        logo_padding=None,
         no_upscale=True,
         no_downscale=True,
         item_types=None,
     )
     warn_unused_cli_overrides(args, ["logo"])
     assert state.stats.warnings == 1
+
+
+@pytest.mark.parametrize(
+    "mode,width,height",
+    [
+        ("thumb", 1000, 600),
+        ("backdrop", 1920, 1200),
+        ("profile", 256, 200),
+        ("logo", 800, 520),
+    ],
+)
+def test_warn_unrecommended_aspect_ratios_warns_on_mismatch(
+    mode, width, height
+):
+    settings = ModeRuntimeSettings(
+        target_width=width,
+        target_height=height,
+        allow_upscale=True,
+        allow_downscale=True,
+        jpeg_quality=85,
+        webp_quality=80,
+    )
+    warn_unrecommended_aspect_ratios({mode: settings})
+    assert state.stats.warnings == 1
+
+
+@pytest.mark.parametrize(
+    "mode,width,height",
+    [
+        ("thumb", 1000, 562),  # ~16:9
+        ("thumb", 1000, 563),  # still rounds to 0.56
+        ("backdrop", 1920, 1080),  # 16:9
+        ("profile", 512, 512),  # 1:1
+        ("logo", 1600, 620),  # matches 800x310 ratio
+    ],
+)
+def test_warn_unrecommended_aspect_ratios_allows_recommended_or_rounded(
+    mode, width, height
+):
+    settings = ModeRuntimeSettings(
+        target_width=width,
+        target_height=height,
+        allow_upscale=True,
+        allow_downscale=True,
+        jpeg_quality=85,
+        webp_quality=80,
+    )
+    warn_unrecommended_aspect_ratios({mode: settings})
+    assert state.stats.warnings == 0
 
 
 def test_backup_disallowed_with_restore(tmp_path, monkeypatch):

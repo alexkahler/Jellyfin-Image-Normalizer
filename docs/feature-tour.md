@@ -38,9 +38,9 @@ A very serious tool for a very specific job.
 ## Ridiculous amount of configurability
 
 - Per-mode width/height, quality, and scaling rules:
-  - `no_upscale`, `no_downscale`  
-  - `no_padding` (logo only)  
-  - `force_upload_noscale` if you want re-uploads even when size doesn’t change  
+  - `no_upscale`, `no_downscale`
+  - `padding` (`remove` or `add`) / `padding_remove_sensitivity` (logo only)
+  - `force_upload_noscale` if you want re-uploads even when size doesn’t change
 - API behavior:
   - TLS verification, timeouts, throttle between requests  
   - Retry count and backoff  
