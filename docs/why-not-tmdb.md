@@ -111,14 +111,14 @@ Another great question — and the answer comes down to how Jellyfin handles cac
   
   Instead of involving Jellyfin’s cache at all:
 
-  1. Bypess Jellyfin's cache and download the **original** images directly.
+  1. Bypass Jellyfin's cache and download the **original** images directly.
   2. Resize, pad, convert, and normalize them using **Pillow**.
-  3. Upload the final,normalized version that Jellyfin should display.
+  3. Upload the final, normalized version that Jellyfin should display.
 
   This approach has clear advantages:
 
   * **Zero Jellyfin cache pollution**
-  * **Faster processing** because local resizing avoids HTTP overhead and won't burden your server.
+  * **Faster processing** because local resizing avoids burdening your already struggling Raspberry Pi server which is trying to transcode three simultaneous 4K HDR streams.
   * **Predictable, repeatable** results (Jellyfin’s scaling rules can change between versions).
   * **Full control** over padding, quality, and canvas size.
 
