@@ -6,6 +6,8 @@ JFIN (pronounced “jay-fin”, and absolutely *not* overthought) is a Python CL
 
 Think: Fiat 500 engine, bolted into a full DTM race chassis.
 
+> 🚧 **This is an early in-development project. Ensure that you run a complete back-up of your entire metadata library and images using Jellyfin's internal backup tool (introduced in v.10.11.0) before using this script.**
+
 ---
 
 <!-- TABLE OF CONTENTS -->
@@ -65,7 +67,7 @@ If your Jellyfin UI looks inconsistent across devices, this tool exists for you.
 
 Jellyfin already does a lot of smart caching and resizing. But a few specific image types still cause pain, especially in mixed-provider setups.
 
-📢 Want a full list of arguments of why not to use TMDb plugin's scaling (that I spent much time thinking of)? Check out [Why not just use TMDb scaling?](docs/why-not-tmdb.md)
+> 📢 Want a full list of arguments of why not to use TMDb plugin's scaling (that I spent much time thinking of)? Check out [Why not just use TMDb scaling?](docs/why-not-tmdb.md)
 
 #### 1. Logos are chaos
 
@@ -135,7 +137,7 @@ Logos look fine in isolation — the chaos only becomes obvious when you see the
 
 You can see real-world comparisons for Desktop (QHD), Tablet (WQXGA), and Mobile (20:9, 1116×2484) here:
 
-👉 [Before & After: Real-World Results](docs/before-and-after-comparison.md)
+> 👉 Check out the [Before & After: Real-World Results](docs/before-and-after-comparison.md)
 
 ### Feature Tour
 
@@ -156,7 +158,7 @@ At a glance, JFIN gives you:
 - 📝 **Logging and automation friendly**  
   CLI + file logging, optional silent mode for cron, and a design that makes it easy to run periodically or inside the Jellyfin container.
 
-👉 Check out the full feature breakdown and details: [Feature Tour](docs/feature-tour.md)
+> 🚀 Find the full feature breakdown and details here: [Feature Tour](docs/feature-tour.md)
 
 ---
 
@@ -168,7 +170,7 @@ At a glance, JFIN gives you:
 - A Jellyfin API key
 - **Python 3.11+**
 
-✨ A full example configuration is included as `config.example.toml`.
+> ✨ A full example configuration is included as `config.example.toml`.
 
 ### Installation
 
@@ -256,7 +258,7 @@ You can ignore the other files in the folder if you only plan to run the script.
    * Log what *would* be uploaded
    * Not touch Jellyfin at all
 
-   💡 You can keep dry_run = true in config and/or use --dry-run from CLI
+   > 💡 You can keep `dry_run = false` in `config.toml` and overwrite it using `--dry-run` from CLI for quick testing. Once you're ready, simply remove the CLI flag.
 
 6. **Enable actual uploads (when you’re ready)**
 
@@ -272,7 +274,7 @@ You can ignore the other files in the folder if you only plan to run the script.
    python jfin.py
    ```
 
-   ❗ Remember to use `--config` flag if your `config.toml` does not live with `jfin.py`.
+   > ❗ Remember to use `--config` flag if your `config.toml` does not live with `jfin.py`.
 
    Now the magic happens (plus backups, if enabled).
 
@@ -358,7 +360,7 @@ Short version:
 Jellyfin 10.11+ provides a robust, official, database-aware backup + restore.
 Use *that* for real server recovery, and treat JFIN’s backups as a convenience utility only.
 
-👉 Full details and edge cases: [Backups, UUIDs, and what JFIN can’t restore](docs/backups-and-uuids.md)
+> ❗ Full details and edge cases: [Backups, UUIDs, and what JFIN can’t restore](docs/backups-and-uuids.md)
 
 ---
 
