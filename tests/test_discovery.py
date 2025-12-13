@@ -30,7 +30,6 @@ def test_discover_libraries_filters_names():
         include_item_types=[],
         enable_image_types=[],
         recursive=True,
-        image_type_limit=1,
     )
 
     libs = discover_libraries(client, discovery)
@@ -46,7 +45,6 @@ def test_discover_libraries_raises_if_filters_match_none():
         include_item_types=[],
         enable_image_types=[],
         recursive=True,
-        image_type_limit=1,
     )
     with pytest.raises(SystemExit):
         discover_libraries(client, discovery)
@@ -66,7 +64,6 @@ def test_discover_libraries_skips_unsupported_collection_types():
         include_item_types=[],
         enable_image_types=[],
         recursive=True,
-        image_type_limit=1,
     )
     client = Client()
 
@@ -103,7 +100,6 @@ def test_discover_library_items_paginates():
             include_item_types,
             enable_image_types,
             recursive,
-            image_type_limit,
             start_index=None,
             limit=None,
         ):
@@ -124,7 +120,6 @@ def test_discover_library_items_paginates():
         include_item_types=["Movie"],
         enable_image_types=["Thumb"],
         recursive=True,
-        image_type_limit=1,
     )
     library = LibraryRef(id="lib", name="Lib", collection_type="tvshows")
     client = PagingClient(pages)
@@ -155,8 +150,19 @@ def test_discover_library_items_maps_image_types():
                 "ParentId": "lib",
                 "ImageTags": {"Thumb": "t2"},
             },
+            {
+                "Id": "3",
+                "Name": "Three",
+                "Type": "Movie",
+                "ParentId": "lib",
+                "ImageTags": {"Thumb": "t1"},
+                "BackdropImageTags": [
+                    "b1",
+                    "b2",
+                ],
+            },
         ],
-        "TotalRecordCount": 2,
+        "TotalRecordCount": 3,
     }
 
     class Client:
@@ -171,7 +177,6 @@ def test_discover_library_items_maps_image_types():
             include_item_types,
             enable_image_types,
             recursive,
-            image_type_limit,
             start_index=None,
             limit=None,
         ):
@@ -181,18 +186,19 @@ def test_discover_library_items_maps_image_types():
     discovery = DiscoverySettings(
         library_names=[],
         include_item_types=["Movie", "Series"],
-        enable_image_types=["Logo", "Thumb"],
+        enable_image_types=["Logo", "Thumb", "Backdrop"],
         recursive=True,
-        image_type_limit=1,
     )
     library = LibraryRef(id="lib", name="Lib", collection_type=None)
     client = Client(response)
 
     items = discover_library_items(client, library, discovery)
-    assert len(items) == 2
+    assert len(items) == 3
     item_map = {item.id: item for item in items}
     assert item_map["1"].image_types == {"Logo", "Thumb"}
     assert item_map["2"].image_types == {"Thumb"}
+    assert item_map["3"].image_types == {"Thumb", "Backdrop"}
+    assert item_map["3"].backdrop_count == 2
     assert client.calls == 1
 
 
@@ -209,7 +215,6 @@ def test_discover_items_without_library_filters_queries_all_items():
             include_item_types,
             enable_image_types,
             recursive,
-            image_type_limit,
             start_index=None,
             limit=None,
         ):
@@ -232,7 +237,6 @@ def test_discover_items_without_library_filters_queries_all_items():
         include_item_types=["Movie"],
         enable_image_types=["Logo"],
         recursive=True,
-        image_type_limit=1,
     )
     client = Client()
 
@@ -264,7 +268,6 @@ def test_discover_libraries_and_items_apply_nested_filters():
             include_item_types,
             enable_image_types,
             recursive,
-            image_type_limit,
             start_index=None,
             limit=None,
         ):
@@ -276,7 +279,6 @@ def test_discover_libraries_and_items_apply_nested_filters():
         include_item_types=["Series"],
         enable_image_types=["Thumb"],
         recursive=True,
-        image_type_limit=1,
     )
     client = Client()
 

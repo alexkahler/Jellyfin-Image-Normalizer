@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import io
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any, Callable, Literal, Optional
 
 from PIL import Image, ImageOps
 
@@ -12,7 +12,7 @@ from .state import RunStats
 
 @dataclass
 class ScalePlan:
-    """Resize decision and resulting dimensions for an image."""
+    """Resize decision and resulting size for an image."""
 
     decision: str
     scale: float
@@ -203,7 +203,7 @@ def get_palette_color_count(img: Image.Image) -> int | None:
         return None
 
 
-def build_logo_image(
+def fit_contain_and_pad_image(
     img: Image.Image,
     target_width: int,
     target_height: int,
@@ -231,26 +231,41 @@ def build_logo_image(
         colors = orig_color_count or 256
         colors = max(2, min(colors, 256))
         result = canvas.convert("P", palette=Image.Palette.ADAPTIVE, colors=colors)
-        state.log.info("  -> Built paletted logo with ~%s colors", colors)
+        state.log.debug("  -> Built paletted logo with ~%s colors", colors)
     elif orig_mode == "LA":
         result = canvas.convert("LA")
-        state.log.info("  -> Built logo in LA (grayscale + alpha)")
+        state.log.debug("  -> Built logo in LA (grayscale + alpha)")
     else:
         result = canvas
 
     return result
 
 
-def build_thumb_image(
+def cover_and_crop_image(
     img: Image.Image,
     target_width: int,
     target_height: int,
     new_width: int,
     new_height: int,
+    mode: Optional[Literal["RGB", "RGBA", "rgb", "rgba"]] = None,
 ) -> Image.Image:
-    """Build a normalized thumb/poster image in memory."""
-    if img.mode not in ("RGB", "L"):
-        img = img.convert("RGB")
+    """
+    Generic cover + center crop with optional final mode.
+    - If mode="RGB": tolerate grayscale input ("L") and ensure RGB output.
+    - If mode="RGBA": always convert to RGBA and preserve alpha.
+    - If mode=None: keep the image's current mode (no conversions).
+    """
+    mode_upper = mode.upper() if mode is not None else None
+        
+    # Pre-conversion rules
+    if mode_upper == "RGB":
+        if img.mode == "L":
+            # allow "L" for now; will convert after crop
+            pass
+        elif img.mode != "RGB":
+            img = img.convert("RGB")
+    elif mode_upper == "RGBA" and img.mode != "RGBA":
+        img = img.convert("RGBA")
 
     resized = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
 
@@ -261,33 +276,11 @@ def build_thumb_image(
 
     cropped = resized.crop((left, top, right, bottom))
 
-    if cropped.mode != "RGB":
-        result = cropped.convert("RGB")
-    else:
-        result = cropped
+    # Post-conversion to guarantee output mode
+    if mode_upper == "RGB" and cropped.mode != "RGB":
+        cropped = cropped.convert("RGB")
 
-    state.log.info("  -> Built normalized thumb image in memory")
-    return result
-
-
-def build_profile_image(
-    img: Image.Image,
-    target_width: int,
-    target_height: int,
-    new_width: int,
-    new_height: int,
-) -> Image.Image:
-    """Build a normalized user profile image in memory (preserves alpha)."""
-    working = img.convert("RGBA")
-
-    resized = working.resize((new_width, new_height), Image.Resampling.LANCZOS)
-
-    left = max(0, (new_width - target_width) // 2)
-    top = max(0, (new_height - target_height) // 2)
-    right = left + target_width
-    bottom = top + target_height
-
-    return resized.crop((left, top, right, bottom))
+    return cropped
 
 
 def build_normalized_image(
@@ -303,7 +296,7 @@ def build_normalized_image(
 ) -> tuple[Image.Image, str, str]:
     """Return normalized image plus content-type/format tuple for the requested mode."""
     if mode == "logo":
-        normalized_img = build_logo_image(
+        normalized_img = fit_contain_and_pad_image(
             img,
             target_width,
             target_height,
@@ -313,25 +306,44 @@ def build_normalized_image(
             new_height,
             no_padding=no_padding,
         )
+        state.log.debug("  -> Built normalized %s image in memory", "Logo")
         return normalized_img, "image/png", "PNG"
     if mode == "thumb":
-        normalized_img = build_thumb_image(
+        normalized_img = cover_and_crop_image(
             img,
             target_width,
             target_height,
             new_width,
             new_height,
+            mode="RGB",
         )
+        state.log.debug("  -> Built normalized %s image in memory", "Thumb")
         return normalized_img, "image/jpeg", "JPEG"
     if mode == "profile":
-        normalized_img = build_profile_image(
+        normalized_img = cover_and_crop_image(
             img,
             target_width,
             target_height,
             new_width,
             new_height,
+            mode="RGBA"
         )
+        state.log.debug("  -> Built normalized %s image in memory", "Profile")
         return normalized_img, "image/webp", "WEBP"
+    
+    if mode == "backdrop":
+        # For v1: reuse thumb’s cover+crop behaviour, but with backdrop-specific size.
+        normalized_img = cover_and_crop_image(
+            img,
+            target_width,
+            target_height,
+            new_width,
+            new_height,
+            mode="RGB",
+        )
+        state.log.debug("  -> Built normalized %s image in memory", "Backdrop")
+        return normalized_img, "image/jpeg", "JPEG"
+
 
     raise ValueError(f"Unsupported mode: {mode}")
 

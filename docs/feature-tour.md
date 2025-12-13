@@ -6,13 +6,15 @@ A very serious tool for a very specific job.
 
 - Talks only to Jellyfin’s HTTP API. No direct filesystem poking. *poke poke.*  
 - External library support. Your artwork cohabitates with your Scarlett Johansson? No problem!  
-- Filters by library names (`Movies`, `Shows`, etc.) when you want.  
+- Filters by library names (`My Awesome 4K Movies`, `Korean Reality`, etc.) when you want.
+- Limit it to a specific item type, like only `Movies` or `Series`.
 
-## Three distinct modes
+## Four distinct modes
 
-- `logo` – Transparent PNG canvas (default `800x310`), optional padding, palette-aware.  
-- `thumb` – Landscape JPEG via cover+crop, tuned for library grids.  
-- `profile` – Square WebP avatars for all users (or a single user).  
+- `logo` – Transparent PNG canvas (default `800x310`), optional padding, palette-aware.
+- `thumb` – Landscape JPEG via cover+crop, tuned for library grids.
+- `backdrop` – Full-width JPEG backdrops normalized to a consistent canvas across all items. No more backdrops that don't fit perfectly on your 4K screen.
+- `profile` – Square WebP avatars for all users (or a single user).
 
 ## Backups & Restore
 
@@ -21,9 +23,9 @@ A very serious tool for a very specific job.
   - `partial` – back up only images that were actually rescaled.  
   - `full` – back up everything touched.  
 - Restore paths:
-  - Per-mode restore (`--restore --mode logo|thumb|profile`)  
+  - Per-mode restore (`--restore --mode logo|thumb|backdrop|profile`)
   - Full restore of all backups (`--restore-all`)  
-  - Single item/user restore (`--restore --single ...`)  
+  - Single item/user restore (`--restore --mode <mode> --single ...`)
 
 ## Extremely safe by default
 
