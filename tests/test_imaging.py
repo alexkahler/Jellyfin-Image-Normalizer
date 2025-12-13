@@ -12,6 +12,7 @@ from jfin_core.imaging import (
     encode_image_to_bytes,
     handle_no_scale,
     make_scale_plan,
+    remove_padding_from_logo,
 )
 
 
@@ -57,6 +58,64 @@ def test_build_logo_image_respects_canvas(rgb_image_bytes):
         no_padding=False,
     )
     assert logo.size == (100, 60)
+
+
+def test_remove_padding_from_logo_crops_transparent_border() -> None:
+    img = Image.new("RGBA", (10, 10), (0, 0, 0, 0))
+    for y in range(2, 8):
+        for x in range(2, 8):
+            img.putpixel((x, y), (255, 255, 255, 255))
+
+    cropped, changed = remove_padding_from_logo(img, sensitivity=0)
+    assert changed is True
+    assert cropped.size == (6, 6)
+
+
+def test_remove_padding_from_logo_does_not_crop_when_border_is_not_transparent() -> None:
+    img = Image.new("RGBA", (10, 10), (10, 20, 30, 255))
+    cropped, changed = remove_padding_from_logo(img, sensitivity=0)
+    assert changed is False
+    assert cropped.size == img.size
+
+
+def test_remove_padding_from_logo_sensitivity_threshold() -> None:
+    img = Image.new("RGBA", (10, 10), (0, 0, 0, 10))
+    for y in range(2, 8):
+        for x in range(2, 8):
+            img.putpixel((x, y), (255, 255, 255, 255))
+
+    cropped0, changed0 = remove_padding_from_logo(img, sensitivity=0)
+    assert changed0 is False
+    assert cropped0.size == img.size
+
+    cropped10, changed10 = remove_padding_from_logo(img, sensitivity=10)
+    assert changed10 is True
+    assert cropped10.size == (6, 6)
+
+
+def test_remove_padding_from_logo_fully_transparent_returns_unchanged() -> None:
+    img = Image.new("RGBA", (10, 10), (0, 0, 0, 0))
+    cropped, changed = remove_padding_from_logo(img, sensitivity=0)
+    assert changed is False
+    assert cropped.size == img.size
+
+
+def test_remove_padding_roundtrip_add_then_remove_restores_pixels() -> None:
+    base = Image.new("RGBA", (6, 4), (10, 20, 30, 255))
+    padded = fit_contain_and_pad_image(
+        img=base,
+        target_width=12,
+        target_height=8,
+        orig_mode=base.mode,
+        orig_color_count=None,
+        new_width=6,
+        new_height=4,
+        no_padding=False,
+    )
+    cropped, changed = remove_padding_from_logo(padded, sensitivity=0)
+    assert changed is True
+    assert cropped.size == base.size
+    assert cropped.convert("RGBA").tobytes() == base.tobytes()
 
 
 # test_imaging.py

@@ -1,19 +1,36 @@
+import io
 import pytest
 from pathlib import Path
 from unittest.mock import Mock
-from typing import cast
+from typing import cast, TypedDict
+
+from PIL import Image
 
 from jfin_core import backup as backup_mod
 from jfin_core import pipeline as pipeline_mod
 from jfin_core.client import JellyfinClient
 from jfin_core.config import ModeRuntimeSettings
 from jfin_core.discovery import DiscoveredItem
-from jfin_core.imaging import ScalePlan
+from jfin_core.imaging import ScalePlan, fit_contain_and_pad_image
 from jfin_core.pipeline import (
     normalize_item_image_api,
     normalize_item_backdrops_api,
     process_single_item_api,
 )
+
+
+class NormalizeImageBytesKwargs(TypedDict):
+    item_id: str
+    label: str
+    image_type: str
+    data: bytes
+    content_type: str | None
+    mode: str
+    make_backup: bool
+    backup_root: Path
+    backup_mode: str
+    dry_run: bool
+    backdrop_index: int | None
 
 
 class StubClient:
@@ -125,7 +142,6 @@ def test_normalize_item_image_api_dry_run_skips_upload(rgb_image_bytes, tmp_path
             allow_downscale=True,
             jpeg_quality=85,
             webp_quality=80,
-            no_padding=False,
         )
     }
 
@@ -157,7 +173,6 @@ def test_process_item_image_payload_dry_run_no_upload(rgb_image_bytes, tmp_path,
         allow_downscale=True,
         jpeg_quality=85,
         webp_quality=80,
-        no_padding=False,
     )
 
     ok = _process_item_image_payload(
@@ -205,7 +220,6 @@ def test_partial_backup_skips_no_scale(rgb_image_bytes, tmp_path):
             allow_downscale=False,
             jpeg_quality=85,
             webp_quality=80,
-            no_padding=False,
         )
     }
 
@@ -247,7 +261,6 @@ def test_backup_updates_when_scaled_image_changes(rgb_image_bytes, tmp_path):
             allow_downscale=True,
             jpeg_quality=85,
             webp_quality=80,
-            no_padding=False,
         )
     }
 
@@ -302,7 +315,6 @@ def test_full_backup_saves_no_scale_images(rgb_image_bytes, tmp_path):
             allow_downscale=False,
             jpeg_quality=85,
             webp_quality=80,
-            no_padding=False,
         )
     }
 
@@ -898,7 +910,6 @@ def test_process_single_item_uses_direct_item_id(rgb_image_bytes, tmp_path):
             allow_downscale=True,
             jpeg_quality=85,
             webp_quality=80,
-            no_padding=False,
         )
     }
 
@@ -950,7 +961,6 @@ def test_process_single_item_backdrop_uses_backdrop_tags_from_item(rgb_image_byt
             allow_downscale=True,
             jpeg_quality=85,
             webp_quality=80,
-            no_padding=False,
         )
     }
 
@@ -982,7 +992,6 @@ def test_single_item_counted_once_across_multiple_modes(rgb_image_bytes, tmp_pat
             allow_downscale=True,
             jpeg_quality=85,
             webp_quality=80,
-            no_padding=False,
         ),
         "logo": ModeRuntimeSettings(
             target_width=100,
@@ -991,7 +1000,6 @@ def test_single_item_counted_once_across_multiple_modes(rgb_image_bytes, tmp_pat
             allow_downscale=True,
             jpeg_quality=85,
             webp_quality=80,
-            no_padding=False,
         ),
     }
 
@@ -1023,3 +1031,262 @@ def test_single_item_counted_once_across_multiple_modes(rgb_image_bytes, tmp_pat
     assert pipeline_mod.state.stats.processed == 1
     assert pipeline_mod.state.stats.images_found == 2
     assert pipeline_mod.state.stats.successes == 2
+
+
+def png_bytes(img: Image.Image) -> bytes:
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def test_logo_padding_remove_crops_before_scale_plan(tmp_path, fake_state: FakeState):
+    from jfin_core.pipeline import _normalize_image_bytes
+
+    target_w, target_h = 100, 50
+    canvas = Image.new("RGBA", (target_w, target_h), (0, 0, 0, 0))
+    content = Image.new("RGBA", (50, 30), (255, 255, 255, 255))
+    canvas.paste(content, (25, 10), content)
+
+    settings = ModeRuntimeSettings(
+        target_width=target_w,
+        target_height=target_h,
+        allow_upscale=True,
+        allow_downscale=True,
+        jpeg_quality=85,
+        webp_quality=80,
+        logo_padding="remove",
+        logo_padding_remove_sensitivity=0,
+    )
+    plan, payload, content_type = _normalize_image_bytes(
+        item_id="item",
+        label="logo-remove-order",
+        image_type="Logo",
+        data=png_bytes(canvas),
+        content_type="image/png",
+        mode="logo",
+        settings=settings,
+        make_backup=False,
+        backup_root=tmp_path,
+        backup_mode="partial",
+        dry_run=True,
+    )
+
+    assert content_type == "image/png"
+    assert plan.orig_width == 50
+    assert plan.orig_height == 30
+    assert plan.decision == "SCALE_UP"
+    assert (plan.new_width, plan.new_height) == (83, 50)
+
+    with Image.open(io.BytesIO(payload)) as out:
+        assert out.size == (83, 50)
+
+
+def test_logo_padding_add_vs_none_affects_canvas(rgb_image_bytes, tmp_path, fake_state: FakeState):
+    from jfin_core.pipeline import _normalize_image_bytes
+
+    data = rgb_image_bytes(size=(50, 50))
+    base_kwargs: NormalizeImageBytesKwargs = {
+        "item_id": "item",
+        "label": "logo-padding-policy",
+        "image_type": "Logo",
+        "data": data,
+        "content_type": "image/png",
+        "mode": "logo",
+        "make_backup": False,
+        "backup_root": tmp_path,
+        "backup_mode": "partial",
+        "dry_run": True,
+        "backdrop_index": None,
+    }
+
+    settings_add = ModeRuntimeSettings(
+        target_width=100,
+        target_height=60,
+        allow_upscale=True,
+        allow_downscale=True,
+        jpeg_quality=85,
+        webp_quality=80,
+        logo_padding="add",
+    )
+    _, payload_add, _ = _normalize_image_bytes(**base_kwargs, settings=settings_add)
+    with Image.open(io.BytesIO(payload_add)) as out_add:
+        assert out_add.size == (100, 60)
+
+    settings_none = ModeRuntimeSettings(
+        target_width=100,
+        target_height=60,
+        allow_upscale=True,
+        allow_downscale=True,
+        jpeg_quality=85,
+        webp_quality=80,
+        logo_padding="none",
+    )
+    plan_none, payload_none, _ = _normalize_image_bytes(
+        **base_kwargs, settings=settings_none
+    )
+    with Image.open(io.BytesIO(payload_none)) as out_none:
+        assert out_none.size == (plan_none.new_width, plan_none.new_height)
+        assert out_none.size == (60, 60)
+
+
+def test_logo_padding_add_pads_when_scale_plan_is_no_scale(tmp_path, fake_state: FakeState):
+    from jfin_core.pipeline import _normalize_image_bytes
+
+    target_w, target_h = 800, 310
+    img = Image.new("RGBA", (800, 157), (10, 20, 30, 255))
+    data = png_bytes(img)
+
+    settings = ModeRuntimeSettings(
+        target_width=target_w,
+        target_height=target_h,
+        allow_upscale=True,
+        allow_downscale=True,
+        jpeg_quality=85,
+        webp_quality=80,
+        logo_padding="add",
+    )
+    plan, payload, content_type = _normalize_image_bytes(
+        item_id="item",
+        label="logo-pad-only",
+        image_type="Logo",
+        data=data,
+        content_type="image/png",
+        mode="logo",
+        settings=settings,
+        make_backup=False,
+        backup_root=tmp_path,
+        backup_mode="partial",
+        dry_run=True,
+    )
+
+    assert content_type == "image/png"
+    assert plan.decision == "PAD_ONLY"
+    assert plan.orig_width == 800
+    assert plan.orig_height == 157
+    assert (plan.new_width, plan.new_height) == (800, 157)
+    with Image.open(io.BytesIO(payload)) as out:
+        assert out.size == (target_w, target_h)
+
+
+def test_logo_padding_remove_warns_on_fully_transparent(tmp_path, fake_state: FakeState):
+    from jfin_core.pipeline import _normalize_image_bytes
+
+    img = Image.new("RGBA", (100, 50), (0, 0, 0, 0))
+    data = png_bytes(img)
+    settings = ModeRuntimeSettings(
+        target_width=100,
+        target_height=50,
+        allow_upscale=True,
+        allow_downscale=True,
+        jpeg_quality=85,
+        webp_quality=80,
+        logo_padding="remove",
+        logo_padding_remove_sensitivity=0,
+    )
+    plan, payload, _ = _normalize_image_bytes(
+        item_id="item",
+        label="logo-transparent",
+        image_type="Logo",
+        data=data,
+        content_type="image/png",
+        mode="logo",
+        settings=settings,
+        make_backup=False,
+        backup_root=tmp_path,
+        backup_mode="partial",
+        dry_run=True,
+    )
+
+    assert fake_state.stats.warnings == 1
+    assert plan.decision == "NO_SCALE"
+    assert payload == data
+
+
+def test_logo_padding_remove_warns_when_crop_noops_at_target_size(tmp_path, fake_state: FakeState):
+    from jfin_core.pipeline import _normalize_image_bytes
+
+    target_w, target_h = 100, 50
+    img = Image.new("RGBA", (target_w, target_h), (0, 0, 0, 0))
+    # A faint (alpha=1) border keeps the bounding box at full size for sensitivity=0.
+    for x in range(target_w):
+        img.putpixel((x, 0), (0, 0, 0, 1))
+        img.putpixel((x, target_h - 1), (0, 0, 0, 1))
+    for y in range(target_h):
+        img.putpixel((0, y), (0, 0, 0, 1))
+        img.putpixel((target_w - 1, y), (0, 0, 0, 1))
+
+    data = png_bytes(img)
+    settings = ModeRuntimeSettings(
+        target_width=target_w,
+        target_height=target_h,
+        allow_upscale=True,
+        allow_downscale=True,
+        jpeg_quality=85,
+        webp_quality=80,
+        logo_padding="remove",
+        logo_padding_remove_sensitivity=0,
+    )
+    plan, payload, _ = _normalize_image_bytes(
+        item_id="item",
+        label="logo-noop-border",
+        image_type="Logo",
+        data=data,
+        content_type="image/png",
+        mode="logo",
+        settings=settings,
+        make_backup=False,
+        backup_root=tmp_path,
+        backup_mode="partial",
+        dry_run=True,
+    )
+
+    assert fake_state.stats.warnings == 1
+    assert plan.decision == "NO_SCALE"
+    assert payload == data
+
+
+def test_logo_padding_add_then_remove_roundtrip_rgba(tmp_path, fake_state: FakeState):
+    from jfin_core.pipeline import _normalize_image_bytes
+
+    base = Image.new("RGBA", (40, 20), (10, 20, 30, 255))
+    padded = fit_contain_and_pad_image(
+        img=base,
+        target_width=100,
+        target_height=50,
+        orig_mode=base.mode,
+        orig_color_count=None,
+        new_width=40,
+        new_height=20,
+        no_padding=False,
+    )
+
+    settings = ModeRuntimeSettings(
+        target_width=100,
+        target_height=50,
+        allow_upscale=False,
+        allow_downscale=False,
+        jpeg_quality=85,
+        webp_quality=80,
+        logo_padding="remove",
+        logo_padding_remove_sensitivity=0,
+    )
+    
+    plan, payload, _ = _normalize_image_bytes(
+        item_id="item",
+        label="logo-roundtrip",
+        image_type="Logo",
+        data=png_bytes(padded),
+        content_type="image/png",
+        mode="logo",
+        settings=settings,
+        make_backup=False,
+        backup_root=tmp_path,
+        backup_mode="partial",
+        dry_run=True,
+    )
+
+    assert plan.decision == "NO_SCALE"
+    with Image.open(io.BytesIO(payload)) as out:
+        out_rgba = out.convert("RGBA")
+        assert out_rgba.size == base.size
+        assert out_rgba.tobytes() == base.tobytes()

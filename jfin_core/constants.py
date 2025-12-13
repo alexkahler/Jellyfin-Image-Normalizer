@@ -35,6 +35,22 @@ MODE_TO_IMAGE_TYPE = {
     "backdrop": "Backdrop",
 }
 
+# Recommended (and default) canvas sizes. Used for UX warnings when users choose
+# target sizes with unusual aspect ratios.
+RECOMMENDED_CANVAS_BY_MODE: dict[str, tuple[int, int]] = {
+    "logo": (800, 310),
+    "thumb": (1000, 562),
+    "profile": (256, 256),
+    "backdrop": (1920, 1080),
+}
+
+RECOMMENDED_ASPECT_LABEL_BY_MODE: dict[str, str] = {
+    "logo": "2.58:1",
+    "thumb": "16:9",
+    "profile": "1:1",
+    "backdrop": "16:9",
+}
+
 # Default item types for discovery (movies and series).
 DEFAULT_ITEM_TYPES = ["Movie", "Series"]
 
@@ -163,12 +179,19 @@ DEFAULT_TOML_TEMPLATE = textwrap.dedent(
     # Block upscaling logos. 
     # Default: False.
     no_upscale = false
-    # Block downscaling logos. 
+    # Block downscaling logos.
     # Default: False.
     no_downscale = false
-    # Skip transparent padding; resize only. 
-    # Default: False.
-    no_padding = false
+    # Logo padding behavior: "add" (default), "remove", or "none".
+    # - add: pad resized logo onto a transparent canvas.
+    # - remove: crop transparent border before scaling; never pad after.
+    # - none: do not add/remove padding; only scale/normalize.
+    # Default: "add".
+    padding = "add"
+    # When padding="remove": treat pixels with alpha <= threshold (0-255) as padding.
+    # If you experience issues with some transparent borders persisting, then try setting this a little higher.
+    # Default: 0.
+    padding_remove_sensitivity = 0
 
     [thumb]
     # Canvas width for thumbs/posters (pixels). 

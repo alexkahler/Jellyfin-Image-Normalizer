@@ -35,7 +35,7 @@ This document explains how the Jellyfin Image Normalizer CLI works so a new team
 - Mode sections (`logo`, `thumb`, `backdrop`, `profile`):
   - Common: `width`, `height`, `no_upscale`, `no_downscale`.
   - Validation: widths/heights must be >0; CLI width/height overrides must also be positive, and a missing side is inferred from the configured aspect ratio (clamped to at least 1px).
-  - `logo`: `no_padding` to skip transparent canvas centering.
+  - `logo`: `padding` controls logo padding/cropping (`add` | `remove` | `none`). Optional `padding_remove_sensitivity` (number, default `0`) is used only when `padding = "remove"`.
   - `thumb`: `jpeg_quality` (1-95).
   - `backdrop`: `jpeg_quality` (1-95).
   - `profile`: `webp_quality` (1-100).
@@ -55,18 +55,19 @@ file_enabled = true
 [logo]
 width = 800
 height = 310
-no_padding = false
+padding = "add"
+padding_remove_sensitivity = 0
 ```
 
 ## CLI Entrypoints (`jfin.py:parse_args`)
 - Core flags: `--config`, `--generate-config`, `--test-jf`, `--mode` (logo|thumb|backdrop|profile), `--single <itemId|username>` (requires `--mode`), `--restore`, `--restore-all` (must be used alone except logging/config flags), `--dry-run`, `--backup`.
 - Config path: `--config <file>.toml` (defaults to `config.toml` beside the repo). Non-TOML paths are rejected.
-- Imaging overrides: `--logo-target-size`, `--thumb-target-size`, `--backdrop-target-size`, `--profile-target-size`, `--thumb-jpeg-quality`, `--backdrop-jpeg-quality`, `--profile-webp-quality`, `--no-upscale`, `--no-downscale`, `--no-padding` (logo only), `--force-upload-noscale`. Target size use `WIDTHxHEIGHT` (positive integers).
+- Imaging overrides: `--logo-target-size`, `--thumb-target-size`, `--backdrop-target-size`, `--profile-target-size`, `--thumb-jpeg-quality`, `--backdrop-jpeg-quality`, `--profile-webp-quality`, `--no-upscale`, `--no-downscale`, `--logo-padding` (logo only), `--force-upload-noscale`. Target size use `WIDTHxHEIGHT` (positive integers).
 - Discovery overrides: `--item-types` (movies|series) to override `[modes].item_types` for `/Items` discovery; values are case-insensitive and parsed like the config setting.
 - Jellyfin overrides: `--jf-url`, `--jf-api-key`, `--libraries`, `--item-types`, `--jf-delay-ms`.
 - Logging toggles: `--silent/-s` for disabling CLI output, `--verbose/-v` for enabling debug logging.
 - Exclusivity/validation: `--generate-config` rejects any operational flags; `--restore-all` rejects combinations except config/logging flags; `--test-jf` requires `--jf-url`/`--jf-api-key` overrides or populated config values.
-- No-op guards: CLI emits warnings when mode-specific flags have no effect (e.g., `--thumb-jpeg-quality` without `thumb`, `--profile-webp-quality` without `profile`, `--no-padding` without `logo`, or target-size flags without their mode).
+- No-op guards: CLI emits warnings when mode-specific flags have no effect (e.g., `--thumb-jpeg-quality` without `thumb`, `--profile-webp-quality` without `profile`, `--logo-padding` without `logo`, or target-size flags without their mode).
 - Exit behavior: most validation errors raise `SystemExit(1)` after recording stats; `--test-jf` exits immediately after the connectivity check.
 
 ## Runtime Flow (High Level)
@@ -116,7 +117,7 @@ no_padding = false
 - `make_scale_plan` computes scale + target size and labels decision (`SCALE_UP`, `SCALE_DOWN`, `NO_SCALE`). Scaling respects `allow_upscale` / `allow_downscale`; disallowed directions clamp to 1.0 (no resize).
 - `handle_no_scale` centralizes NO_SCALE behavior (success unless forced upload fails).
 - Mode builders:
-  - Logo: convert to RGBA, resize with LANCZOS, center on transparent canvas unless `no_padding`; preserve palette (`P` mode) by converting back with adaptive palette and original color count when known; `LA` preserved. Output `image/png`.
+  - Logo: optional padding policies via `logo.padding` (`add` | `remove` | `none`). When `remove`, JFIN crops transparent border padding (alpha threshold `logo.padding_remove_sensitivity`) **before** computing the scale plan; it never pads after. When `add`, it centers the resized logo on a transparent canvas. When `none`, it skips both add/remove padding and only rescales. Palette (`P`) is preserved by converting back with an adaptive palette and original color count when known; `LA` preserved. Output `image/png`. In `remove`, JFIN warns if the crop is a no-op on an already target-sized image (possible non-obvious border pixels) or if the image is fully transparent at the chosen threshold.
   - Thumb: convert to RGB, cover-scale then center-crop to canvas. Output JPEG with `jpeg_quality`, optimized + progressive.
   - Backdrop: reuse thumb’s cover+crop behavior but with backdrop-specific target size. Always treated as RGB and encoded as JPEG with `jpeg_quality`.
   - Profile: convert to RGBA, cover-scale then crop. Output WebP with `webp_quality` (method=6). Alpha preserved.

@@ -4,7 +4,7 @@ import copy
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 try:
     import tomllib  # type: ignore[attr-defined]
@@ -22,6 +22,8 @@ from .constants import (
     SECTION_KEY_MAP,
 )
 
+LogoPadding = Literal["add", "remove", "none"]
+
 
 @dataclass
 class ModeRuntimeSettings:
@@ -33,7 +35,8 @@ class ModeRuntimeSettings:
     allow_downscale: bool
     jpeg_quality: int
     webp_quality: int
-    no_padding: bool
+    logo_padding: LogoPadding = "add"
+    logo_padding_remove_sensitivity: float = 0.0
 
 
 @dataclass
@@ -277,11 +280,22 @@ def validate_config_types(cfg: dict[str, Any]) -> None:
         expect_bool(mode_cfg, "no_upscale", f"config.{mode}")
         expect_bool(mode_cfg, "no_downscale", f"config.{mode}")
         if mode == "logo":
-            expect_bool(mode_cfg, "no_padding", f"config.{mode}")
+            if "no_padding" in mode_cfg:
+                state.log.warning(
+                    "Config key 'logo.no_padding' has been removed. "
+                    "Use logo.padding = \"none\" instead of no_padding=true."
+                )
+                state.stats.record_warning()
+                errors.append(
+                    "config.logo.no_padding has been removed. "
+                    "Use logo.padding = \"none\" instead of no_padding=true."
+                )
+            expect_string(mode_cfg, "padding", f"config.{mode}")
+            expect_number(mode_cfg, "padding_remove_sensitivity", f"config.{mode}")
         if mode == "thumb" or mode == "backdrop":
-            expect_int(mode_cfg, "jpeg_quality", f"config.{mode}")
+            expect_int(mode_cfg, "jpeg_quality", f"config.{mode}")        
         if mode == "profile":
-            expect_int(mode_cfg, "webp_quality", f"config.{mode}")
+            expect_int(mode_cfg, "webp_quality", f"config.{mode}")        
 
         width = mode_cfg.get("width")
         height = mode_cfg.get("height")
@@ -309,6 +323,23 @@ def validate_config_types(cfg: dict[str, Any]) -> None:
                     errors.append(
                         "config.profile.webp_quality must be between "
                         "1 and 100."
+                    )
+        if mode == "logo":
+            padding = mode_cfg.get("padding")
+            if isinstance(padding, str):
+                normalized = padding.strip().lower()
+                if normalized not in {"add", "remove", "none"}:
+                    errors.append(
+                        "config.logo.padding must be one of "
+                        "\"add\", \"remove\", or \"none\"."
+                    )
+            sensitivity = mode_cfg.get("padding_remove_sensitivity")
+            if isinstance(sensitivity, (int, float)) and not isinstance(
+                sensitivity, bool
+            ):
+                if sensitivity < 0:
+                    errors.append(
+                        "config.logo.padding_remove_sensitivity must be >= 0."
                     )
 
     if errors:
@@ -550,17 +581,41 @@ def build_mode_runtime_settings(
     allow_upscale = not (mode_cfg.get("no_upscale", False)
                          or getattr(args, "no_upscale", False))
     allow_downscale = not (mode_cfg.get("no_downscale", False)
-                           or getattr(args, "no_downscale", False))
-    no_padding = bool(
-        mode_cfg.get("no_padding", False) or (
-            getattr(args, "no_padding", False) and mode == "logo")
-    )
+                           or getattr(args, "no_downscale", False))       
 
     jpeg_quality = int(mode_cfg.get("jpeg_quality", 85))
     jpeg_quality = max(1, min(95, jpeg_quality))
     webp_quality = int(mode_cfg.get("webp_quality", 80)
                        ) if "webp_quality" in mode_cfg else 80
     webp_quality = max(1, min(100, webp_quality))
+
+    logo_padding: LogoPadding = "add"
+    logo_padding_remove_sensitivity = 0.0
+    if mode == "logo":
+        cfg_padding = mode_cfg.get("padding", "add")
+        if isinstance(cfg_padding, str):
+            cfg_padding = cfg_padding.strip().lower()
+        else:
+            cfg_padding = "add"
+        if cfg_padding not in {"add", "remove", "none"}:
+            raise ConfigError(
+                f"logo.padding must be one of add/remove/none (got {cfg_padding!r})."
+            )
+        arg_padding = getattr(args, "logo_padding", None)
+        if isinstance(arg_padding, str) and arg_padding:
+            cfg_padding = arg_padding.strip().lower()
+        logo_padding = cast(LogoPadding, cfg_padding)
+
+        sensitivity = mode_cfg.get("padding_remove_sensitivity", 0)
+        if isinstance(sensitivity, (int, float)) and not isinstance(
+            sensitivity, bool
+        ):
+            logo_padding_remove_sensitivity = float(sensitivity)
+        if (0.0 > logo_padding_remove_sensitivity
+                or logo_padding_remove_sensitivity > 255.0):
+            raise ConfigError(
+                f"logo.padding_remove_sensitivity must be between 0 and 255. "
+                "(got {logo_padding_remove_sensitivity}).")
 
     return ModeRuntimeSettings(
         target_width=target_width,
@@ -569,7 +624,8 @@ def build_mode_runtime_settings(
         allow_downscale=allow_downscale,
         jpeg_quality=jpeg_quality,
         webp_quality=webp_quality,
-        no_padding=no_padding,
+        logo_padding=logo_padding,
+        logo_padding_remove_sensitivity=logo_padding_remove_sensitivity,
     )
 
 

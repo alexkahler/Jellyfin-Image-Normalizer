@@ -2,6 +2,7 @@ import argparse
 
 import pytest
 
+from jfin_core import state
 from jfin_core.config import (
     apply_cli_overrides,
     build_discovery_settings,
@@ -13,6 +14,23 @@ from jfin_core.config import (
     parse_operations,
     validate_config_types,
 )
+
+
+def test_validate_config_types_rejects_removed_logo_no_padding_key():
+    cfg = {
+        "jf_url": "https://demo.example.com",
+        "jf_api_key": "token",
+        "logo": {
+            "width": 800,
+            "height": 310,
+            "no_upscale": False,
+            "no_downscale": False,
+            "no_padding": True,
+        },
+    }
+    with pytest.raises(ConfigError, match="logo\\.no_padding has been removed"):
+        validate_config_types(cfg)
+    assert state.stats.warnings == 1
 
 
 def test_load_config_from_path_parses_toml_and_builds_mode(tmp_path):
@@ -28,7 +46,7 @@ def test_load_config_from_path_parses_toml_and_builds_mode(tmp_path):
         height = 360
         no_upscale = true
         no_downscale = false
-        no_padding = true
+        padding = "none"
         """,
         encoding="utf-8",
     )
@@ -45,17 +63,17 @@ def test_load_config_from_path_parses_toml_and_builds_mode(tmp_path):
         profile_target_size=None,
         no_upscale=False,
         no_downscale=False,
-        no_padding=False,
+        logo_padding=None,
         thumb_jpeg_quality=None,
         backdrop_jpeg_quality=None,
         profile_webp_quality=None,
         item_types=None,
     )
-    settings = build_mode_runtime_settings("logo", cfg["logo"], args)
+    settings = build_mode_runtime_settings("logo", cfg["logo"], args)     
     assert settings.target_width == 640
     assert settings.target_height == 360
     assert settings.allow_upscale is False
-    assert settings.no_padding is True
+    assert settings.logo_padding == "none"
 
 
 def test_load_config_from_path_rejects_non_toml(tmp_path):
@@ -113,7 +131,7 @@ def test_validate_config_types_requires_positive_size():
             "height": 200,
             "no_upscale": False,
             "no_downscale": False,
-            "no_padding": False,
+            "padding": "add",
         },
     }
     with pytest.raises(ConfigError) as excinfo:
@@ -151,7 +169,7 @@ def test_load_config_from_sections_lifts_keys(tmp_path):
         height = 400
         no_upscale = false
         no_downscale = false
-        no_padding = false
+        padding = "add"
         """,
         encoding="utf-8",
     )
@@ -200,7 +218,7 @@ def test_build_mode_runtime_settings_respects_cli_overrides():
         profile_target_size=None,
         no_upscale=True,
         no_downscale=False,
-        no_padding=True,
+        logo_padding="none",
         thumb_jpeg_quality=None,
         backdrop_jpeg_quality=None,
         profile_webp_quality=None,
@@ -211,16 +229,16 @@ def test_build_mode_runtime_settings_respects_cli_overrides():
         "height": 600,
         "no_upscale": False,
         "no_downscale": False,
-        "no_padding": False,
+        "padding": "add",
         "jpeg_quality": 85,
         "webp_quality": 75,
     }
-    settings = build_mode_runtime_settings("logo", mode_cfg, args)
+    settings = build_mode_runtime_settings("logo", mode_cfg, args)        
     assert settings.target_width == 400
     assert settings.target_height == 300
     assert settings.allow_upscale is False
     assert settings.allow_downscale is True
-    assert settings.no_padding is True
+    assert settings.logo_padding == "none"
 
 
 def test_build_mode_runtime_settings_infers_size_without_zero():
@@ -231,7 +249,7 @@ def test_build_mode_runtime_settings_infers_size_without_zero():
         profile_target_size=None,
         no_upscale=False,
         no_downscale=False,
-        no_padding=False,
+        logo_padding=None,
         thumb_jpeg_quality=None,
         backdrop_jpeg_quality=None,
         profile_webp_quality=None,
@@ -242,7 +260,7 @@ def test_build_mode_runtime_settings_infers_size_without_zero():
         "height": 2,
         "no_upscale": False,
         "no_downscale": False,
-        "no_padding": False,
+        "padding": "add",
         "jpeg_quality": 85,
         "webp_quality": 75,
     }
@@ -259,7 +277,7 @@ def test_build_mode_runtime_settings_rejects_non_positive_override():
         profile_target_size=None,
         no_upscale=False,
         no_downscale=False,
-        no_padding=False,
+        logo_padding=None,
         thumb_jpeg_quality=None,
         backdrop_jpeg_quality=None,
         profile_webp_quality=None,
@@ -270,7 +288,7 @@ def test_build_mode_runtime_settings_rejects_non_positive_override():
         "height": 50,
         "no_upscale": False,
         "no_downscale": False,
-        "no_padding": False,
+        "padding": "add",
         "jpeg_quality": 85,
         "webp_quality": 75,
     }
@@ -315,7 +333,7 @@ def test_apply_cli_overrides_applies_target_size_per_mode(mode, attr, size):
         profile_target_size=None,
         no_upscale=False,
         no_downscale=False,
-        no_padding=False,
+        logo_padding=None,
         thumb_jpeg_quality=None,
         backdrop_jpeg_quality=None,
         profile_webp_quality=None,
@@ -351,7 +369,7 @@ def test_apply_cli_overrides_applies_quality_overrides(mode, attr, key, value):
         profile_target_size=None,
         no_upscale=False,
         no_downscale=False,
-        no_padding=False,
+        logo_padding=None,
         thumb_jpeg_quality=None,
         backdrop_jpeg_quality=None,
         profile_webp_quality=None,

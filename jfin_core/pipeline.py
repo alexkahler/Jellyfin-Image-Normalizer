@@ -33,6 +33,7 @@ from .imaging import (
     handle_no_scale,
     log_processing_summary,
     make_scale_plan,
+    remove_padding_from_logo,
     record_scale_decision,
 )
 
@@ -63,6 +64,7 @@ def _plan_and_backup_image(
         fit_mode=fit_mode,
         allow_upscale=settings.allow_upscale,
         allow_downscale=settings.allow_downscale,
+        pad_to_canvas=bool(fit_mode == "fit" and settings.logo_padding == "add"),
     )
 
     if make_backup and not dry_run and should_backup_for_plan(plan.decision, backup_mode):
@@ -77,11 +79,21 @@ def _plan_and_backup_image(
         )
 
     record_scale_decision(label, plan)
+    output_w = settings.target_width
+    output_h = settings.target_height
+    if plan.is_no_scale:
+        output_w, output_h = img.size
+    elif fit_mode == "fit" and settings.logo_padding != "add":
+        output_w = plan.new_width
+        output_h = plan.new_height
+
     log_processing_summary(
         label,
         plan,
         settings.target_width,
         settings.target_height,
+        output_w,
+        output_h,
         img.mode,
         img.format,
     )
@@ -106,10 +118,51 @@ def _normalize_image_bytes(
     """
     Return the normalized payload bytes, normalized content-type, and scale plan for a single image.
     """
+    def has_pixels_above_alpha_threshold(
+        src: Image.Image, sensitivity: float
+    ) -> bool:
+        rgba = src if src.mode == "RGBA" else src.convert("RGBA")
+        alpha = rgba.getchannel("A")
+        mask = alpha.point([255 if a > sensitivity else 0 for a in range(256)])
+        return mask.getbbox() is not None
+
     with Image.open(io.BytesIO(data)) as img:
         img = apply_exif_orientation(img)
         orig_mode = img.mode
         fit_mode = "fit" if mode == "logo" else "cover"
+
+        orig_color_count = (
+            get_palette_color_count(img)
+            if (mode == "logo" and orig_mode == "P")
+            else None
+        )
+
+        cropped = False
+        if mode == "logo" and settings.logo_padding == "remove":
+            sensitivity = settings.logo_padding_remove_sensitivity
+            fully_transparent = not has_pixels_above_alpha_threshold(
+                img, sensitivity
+            )
+            before_size = img.size
+            img, cropped = remove_padding_from_logo(img, sensitivity)
+
+            if fully_transparent:
+                state.log.warning(
+                    "[WARN] Logo padding removal skipped: image is fully "
+                    "transparent at sensitivity=%s.",
+                    sensitivity,
+                )
+                state.stats.record_warning()
+            elif (not cropped) and img.size == before_size and img.size == (
+                settings.target_width,
+                settings.target_height,
+            ):
+                state.log.warning(
+                    "[WARN] Logo padding removal may have failed: image "
+                    "remained at target size after crop; borders may contain "
+                    "non-obvious pixels."
+                )
+                state.stats.record_warning()
 
         plan = _plan_and_backup_image(
             img=img,
@@ -127,7 +180,7 @@ def _normalize_image_bytes(
             backdrop_index=backdrop_index,
         )
 
-        if plan.is_no_scale:
+        if plan.is_no_scale and not cropped:
             # Skip normalization/encoding when no scaling is needed or allowed.
             return (
                 plan,
@@ -135,9 +188,6 @@ def _normalize_image_bytes(
                 content_type or "application/octet-stream",
             )
 
-        orig_color_count = (
-            get_palette_color_count(img) if (mode == "logo" and orig_mode == "P") else None
-        )
         normalized_img, normalized_content_type, fmt = build_normalized_image(
             img=img,
             mode=mode,
@@ -147,7 +197,7 @@ def _normalize_image_bytes(
             new_height=plan.new_height,
             orig_mode=orig_mode,
             orig_color_count=orig_color_count,
-            no_padding=settings.no_padding,
+            logo_padding=settings.logo_padding,
         )
         payload = encode_image_to_bytes(
             normalized_img=normalized_img,
@@ -349,7 +399,6 @@ def normalize_item_backdrops_api(
         return False
 
     # Phase 1: Fetch & stage - fetch all originals to disk with original extensions
-    # TODO: Consider using a TemporaryDirectory for staging when backups are disabled.
     staging_dir = None
     if not dry_run:
         staging_dir = get_staging_dir(backup_root, item.id)
@@ -569,7 +618,7 @@ def process_discovered_items(
     """Iterate discovered items and normalize the enabled image types via API calls, tracking progress stats."""
     enabled_set = set(enabled_image_types)
     
-    total_images = 0 #FIXME Move to state.stats.total_images?
+    total_images = 0
     for item in items:
         for image_type in (item.image_types & enabled_set):
             if image_type == "Backdrop":
@@ -577,7 +626,7 @@ def process_discovered_items(
             else:
                 total_images += 1
     
-    processed_images = 0 #FIXME Move to state.stats.processed_images?
+    processed_images = 0
 
     state.stats.record_images_found(total_images)
 
@@ -592,7 +641,7 @@ def process_discovered_items(
         for image_type in sorted(item.image_types):
             if image_type not in enabled_set:
                 continue
-            increment = (item.backdrop_count or 1) if image_type == "Backdrop" else 1 #FIXME Migrate counting to normalize_item_image_api and normalize_item_backdrops_api.
+            increment = (item.backdrop_count or 1) if image_type == "Backdrop" else 1
             normalize_item_image_api(
                 item=item,
                 image_type=image_type,
