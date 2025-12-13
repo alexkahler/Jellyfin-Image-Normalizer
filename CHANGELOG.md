@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.3.0
+
+### Added
+
+* Logo padding modes (`add`/`remove`/`none`) with `padding_remove_sensitivity`; new `--logo-padding` CLI flag and config docs/examples.
+* Aspect-ratio guidance: recommended canvas sizes per mode and warnings when target ratios diverge.
+* Transparent-border removal pipeline for logos plus output-size logging detail.
+Changed
+
+### Changed
+* Deprecated `logo.no_padding`; validation now warns and guides to `logo.padding = "none`".
+* Scaling/backup flow now pads only when requested and can skip re-encoding on no-scale without crop.
+* README, advanced usage, feature tour, and example config refreshed.
+
+### Fixed
+* More robust CLI size parsing and unused-flag warnings.
+* Cropping/padding edge cases for logos, including fully transparent inputs.
+* Test suite expanded to cover new padding behavior, aspect warnings, and CLI validation.
+
 ## 0.2.0
 
 ### Added
