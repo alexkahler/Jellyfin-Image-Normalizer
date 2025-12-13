@@ -6,7 +6,14 @@ from typing import Any
 
 @dataclass
 class RunStats:
-    """In-memory counters for a single JFIN run."""
+    """
+    In-memory counters for a single JFIN run.
+
+    Semantics:
+    - processed: count of unique items/entities processed (e.g., a movie/series id).
+    - images_found: count of images discovered/considered.
+    - successes/skipped/warnings/errors: per-image outcomes.
+    """
 
     processed: int = 0
     images_found: int = 0
@@ -15,22 +22,27 @@ class RunStats:
     warnings: int = 0
     errors: int = 0
     failed_items: list[tuple[str, str]] = field(default_factory=list)
+    _processed_item_ids: set[str] = field(default_factory=set, repr=False)
+
+    def record_item_processed(self, item_id: str) -> None:
+        """Count a processed item exactly once per run."""
+        if not item_id:
+            return
+        if item_id in self._processed_item_ids:
+            return
+        self._processed_item_ids.add(item_id)
+        self.processed += 1
 
     def record_success(self) -> None:
-        """Count a successful processed item/image."""
-        self.processed += 1
+        """Count a successful processed image."""
         self.successes += 1
 
     def record_warning(self, count_processed: bool = False) -> None:
-        """Count a warning; optionally treat it as a processed item."""
-        if count_processed:
-            self.processed += 1
+        """Count a warning (per-image). `count_processed` is kept for compatibility."""
         self.warnings += 1
 
     def record_skip(self, count_processed: bool = False) -> None:
-        """Count a skip separately from warnings; optionally treat it as processed."""
-        if count_processed:
-            self.processed += 1
+        """Count a skip separately from warnings (per-image). `count_processed` is kept for compatibility."""
         self.skipped += 1
 
     def record_images_found(self, count: int) -> None:
@@ -40,8 +52,7 @@ class RunStats:
         self.images_found += count
 
     def record_error(self, path: str, reason: str) -> None:
-        """Count an error and capture the failing item identifier and reason."""
-        self.processed += 1
+        """Count an error (per-image) and capture the failing identifier and reason."""
         self.errors += 1
         self.failed_items.append((path, reason))
 

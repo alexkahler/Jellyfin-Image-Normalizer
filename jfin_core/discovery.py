@@ -28,6 +28,7 @@ class DiscoveredItem:
     parent_id: str | None
     library_id: str | None
     library_name: str | None
+    backdrop_count: int | None
     image_types: set[str] = field(default_factory=set)
 
     def add_image_type(self, image_type: str) -> None:
@@ -108,7 +109,18 @@ def discover_libraries(
     return libraries
 
 
+def _item_backdrop_count(item: dict[str, Any]) -> int:
+    """Return how many backdrop tags the item exposes, treating missing values as zero."""
+    tags = item.get("BackdropImageTags") or []
+    if isinstance(tags, list):
+        return len(tags)
+    return 0
+
+
 def _item_has_image_type(item: dict[str, Any], image_type: str) -> bool:
+    """Determine whether the discovered entry exposes an image of the requested type."""
+    if image_type == "Backdrop":
+        return _item_backdrop_count(item) > 0
     image_tags = item.get("ImageTags") or {}
     return image_type in image_tags
 
@@ -137,7 +149,6 @@ def discover_library_items(
             include_item_types=discovery.include_item_types,
             enable_image_types=",".join(enabled_types),
             recursive=discovery.recursive,
-            image_type_limit=discovery.image_type_limit,
             start_index=start_index,
             limit=page_size,
         )
@@ -154,6 +165,8 @@ def discover_library_items(
             item_id = raw.get("Id")
             if not item_id:
                 continue
+            
+            backdrop_count = _item_backdrop_count(raw)
 
             matching_types = [it for it in enabled_types if _item_has_image_type(raw, it)]
             if not matching_types:
@@ -167,9 +180,17 @@ def discover_library_items(
                     parent_id=raw.get("ParentId"),
                     library_id=library.id if library else None,
                     library_name=library.name if library else None,
+                    backdrop_count=None
                 )
+                
+            
+            item = items[item_id]
+            if backdrop_count and "Backdrop" in enabled_types:
+                # keep max in case of multiple pages
+                item.backdrop_count = max(item.backdrop_count or 0, backdrop_count)
+                
             for image_type in matching_types:
-                items[item_id].add_image_type(image_type)
+                item.add_image_type(image_type)
 
         state.log.info(
             "%s: fetched %s items (start=%s), unique with target images so far: %s",

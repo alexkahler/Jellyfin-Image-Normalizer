@@ -54,7 +54,7 @@ Think: Fiat 500 engine, bolted into a full DTM race chassis.
 JFIN is a safe-by-default CLI tool that:
 
 - Normalizes chaotic TMDb logos to a consistent canvas
-- Resizes misclassified “thumb” backdrops to sane dimensions
+- Resizes misclassified “thumb” backdrops to sane size
 - Optimizes oversized user profile images
 - Talks only to Jellyfin’s HTTP API (no direct filesystem poking)
 - Supports dry-runs, backups, and restore helpers so it’s very hard to misuse
@@ -141,11 +141,11 @@ You can see real-world comparisons for Desktop (QHD), Tablet (WQXGA), and Mobile
 
 At a glance, JFIN gives you:
 
-- 🔍 **API-only discovery**  
+- 🔍 **API-only discovery**
   Talks only to Jellyfin’s HTTP API (no direct filesystem poking) with optional library filters and item types.
 
-- 🖼 **Three focused modes**  
-  `logo`, `thumb`, and `profile` — each with its own canvas, format, and scaling rules tuned for Jellyfin’s UI.
+- 🖼 **Four focused modes**
+  `logo`, `thumb`, `backdrop`, and `profile` — each with its own canvas, format, and scaling rules tuned for Jellyfin’s UI.
 
 - 🧪 **Safe-by-default behavior**  
   `dry_run = true` in the generated config, hard blocking of POST/DELETE while dry-run is on, and optional backups before any writes.
@@ -164,7 +164,7 @@ At a glance, JFIN gives you:
 
 ### Prerequisites
 
-- A running Jellyfin server with API access
+- Jellyfin 10.11.4+
 - A Jellyfin API key
 - **Python 3.11+**
 
@@ -223,7 +223,7 @@ You can ignore the other files in the folder if you only plan to run the script.
    backup     = true
 
    [modes]
-   operations = ["logo", "thumb", "profile"] # or a subset
+   operations = ["logo", "thumb", "backdrop", "profile"] # or a subset
    ```
 
    Optional:
@@ -298,16 +298,22 @@ Override logo size and disable padding (for the minimalists):
 
 ```bash
 python jfin.py --mode=logo \
-  --width 500 --height 200 --no-padding
+  --logo-target-size 500x200 --no-padding
 ```
 
 Override mode and fix thumbs (and resize those “4K thumbs”):
 
 ```bash
-python jfin.py --mode=thumb --width 1000
+python jfin.py --mode=thumb --thumb-target-size 1000x562
 ```
 
-Override mode and process profile images for a single user:
+Normalize selected images for a single item:
+
+```bash
+python jfin.py --mode=logo|thumb|backdrop --single <item_uuid>
+```
+
+Override mode and process profile images for a single user (profile-only):
 
 ```bash
 python jfin.py --mode=profile --single some_username

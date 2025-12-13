@@ -2,10 +2,35 @@
 import argparse
 import sys
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, cast, Tuple
+
+
+def parse_size_pair(value: str) -> Tuple[int, int]:
+    """Parse WIDTHxHEIGHT size strings into a positive integer tuple for argparse."""
+    if not isinstance(value, str) or "x" not in value.lower():
+        raise argparse.ArgumentTypeError(
+            "Expected WIDTHxHEIGHT (e.g., 1000x562)."
+        )
+    parts = value.lower().split("x", 1)
+    try:
+        width = int(parts[0])
+        height = int(parts[1])
+    except ValueError:
+        raise argparse.ArgumentTypeError(
+            "Width and height must be integers (e.g., 1000x562)."
+        )
+    if width <= 0 or height <= 0:
+        raise argparse.ArgumentTypeError(
+            "Width and height must be positive integers."
+        )
+    return width, height
 
 from jfin_core import state
-from jfin_core.backup import normalize_backup_mode
+from jfin_core.backup import (
+    normalize_backup_mode,
+    restore_from_backups,
+    restore_single_item_from_backup,
+)   
 from jfin_core.client import JellyfinClient
 from jfin_core.config import (
     apply_cli_overrides,
@@ -28,12 +53,11 @@ from jfin_core.pipeline import (
     process_profiles,
     process_single_profile,
     process_single_item_api,
-    restore_from_backups,
-    restore_single_from_backup,
 )
 
 
 def parse_args() -> argparse.Namespace:
+    #FIXME Missing docstring
     parser = argparse.ArgumentParser(
         description=(
             "Normalize Jellyfin images (logos, thumbs, profiles) via the Jellyfin API.\n\n"
@@ -67,34 +91,53 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--mode",
         help=(
-            "Image types to handle, e.g. 'logo', 'thumb', 'profile', or a pipe-separated "
-            "list like '"'logo|thumb'"'. Overrides the config 'operations' value if provided."
+            "Image types to handle, e.g. 'logo', 'thumb', 'profile', 'backdrop', "
+            "or a pipe-separated list like '"'logo|thumb'"'. Overrides the config "
+            "'operations' value if provided."
         ),
     )
 
     parser.add_argument(
-        "--width",
-        type=int,
-        default=None,
-        help="Override target canvas width for this run.",
+        "--logo-target-size",
+        metavar="WIDTHxHEIGHT",
+        type=parse_size_pair,
+        help="Override logo canvas size with WIDTHxHEIGHT (e.g., 800x310).",
+    )
+    parser.add_argument(
+        "--thumb-target-size",
+        metavar="WIDTHxHEIGHT",
+        type=parse_size_pair,
+        help="Override thumb canvas size with WIDTHxHEIGHT (e.g., 1000x562).",
+    )
+    parser.add_argument(
+        "--backdrop-target-size",
+        metavar="WIDTHxHEIGHT",
+        type=parse_size_pair,
+        help="Override backdrop canvas size with WIDTHxHEIGHT (e.g., 1920x1080).",
+    )
+    parser.add_argument(
+        "--profile-target-size",
+        metavar="WIDTHxHEIGHT",
+        type=parse_size_pair,
+        help="Override profile canvas size with WIDTHxHEIGHT (e.g., 256x256).",
     )
 
     parser.add_argument(
-        "--height",
-        type=int,
-        default=None,
-        help="Override target canvas height for this run.",
-    )
-
-    parser.add_argument(
-        "--jpeg-quality",
+        "--thumb-jpeg-quality",
         type=int,
         default=None,
         help="JPEG quality for thumb output (1-95). Overrides config thumb.jpeg_quality.",
     )
 
     parser.add_argument(
-        "--webp-quality",
+        "--backdrop-jpeg-quality",
+        type=int,
+        default=None,
+        help="JPEG quality for backdrop output (1-95). Overrides config backdrop.jpeg_quality.",
+    )
+
+    parser.add_argument(
+        "--profile-webp-quality",
         type=int,
         default=None,
         help="WebP quality for profile output (1-100). Overrides config profile.webp_quality.",
@@ -115,7 +158,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--single",
         help=(
-            "Process a single target: username for profile mode, or itemId for logo/thumb."
+            "Process a single Jellyfin item by id (logo/thumb/backdrop). "
+            "Use --mode to filter which image types run."
         ),
     )
 
@@ -269,25 +313,90 @@ def validate_restore_all_args(argv: list[str]) -> None:
         raise SystemExit(1)
 
 
+def validate_test_jf_args(argv: list[str]) -> None:
+    """
+    Ensure --test-jf is not combined with other operational arguments.
+
+    Allows only Jellyfin connection overrides, config path, and logging flags.
+    """
+    allowed = {
+        "--test-jf",
+        "--config",
+        "--silent",
+        "-s",
+        "--verbose",
+        "-v",
+        "--jf-url",
+        "--jf-api-key",
+        "--jf-delay-ms",
+    }
+    extras: list[str] = []
+    skip_next = False
+
+    for token in argv:
+        if skip_next:
+            skip_next = False
+            continue
+
+        if token in {"--config", "--jf-url", "--jf-api-key", "--jf-delay-ms"}:
+            skip_next = True
+            continue
+        if token.startswith("--config=") or token.startswith("--jf-url=") or token.startswith("--jf-api-key=") or token.startswith("--jf-delay-ms="):
+            continue
+        if token in allowed:
+            continue
+
+        extras.append(token)
+
+    if extras:
+        state.log.critical(
+            "--test-jf cannot be combined with other arguments (found: %s).",
+            ", ".join(extras),
+        )
+        state.stats.record_error("arguments", "test-jf combined with other args")
+        raise SystemExit(1)
+
+
 def warn_unused_cli_overrides(args: argparse.Namespace, operations: list[str]) -> None:
     """
     Emit warnings for CLI overrides that have no effect with the requested operations.
 
-    Examples: --jpeg-quality without thumb mode, --webp-quality without profile mode, or --no-padding without logo mode.
+    Examples: --thumb-jpeg-quality without thumb mode, --profile-webp-quality without profile mode,
+    target-size flags without their mode, or --no-padding without logo mode.
     Each warning is logged and counted so the operator is aware that a flag was ignored.
     """
     ops = set(operations)
-    if args.jpeg_quality is not None and "thumb" not in ops:
-        state.log.warning("--jpeg-quality has no effect because 'thumb' mode is not selected.")
+    if getattr(args, "no_upscale", False) and getattr(args, "no_downscale", False):
+        state.log.warning(
+            "--no-upscale and --no-downscale together disable all scaling."
+        )
         state.stats.record_warning()
-    if args.webp_quality is not None and "profile" not in ops:
-        state.log.warning("--webp-quality has no effect because 'profile' mode is not selected.")
+    if args.thumb_jpeg_quality is not None and "thumb" not in ops:
+        state.log.warning("--thumb-jpeg-quality has no effect because 'thumb' mode is not selected.")
+        state.stats.record_warning()
+    if args.backdrop_jpeg_quality is not None and "backdrop" not in ops:
+        state.log.warning("--backdrop-jpeg-quality has no effect because 'backdrop' mode is not selected.")
+        state.stats.record_warning()
+    if args.profile_webp_quality is not None and "profile" not in ops:
+        state.log.warning("--profile-webp-quality has no effect because 'profile' mode is not selected.")
         state.stats.record_warning()
     if args.no_padding and "logo" not in ops:
         state.log.warning("--no-padding has no effect because 'logo' mode is not selected.")
         state.stats.record_warning()
-    if getattr(args, "item_types", None) and not ({"logo", "thumb"} & ops):
-        state.log.warning("--item-types has no effect without 'logo' or 'thumb' modes selected.")
+    dim_warnings = [
+        ("logo", args.logo_target_size, "--logo-target-size"),
+        ("thumb", args.thumb_target_size, "--thumb-target-size"),
+        ("backdrop", args.backdrop_target_size, "--backdrop-target-size"),
+        ("profile", args.profile_target_size, "--profile-target-size"),
+    ]
+    for mode, value, flag in dim_warnings:
+        if value is not None and mode not in ops:
+            state.log.warning("%s has no effect because '%s' mode is not selected.", flag, mode)
+            state.stats.record_warning()
+    if getattr(args, "item_types", None) and not ({"logo", "thumb", "backdrop"} & ops):
+        state.log.warning(
+            "--item-types has no effect without 'logo', 'thumb', or 'backdrop' modes selected."
+        )
         state.stats.record_warning()
 
 
@@ -348,6 +457,12 @@ def main() -> None:
 
         if args.restore_all:
             validate_restore_all_args(sys.argv[1:])
+        if args.test_jf:
+            validate_test_jf_args(sys.argv[1:])
+        if args.restore and args.backup:
+            state.log.critical("--backup cannot be used with --restore.")
+            state.stats.record_error("arguments", "backup used with restore")
+            raise SystemExit(1)
 
         force_upload_noscale = bool(cfg.get("force_upload_noscale", False))
         backup_mode = normalize_backup_mode(cfg.get("backup_mode", "partial"))
@@ -393,9 +508,9 @@ def main() -> None:
                 state.stats.record_error("test-jf", "Connection test failed.")
             raise SystemExit(0 if ok else 1)
 
-        if args.single and len(operations) != 1:
-            state.log.critical("--single can only be used with one mode/operation.")
-            state.stats.record_error("arguments", "--single used with multiple modes")
+        if args.single and not args.mode:
+            state.log.critical("--single requires an explicit --mode to determine target type.")
+            state.stats.record_error("arguments", "--single missing --mode")
             raise SystemExit(1)
         warn_unused_cli_overrides(args, operations)
 
@@ -425,47 +540,15 @@ def main() -> None:
                 state.stats.record_error("configuration", str(exc))
                 raise SystemExit(1)
 
-            if args.single and not restore_requested:
-                if mode == "profile":
-                    process_single_profile(
-                        username=args.single,
-                        settings=settings_by_mode[mode],
-                        dry_run=dry_run,
-                        jf_client=jf_client,
-                        force_upload_noscale=force_upload_noscale,
-                        is_restore=args.restore,
-                        make_backup=make_backup,
-                        backup_root=backup_root,
-                        backup_mode=backup_mode,
-                    )
-                    raise SystemExit(0)
+        if args.single:
+            ops_set = set(operations)
+            if "profile" in ops_set:
+                if operations != ["profile"]:
+                    state.log.critical("--single with profile mode cannot be combined with other modes.")
+                    state.stats.record_error("arguments", "--single profile combined with other modes")
+                    raise SystemExit(1)
 
-                if mode in ("logo", "thumb"):
-                    process_single_item_api(
-                        item_id=args.single,
-                        mode=mode,
-                        settings_by_mode=settings_by_mode,
-                        jf_client=cast(JellyfinClient, jf_client),
-                        dry_run=dry_run,
-                        force_upload_noscale=force_upload_noscale,
-                        make_backup=make_backup,
-                        backup_root=backup_root,
-                        backup_mode=backup_mode,
-                    )
-                    raise SystemExit(0)
-
-                state.log.critical("--single not supported for mode '%s'.", mode)
-                state.stats.record_error("arguments", f"--single not supported for mode {mode}")
-                raise SystemExit(1)
-
-        if restore_requested:
-            if jf_client is None:
-                state.log.critical("Jellyfin client is required for restore.")
-                state.stats.record_error("restore", "Missing Jellyfin client")
-                raise SystemExit(1)
-            if args.single:
-                mode = operations[0]
-                if mode == "profile":
+                if restore_requested:
                     users = jf_client.list_users(is_disabled=False)
                     user = find_user_by_name(users, args.single)
                     if user is None:
@@ -477,22 +560,63 @@ def main() -> None:
                         state.log.critical("Resolved user '%s' is missing an Id.", args.single)
                         state.stats.record_error(args.single, "User missing Id")
                         raise SystemExit(1)
-                    ok = restore_single_from_backup(
+                    ok = restore_single_item_from_backup(
                         backup_root=backup_root,
                         jf_client=jf_client,
-                        mode=mode,
+                        mode="profile",
                         target_id=target_id,
                         dry_run=dry_run,
                     )
-                else:
-                    ok = restore_single_from_backup(
+                    raise SystemExit(0 if ok else 1)
+
+                process_single_profile(
+                    username=args.single,
+                    settings=settings_by_mode["profile"],
+                    dry_run=dry_run,
+                    jf_client=jf_client,
+                    force_upload_noscale=force_upload_noscale,
+                    is_restore=False,
+                    make_backup=make_backup,
+                    backup_root=backup_root,
+                    backup_mode=backup_mode,
+                )
+                raise SystemExit(0)
+
+            # Single item id across selected item modes.
+            if restore_requested:
+                ok_all = True
+                for mode in operations:
+                    ok = restore_single_item_from_backup(
                         backup_root=backup_root,
                         jf_client=jf_client,
                         mode=mode,
                         target_id=args.single,
                         dry_run=dry_run,
                     )
-                raise SystemExit(0 if ok else 1)
+                    ok_all = ok_all and ok
+                raise SystemExit(0 if ok_all else 1)
+
+            ok_all = True
+            for mode in operations:
+                ok = process_single_item_api(
+                    item_id=args.single,
+                    mode=mode,
+                    settings_by_mode=settings_by_mode,
+                    jf_client=cast(JellyfinClient, jf_client),
+                    dry_run=dry_run,
+                    force_upload_noscale=force_upload_noscale,
+                    make_backup=make_backup,
+                    backup_root=backup_root,
+                    backup_mode=backup_mode,
+                )
+                ok_all = ok_all and ok
+            raise SystemExit(0 if ok_all else 1)
+
+        if restore_requested:
+            if jf_client is None:
+                state.log.critical("Jellyfin client is required for restore.")
+                state.stats.record_error("restore", "Missing Jellyfin client")
+                raise SystemExit(1)
 
             restore_from_backups(
                 backup_root=backup_root,
@@ -502,7 +626,7 @@ def main() -> None:
             )
             raise SystemExit(0)
 
-        opeation_modes = [m for m in operations if m in ("logo", "thumb")]
+        opeation_modes = [m for m in operations if m in ("logo", "thumb", "backdrop")]
         if opeation_modes:
             if jf_client is None:
                 state.log.critical("Jellyfin client is required for library processing.")

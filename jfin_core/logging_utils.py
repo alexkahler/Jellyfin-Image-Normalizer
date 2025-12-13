@@ -35,6 +35,7 @@ class _ColorFormatter(logging.Formatter):
 
 
 def _parse_log_level(name: str | None, default: str = "INFO") -> int:
+    """Map a level name to a logging constant, defaulting when input is missing or unknown."""
     mapping = {
         "CRITICAL": logging.CRITICAL,
         "ERROR": logging.ERROR,
@@ -49,6 +50,7 @@ def _parse_log_level(name: str | None, default: str = "INFO") -> int:
 
 
 def setup_logging(cfg: dict[str, Any], args: Any) -> tuple[logging.LoggerAdapter, dict[str, Any]]:
+    """Configure logging handlers/adapters based on config/CLI args and return the adapter plus effective settings."""
     logging_cfg = cfg.get("logging", {}) or {}
 
     silent = bool(getattr(args, "silent", False) or logging_cfg.get("silent", False))
@@ -123,6 +125,7 @@ def log_run_start(
     file_level: str,
     log_file: Path,
 ) -> None:
+    """Record run metadata (config, operations, flags) and flip shared dry_run flag before processing."""
     state.dry_run = dry_run
     version = cfg.get("version") or APP_VERSION
     state.log.info(
@@ -142,6 +145,7 @@ def log_run_start(
 
 
 def log_run_summary(stats: RunStats) -> None:
+    """Log completion summary with counts of processed/skipped/warned items (and highlight dry-run mode)."""
     state.log.info("Run completed.")
     state.log.info(
         "Summary: items processed=%s, images found=%s, success=%s, skipped=%s, warnings=%s, errors=%s",
@@ -158,5 +162,5 @@ def log_run_summary(stats: RunStats) -> None:
             state.log.error(" - %s: %s", path, reason)
     if state.dry_run:
         state.log.info(
-            "DRY RUN ENABLED: No changes were made and no images were uploaded, deleted, or saved to backups. All actions were simulated only."
+            "DRY RUN ENABLED: No changes were made and no images were uploaded, deleted, or saved to backups. All actions were simulated."
         )

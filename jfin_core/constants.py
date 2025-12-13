@@ -1,4 +1,6 @@
-APP_VERSION = "0.1.1"
+import textwrap
+
+APP_VERSION = "0.1.2"
 
 MODE_CONFIG = {
     "logo": {
@@ -10,21 +12,27 @@ MODE_CONFIG = {
     "profile": {
         "filename": "profile",
     },
+    "backdrop": {
+        "filename": "backdrop.jpg",
+    },
 }
 
 DEFAULT_CONFIG_NAME = "config.toml"
+
 VALID_MODES = set(MODE_CONFIG.keys())
 
 IMAGE_TYPE_TO_MODE = {
     "Logo": "logo",
     "Thumb": "thumb",
     "Primary": "profile",
+    "Backdrop": "backdrop",
 }
 
 MODE_TO_IMAGE_TYPE = {
     "logo": "Logo",
     "thumb": "Thumb",
     "profile": "Primary",
+    "backdrop": "Backdrop",
 }
 
 # Default item types for discovery (movies and series).
@@ -37,4 +45,180 @@ FILENAME_CONFIG = {
     "Logo": "logo",
     "Thumb": "landscape",
     "Primary": "profile",
+    "Backdrop": "backdrop",
 }
+
+VALID_BACKUP_MODES = {"full", "partial"}
+
+SECTION_KEY_MAP = {
+    "server": ["jf_url", "jf_api_key"],
+    "api": [
+        "verify_tls",
+        "timeout",
+        "jf_delay_ms",
+        "api_retry_count",
+        "api_retry_backoff_ms",
+        "fail_fast",
+        "dry_run",
+    ],
+    "backup": [
+        "backup",
+        "backup_mode",
+        "backup_dir",
+        "force_upload_noscale",
+    ],
+    "modes": ["operations", "item_types"],
+}
+
+DEFAULT_TOML_TEMPLATE = textwrap.dedent(
+    """\
+    # Jellyfin Image Normalizer configuration (TOML)
+
+    [server]
+    # Required Jellyfin base URL including protocol
+    # (e.g. https://media.example.com). 
+    # Default: placeholder.
+    jf_url = "https://your-jellyfin-url-here:8096"
+    # Required Jellyfin API key with library access. 
+    # Default: placeholder.
+    jf_api_key = "YOUR_API_KEY_HERE"
+
+    [api]
+    # Verify TLS certificates for HTTPS connections (bool). 
+    # Default: True.
+    verify_tls = true
+    # HTTP timeout in seconds for Jellyfin requests. 
+    # Default: 15.0 seconds.
+    timeout = 15
+    # Delay between API calls in milliseconds.
+    # Increase this if you are experiencing errors during upload or deletions.
+    # Default: 100 ms.
+    jf_delay_ms = 100
+    # Number of retry attempts for GET/POST operations. 
+    # Default: 3.
+    api_retry_count = 3
+    # Initial retry backoff in milliseconds (doubles each attempt).
+    # Default: 500 ms.
+    api_retry_backoff_ms = 500
+    # Raise immediately when uploads fail instead of continuing.
+    # Default: False.
+    fail_fast = false
+    # When true, no POST/PUT/DELETE calls are issued (safety). 
+    # Default: True.
+    dry_run = true
+
+    [backup]
+    # Save originals to backup_dir before uploads. 
+    # Default: True.
+    backup = true
+    # partial backs up only scaled images; full backs up all images.
+    # Default: partial.
+    backup_mode = "partial"
+    # Root folder for backups (relative or absolute). 
+    # Default: backup.
+    backup_dir = "backup"
+    # Re-upload originals even when no resize is needed. 
+    # Default: False.
+    force_upload_noscale = false
+
+    [modes]
+    # Modes to run, i.e., which image types to process: (logo|thumb|profile|
+    # backdrop). Accepts a pipe-separated string or a string array.
+    # Default: logo|thumb|profile.
+    operations = ["logo", "thumb", "profile"]
+    # Jellyfin library types to process for logo/thumb/backdrop discovery
+    # (movies|series). Accepts pipe-separated string or array.
+    # Default: movies|series.
+    item_types = "movies|series"
+
+    [logging]
+    # Path to log file. e.g., "/opt/var/log/jfin.log". 
+    # Default: jfin.log.
+    file_path = "jfin.log"
+    # Write logs to file. 
+    # Default: True.
+    file_enabled = true
+    # File log level (DEBUG, INFO, WARNING, ERROR, CRITICAL). 
+    # Default: INFO.
+    file_level = "INFO"
+    # CLI log level. 
+    # Default: INFO.
+    cli_level = "INFO"
+    # Suppress CLI logging except critical errors. 
+    # Default: False.
+    silent = false
+
+    [libraries]
+    # Optional library name filters (list/pipe/comma).
+    # Default: empty (all media folders; filtered by item_types).
+    names = []
+
+    [logo]
+    # Canvas width for logos (pixels). 
+    # Default: 800.
+    width = 800
+    # Canvas height for logos (pixels). 
+    # Default: 310.
+    height = 310
+    # Block upscaling logos. 
+    # Default: False.
+    no_upscale = false
+    # Block downscaling logos. 
+    # Default: False.
+    no_downscale = false
+    # Skip transparent padding; resize only. 
+    # Default: False.
+    no_padding = false
+
+    [thumb]
+    # Canvas width for thumbs/posters (pixels). 
+    # Default: 1000.
+    width = 1000
+    # Canvas height for thumbs/posters (pixels).
+    # Default: 562.
+    height = 562
+    # Block upscaling thumbs. 
+    # Default: True.
+    no_upscale = true
+    # Block downscaling thumbs. 
+    # Default: False.
+    no_downscale = false
+    # JPEG quality (1-95) for thumbs. 
+    # Default: 85.
+    jpeg_quality = 85
+
+    [profile]
+    # Canvas width for profile images (pixels). 
+    # Default: 256.
+    width = 256
+    # Canvas height for profile images (pixels). 
+    # Default: 256.
+    height = 256
+    # Block upscaling profiles. 
+    # Default: True.
+    no_upscale = true
+    # Block downscaling profiles. 
+    # Default: False.
+    no_downscale = false
+    # WebP quality (1-100) for profiles. 
+    # Default: 80.
+    webp_quality = 80
+
+    [backdrop]
+    # Canvas width for backdrops (pixels). 
+    # Default: 1920.
+    width = 1920
+    # Canvas height for backdrops (pixels). 
+    # Default: 1080.
+    height = 1080
+    # Block upscaling backdrops. 
+    # Default: True.
+    no_upscale = true
+    # Block downscaling backdrops. 
+    # Default: False.
+    no_downscale = false
+    # JPEG quality (1-95) for backdrops. 
+    # Default: 85.
+    jpeg_quality = 85
+    """
+)

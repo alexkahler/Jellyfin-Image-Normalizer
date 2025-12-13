@@ -3,7 +3,7 @@
 This document explains how the Jellyfin Image Normalizer CLI works so a new team can operate or extend it. It covers runtime flow, configuration, modules, key classes/functions, imaging rules, API usage, and backup/restore behavior.
 
 ## Purpose and Scope
-- Normalize Jellyfin artwork for three modes: `logo` (transparent fits), `thumb` (landscape/poster cover), and `profile` (user avatars).
+- Normalize Jellyfin artwork for four modes: `logo` (transparent fits), `thumb` (landscape/poster cover), `backdrop` (full-width backgrounds), and `profile` (user avatars).
 - Operates fully via Jellyfin APIs: discover items/users, stream images, normalize in memory with Pillow, and (optionally) upload replacements.
 - Safety first: dry-run defaults are baked in; writes require explicit config/CLI approval. Backups are stored before uploads when enabled.
 
@@ -22,7 +22,7 @@ This document explains how the Jellyfin Image Normalizer CLI works so a new team
 
 ## Configuration Model (`config.toml`)
 - Location: defaults to `config.toml` beside the repo root (`jfin_core/config.py:default_config_path`). Generate a starter file with `python jfin.py --generate-config` (optionally `--config <path>.toml`, no other operational flags allowed).
-- Format: TOML only. `.json` configs are rejected at load time. Comments are inline `#` entries; there is no `_comments` table.
+- Format: TOML only. Comments are inline `#` entries.
 - Sections: grouped defaults under `[server]`, `[api]`, `[backup]`, `[modes]` (plus `[logging]`, `[libraries]`, and mode sections). Keys are lifted to the root for runtime use; only the current schema is supported.
 - Required: `jf_url` (base URL) and `jf_api_key` (used in the MediaBrowser Authorization header), non-empty strings.
 - API behavior: `verify_tls` (bool), `timeout` (sec), `jf_delay_ms` (throttle between requests), `api_retry_count`, `api_retry_backoff_ms`, `fail_fast` (raise on API upload errors), `dry_run` (default true in generated config).
@@ -32,11 +32,12 @@ This document explains how the Jellyfin Image Normalizer CLI works so a new team
 - Logging: `logging.file_path`, `file_enabled`, `file_level`, `cli_level`, `silent`. CLI `-s/--silent` and `-v/--verbose` override CLI logging.
 - Optional: `version` (string) used for logging and sent in the MediaBrowser `Authorization` header.
 - Discovery: `libraries.names` to filter by normalized library names; `item_types` drives which Jellyfin item types (`Movie`/`Series`) are queried during discovery.
-- Mode sections (`logo`, `thumb`, `profile`):
+- Mode sections (`logo`, `thumb`, `backdrop`, `profile`):
   - Common: `width`, `height`, `no_upscale`, `no_downscale`.
   - Validation: widths/heights must be >0; CLI width/height overrides must also be positive, and a missing side is inferred from the configured aspect ratio (clamped to at least 1px).
   - `logo`: `no_padding` to skip transparent canvas centering.
   - `thumb`: `jpeg_quality` (1-95).
+  - `backdrop`: `jpeg_quality` (1-95).
   - `profile`: `webp_quality` (1-100).
 
 Example TOML:
@@ -58,14 +59,14 @@ no_padding = false
 ```
 
 ## CLI Entrypoints (`jfin.py:parse_args`)
-- Core flags: `--config`, `--generate-config`, `--test-jf`, `--mode` (logo|thumb|profile), `--single <user|itemId>`, `--restore`, `--restore-all` (must be used alone except logging/config flags), `--dry-run`, `--backup`.
+- Core flags: `--config`, `--generate-config`, `--test-jf`, `--mode` (logo|thumb|backdrop|profile), `--single <itemId|username>` (requires `--mode`), `--restore`, `--restore-all` (must be used alone except logging/config flags), `--dry-run`, `--backup`.
 - Config path: `--config <file>.toml` (defaults to `config.toml` beside the repo). Non-TOML paths are rejected.
-- Imaging overrides: `--width/--height`, `--jpeg-quality`, `--webp-quality`, `--no-upscale`, `--no-downscale`, `--no-padding` (logo only), `--force-upload-noscale`. Width/height overrides must be positive; if only one side is provided, the other is inferred from the configured aspect ratio.
+- Imaging overrides: `--logo-target-size`, `--thumb-target-size`, `--backdrop-target-size`, `--profile-target-size`, `--thumb-jpeg-quality`, `--backdrop-jpeg-quality`, `--profile-webp-quality`, `--no-upscale`, `--no-downscale`, `--no-padding` (logo only), `--force-upload-noscale`. Target size use `WIDTHxHEIGHT` (positive integers).
 - Discovery overrides: `--item-types` (movies|series) to override `[modes].item_types` for `/Items` discovery; values are case-insensitive and parsed like the config setting.
 - Jellyfin overrides: `--jf-url`, `--jf-api-key`, `--libraries`, `--item-types`, `--jf-delay-ms`.
-- Logging toggles: `--silent/-s`, `--verbose/-v`.
+- Logging toggles: `--silent/-s` for disabling CLI output, `--verbose/-v` for enabling debug logging.
 - Exclusivity/validation: `--generate-config` rejects any operational flags; `--restore-all` rejects combinations except config/logging flags; `--test-jf` requires `--jf-url`/`--jf-api-key` overrides or populated config values.
-- No-op guards: CLI emits warnings when mode-specific flags have no effect (e.g., `--jpeg-quality` without `thumb`, `--webp-quality` without `profile`, `--no-padding` without `logo`).
+- No-op guards: CLI emits warnings when mode-specific flags have no effect (e.g., `--thumb-jpeg-quality` without `thumb`, `--profile-webp-quality` without `profile`, `--no-padding` without `logo`, or target-size flags without their mode).
 - Exit behavior: most validation errors raise `SystemExit(1)` after recording stats; `--test-jf` exits immediately after the connectivity check.
 
 ## Runtime Flow (High Level)
@@ -77,23 +78,32 @@ no_padding = false
 6) Pre-flight connectivity check: call `/System/Info` once via `test_connection`; abort early with a logged critical if unreachable, unauthorized/forbidden, returning 503, or reporting `IsShuttingDown=true`.  
 7) For each mode, validate required config and build `ModeRuntimeSettings` (width/height, scaling flags, qualities, padding).  
 8) Branches:
-   - `--single` + `logo|thumb`: call `process_single_item_api` (no discovery) with the provided item id.
-   - `--single` + `profile`: call `process_single_profile` (username lookup).
+   - `--single` + item modes (`logo`/`thumb`/`backdrop` or a combination): call `process_single_item_api` once per selected mode (no discovery) for the provided item id.
+   - `--single` + `profile` only: call `process_single_profile` (username lookup).
    - `--restore` + `--mode`: restore backups for those modes; with `--single`, restore only the targeted item/user using backup file lookup.
    - `--restore-all`: reuses the same restore path with all modes selected.
    - Normal processing: library modes (`logo`/`thumb`) via discovery + normalize; `profile` via user list.
 9) Always log scale decisions, API failures, and run summary before exit.
 
 ## Discovery and Library Processing (`pipeline.process_libraries_via_api`)
-- Build `DiscoverySettings` from config and requested operations; image types are derived from modes (`Logo`, `Thumb`) and `item_types` map to `IncludeItemTypes` (`Movie`/`Series`).
+- Build `DiscoverySettings` from config and requested operations; image types are derived from modes (`Logo`, `Thumb`, `Backdrop`) and `item_types` map to `IncludeItemTypes` (`Movie`/`Series`).
 - If `libraries.names` is defined, discover libraries (`discover_libraries`) via `/Library/MediaFolders`, normalize names, and filter to matches. When no filters are provided, skip `/Library/MediaFolders` entirely.
-- Discover items (`discover_library_items`): paginated `/Items` queries. When libraries were selected, call with `ParentId=<libraryId>` per library; when no library filters are present, call `/Items` once without `ParentId` and with `Recursive=true`. Always set `IncludeItemTypes` from `item_types`, `EnableImageTypes` from requested modes, and `ImageTypeLimit=1`, paging until no records remain. Collect items that already have the requested image tags.
-- Normalize images (`process_discovered_items` -> `normalize_item_image_api`):
-  - Fetch original via `/Items/<itemId>/Images/<ImageType>`.
-  - Apply EXIF orientation, plan resize (`fit` for logos, `cover` for thumbs), and decide SCALE_UP/DOWN/NO_SCALE based on `allow_upscale/allow_downscale`.
-  - Optionally back up originals (`backup_mode` gate) to `backup/<first2>/<id>/<stem>.<ext>` using inferred content type.
-  - For NO_SCALE: record success; optionally re-upload original when `force_upload_noscale` is true.
-  - For scaled images: build normalized image (see Imaging Rules), encode, and upload via `set_item_image_bytes` (base64 payload). Track API failures in `state.api_failures`.
+- Discover items (`discover_library_items`): paginated `/Items` queries. When libraries were selected, call with `ParentId=<libraryId>` per library; when no library filters are present, call `/Items` once without `ParentId` and with `Recursive=true`. Always set `IncludeItemTypes` from `item_types`, `EnableImageTypes` and from requested modes, paging until no records remain. Collect items that already have the requested image tags.
+- Normalize images (`process_discovered_items` -> `normalize_item_image_api` / `normalize_item_backdrops_api`):
+  - For non-backdrop types (`Logo`, `Thumb`, `Primary`):
+    - Fetch original via `/Items/<itemId>/Images/<ImageType>`.
+    - Apply EXIF orientation, plan resize (`fit` for logos, `cover` for thumbs), and decide SCALE_UP/DOWN/NO_SCALE based on `allow_upscale/allow_downscale`.
+    - Optionally back up originals (`backup_mode` gate) to `backup/<first2>/<id>/<stem>.<ext>` using inferred content type.
+    - For NO_SCALE: record skip; optionally re-upload original when `force_upload_noscale` is true (if `fouce_upload_noscale` then record success/failed result).
+    - For scaled images: build normalized image (see Imaging Rules), encode, and upload via `set_item_image_bytes` (base64 payload). Track API failures in `state.api_failures`.
+  - For backdrops (`Backdrop`):
+    - Discovery records `DiscoveredItem.backdrop_count` from `BackdropImageTags` so the pipeline knows how many backdrops are present.
+    - `normalize_item_backdrops_api` runs a dedicated multi-phase flow:
+      1. **Fetch & stage**: fetch all backdrops for indices `0..count-1`, infer file extension from content-type, and write originals to a per-item staging directory under `backup_root/staging/<itemId>`. Any fetch or staging failure aborts and cleans staging.
+      2. **Normalize**: for each staged file, re-read bytes, call `_normalize_image_bytes` with `mode="backdrop"` and `backdrop_index` set to the source index, and keep normalized bytes in memory.
+      3. **Delete originals**: delete all original backdrops on the server by repeatedly calling `DELETE /Items/<id>/Images/Backdrop/0` until the expected count is removed. Then issue a `HEAD` request for index 0 and require a 404-equivalent (no image) before continuing.
+      4. **Upload normalized set**: upload normalized payloads back as a dense index set `0..count-1`, preserving source ordering. Backdrops are always re-uploaded even when NO_SCALE, to keep Jellyfin’s automatically compacted indices consistent.
+      5. **Finalize staging**: when all uploads succeed, remove the staging directory; if any upload fails, retain staged originals on disk for manual inspection and return a failure result for that item.
   - Progress logged every 25 images.
 
 ## Profile Processing (`pipeline.process_profiles` / `process_single_profile`)
@@ -108,6 +118,7 @@ no_padding = false
 - Mode builders:
   - Logo: convert to RGBA, resize with LANCZOS, center on transparent canvas unless `no_padding`; preserve palette (`P` mode) by converting back with adaptive palette and original color count when known; `LA` preserved. Output `image/png`.
   - Thumb: convert to RGB, cover-scale then center-crop to canvas. Output JPEG with `jpeg_quality`, optimized + progressive.
+  - Backdrop: reuse thumb’s cover+crop behavior but with backdrop-specific target size. Always treated as RGB and encoded as JPEG with `jpeg_quality`.
   - Profile: convert to RGBA, cover-scale then crop. Output WebP with `webp_quality` (method=6). Alpha preserved.
 - EXIF orientation: `apply_exif_orientation` uses transpose but avoids rotating tall images when orientation implies swap and height >= width.
 - Color stats: `get_palette_color_count` attempts to retain palette size for logos (used only when original mode is `P`).
@@ -118,7 +129,7 @@ no_padding = false
 - Uploads:
   - Items: `set_item_image_bytes` POSTs base64 image to `/Items/<id>/Images/<type>` with `Content-Type` set from normalized format. Optional `set_item_image` reads from disk.
   - Profiles: `set_user_profile_image` DELETEs `/UserImage?userId=<id>` then POSTs base64 to the same endpoint. `delete_user_profile_image` treats 404 as success.
-- Safety gates: `_writes_allowed` blocks POST/DELETE when `dry_run` is true. `delay` enforces per-request sleep after successful POSTs.
+- Safety gates: `_writes_allowed` blocks POST/DELETE when `dry_run` is true. `delay` enforces per-request sleep after successful GET/POST/DELETE.
 - Failure reporting: `_post_image` appends failure dicts to `state.api_failures` (with item/user id, image_type, path, error) and honors `fail_fast` to raise on first failure.
 
 ## Backup and Restore (`jfin_core/backup.py`, `pipeline.restore_from_backups`, `restore_single_from_backup`)
@@ -137,7 +148,7 @@ no_padding = false
 - `ModeRuntimeSettings` (`jfin_core/config.py`): resolved per-mode sizes, scaling flags, qualities, padding.
 - `DiscoverySettings` (`config.py`): library filters, item type filters, and image query settings.
 - `LibraryRef`, `DiscoveredItem` (`discovery.py`): carry ids, names, collection types, and discovered image types.
-- `ScalePlan` (`imaging.py`): resize decision, factors, and original/target dimensions; used for reporting and NO_SCALE handling.
+- `ScalePlan` (`imaging.py`): resize decision, factors, and original/target size; used for reporting and NO_SCALE handling.
 - `JellyfinClient` (`client.py`): API facade with request helpers, GET methods, upload/delete calls, dry-run gatekeeping.
 
 ## Config Migration Notes

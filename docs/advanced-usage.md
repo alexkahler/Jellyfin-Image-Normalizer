@@ -9,13 +9,12 @@ This page collects small but useful patterns and best practices that don't fit i
 If you manually replace an image inside your Jellyfin metadata folder and Jellyfin refuses to acknowledge it (cache might not be updated or the old image size is still shown), you can force JFIN to re-upload the file:
 
 ```bash
-python jfin.py --single <item_uuid> \
+python jfin.py --mode logo --single <item_uuid> \
   --force-upload-noscale \
-  --width <image_width> \
-  --height <image_height>
+  --logo-target-size <image_width>x<image_height>
 ```
 
-This forces Jellyfin to associate the new file with the item, even if the dimensions didn't change.
+This forces Jellyfin to associate the new file with the item, even if the size didn't change.
 
 ---
 
@@ -29,6 +28,25 @@ python jfin.py --mode logo --item-types series
 ```
 
 You can also combine values: `--item-types movies|series` (default) or set the same option in `config.toml` under `[modes].item_types`.
+
+---
+
+## Normalize specific images for a single item
+
+If you want to re-normalize specific images for a specific item (for example after changing artwork in Jellyfin), you can target the item directly. Use `--mode` to filter which image types run:
+
+```bash
+python jfin.py --mode=backdrop --single <item_uuid>
+
+# Or multiple image types at once:
+python jfin.py --mode=logo|thumb|backdrop --single <item_uuid>
+```
+
+Behind the scenes JFIN will:
+
+- Fetch all existing backdrops for that item.
+- Normalize them according to your `[backdrop]` config (or CLI overrides).
+- Delete the originals and re-upload preserving the original ordering.
 
 ## Use a Maintenance Account
 

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import io
-import os
 from pathlib import Path
 from typing import Any
 
@@ -9,8 +8,9 @@ from PIL import Image
 
 from . import state
 from .backup import (
-    content_type_from_extension,
-    image_type_from_filename,
+    cleanup_staging_dir,
+    get_staging_dir,
+    guess_extension_from_content_type,
     save_backup,
     should_backup_for_plan,
 )
@@ -51,6 +51,7 @@ def _plan_and_backup_image(
     backup_root: Path,
     backup_mode: str,
     dry_run: bool,
+    backdrop_index: int | None = None,
 ) -> ScalePlan:
     """
     Compute the resize plan, persist backups when applicable, and log the processing summary.
@@ -72,6 +73,7 @@ def _plan_and_backup_image(
             data=raw_bytes,
             content_type=content_type,
             overwrite_existing=True,
+            backdrop_index=backdrop_index,
         )
 
     record_scale_decision(label, plan)
@@ -86,6 +88,172 @@ def _plan_and_backup_image(
     return plan
 
 
+def _normalize_image_bytes(
+    *,
+    item_id: str,
+    label: str,
+    image_type: str,
+    data: bytes,
+    content_type: str | None,
+    mode: str,
+    settings: ModeRuntimeSettings,
+    make_backup: bool,
+    backup_root: Path,
+    backup_mode: str,
+    dry_run: bool,
+    backdrop_index: int | None = None,
+) -> tuple[ScalePlan, bytes, str]:
+    """
+    Return the normalized payload bytes, normalized content-type, and scale plan for a single image.
+    """
+    with Image.open(io.BytesIO(data)) as img:
+        img = apply_exif_orientation(img)
+        orig_mode = img.mode
+        fit_mode = "fit" if mode == "logo" else "cover"
+
+        plan = _plan_and_backup_image(
+            img=img,
+            label=label,
+            fit_mode=fit_mode,
+            settings=settings,
+            item_id=item_id,
+            image_type=image_type,
+            raw_bytes=data,
+            content_type=content_type,
+            make_backup=make_backup,
+            backup_root=backup_root,
+            backup_mode=backup_mode,
+            dry_run=dry_run,
+            backdrop_index=backdrop_index,
+        )
+
+        if plan.is_no_scale:
+            # Skip normalization/encoding when no scaling is needed or allowed.
+            return (
+                plan,
+                data,
+                content_type or "application/octet-stream",
+            )
+
+        orig_color_count = (
+            get_palette_color_count(img) if (mode == "logo" and orig_mode == "P") else None
+        )
+        normalized_img, normalized_content_type, fmt = build_normalized_image(
+            img=img,
+            mode=mode,
+            target_width=settings.target_width,
+            target_height=settings.target_height,
+            new_width=plan.new_width,
+            new_height=plan.new_height,
+            orig_mode=orig_mode,
+            orig_color_count=orig_color_count,
+            no_padding=settings.no_padding,
+        )
+        payload = encode_image_to_bytes(
+            normalized_img=normalized_img,
+            fmt=fmt,
+            jpeg_quality=settings.jpeg_quality,
+            webp_quality=settings.webp_quality,
+        )
+
+    return plan, payload, normalized_content_type
+
+
+def _process_item_image_payload(
+    *,
+    item_id: str,
+    label: str,
+    image_type: str,
+    data: bytes,
+    content_type: str | None,
+    mode: str,
+    settings: ModeRuntimeSettings,
+    jf_client: JellyfinClient,
+    dry_run: bool,
+    force_upload_noscale: bool,
+    make_backup: bool,
+    backup_root: Path,
+    backup_mode: str,
+    backdrop_index: int | None = None,
+) -> bool:
+    """
+    Shared processing for a single image payload (item image or backdrop).
+    Returns True on success, False on failure.
+    """
+    try:
+        plan, payload, normalized_content_type = _normalize_image_bytes(
+            item_id=item_id,
+            label=label,
+            image_type=image_type,
+            data=data,
+            content_type=content_type,
+            mode=mode,
+            settings=settings,
+            make_backup=make_backup,
+            backup_root=backup_root,
+            backup_mode=backup_mode,
+            dry_run=dry_run,
+            backdrop_index=backdrop_index,
+        )
+
+        def upload_original() -> tuple[bool, str | None]:
+            before_failures = len(state.api_failures)
+            upload_ok = jf_client.set_item_image_bytes(
+                item_id=item_id,
+                image_type=image_type,
+                data=data,
+                content_type=content_type or "application/octet-stream",
+                backdrop_index=backdrop_index,
+                failures=state.api_failures,
+            )
+            return upload_ok, state.latest_api_error(before_failures)
+
+        if mode == "backdrop":
+            # For backdrops we always want a final asset, so do not skip uploads.
+            skip_when_no_scale = False
+        else:
+            skip_when_no_scale = bool(mode in ("logo", "thumb") and not force_upload_noscale)
+
+        no_scale_result = handle_no_scale(
+            plan=plan,
+            dry_run=dry_run,
+            force_upload=force_upload_noscale,
+            upload_fn=upload_original,
+            record_label=label,
+            default_error="API upload failed for NO_SCALE image",
+            stats=state.stats,
+            skip_when_no_scale=skip_when_no_scale,
+        )
+        if no_scale_result is not None:
+            return no_scale_result
+
+        if dry_run:
+            state.stats.record_success()
+            return True
+
+        before_failures = len(state.api_failures)
+        upload_ok = jf_client.set_item_image_bytes(
+            item_id=item_id,
+            image_type=image_type,
+            data=payload,
+            content_type=normalized_content_type,
+            backdrop_index=backdrop_index,
+            failures=state.api_failures,
+        )
+        if upload_ok:
+            state.stats.record_success()
+            return True
+
+        upload_error = state.latest_api_error(before_failures)
+        state.stats.record_error(label, upload_error or "API upload failed")
+        return False
+
+    except Exception as e:
+        state.log.exception("[ERROR] Failed to process %s", label)
+        state.stats.record_error(label, str(e))
+        return False
+
+
 def normalize_item_image_api(
     *,
     item: DiscoveredItem,
@@ -98,12 +266,26 @@ def normalize_item_image_api(
     backup_root: Path,
     backup_mode: str,
 ) -> bool:
+    """Fetch, normalize, and upload (when enabled) one item image, delegating backdrops to their dedicated helper."""
+    if image_type == "Backdrop":
+        # Multi-image type; handled by dedicated helper.
+        return normalize_item_backdrops_api(
+            item=item,
+            settings_by_mode=settings_by_mode,
+            jf_client=jf_client,
+            dry_run=dry_run,
+            force_upload_noscale=force_upload_noscale,
+            make_backup=make_backup,
+            backup_root=backup_root,
+            backup_mode=backup_mode,
+        )
+    
     mode = IMAGE_TYPE_TO_MODE.get(image_type)
     if not mode:
         state.log.warning("[WARN] Unsupported image type %s; skipping.", image_type)
         state.stats.record_warning()
         return False
-
+    
     settings = settings_by_mode.get(mode)
     if settings is None:
         state.log.warning("[WARN] No settings for mode '%s'; skipping %s.", mode, image_type)
@@ -117,97 +299,259 @@ def normalize_item_image_api(
         return False
 
     data, content_type = image_payload
+    return _process_item_image_payload(
+        item_id=item.id,
+        label=label,
+        image_type=image_type,
+        data=data,
+        content_type=content_type,
+        mode=mode,
+        settings=settings,
+        jf_client=jf_client,
+        dry_run=dry_run,
+        force_upload_noscale=force_upload_noscale,
+        make_backup=make_backup,
+        backup_root=backup_root,
+        backup_mode=backup_mode,
+    )
 
-    try:
-        with Image.open(io.BytesIO(data)) as img:
-            img = apply_exif_orientation(img)
-            orig_mode = img.mode
-            fit_mode = "fit" if mode == "logo" else "cover"
 
-            plan = _plan_and_backup_image(
-                img=img,
-                label=label,
-                fit_mode=fit_mode,
-                settings=settings,
+def normalize_item_backdrops_api(
+    *,
+    item: DiscoveredItem,
+    settings_by_mode: dict[str, ModeRuntimeSettings],
+    jf_client: JellyfinClient,
+    dry_run: bool,
+    force_upload_noscale: bool,  # Intentionally ignored for backdrops; we always reupload to preserve order.
+    make_backup: bool,
+    backup_root: Path,
+    backup_mode: str,
+) -> bool:
+    """Normalize all backdrops for a single item using fetch-normalize-delete-upload phases."""
+    image_type = "Backdrop"
+    mode = IMAGE_TYPE_TO_MODE.get(image_type)
+    if not mode:
+        state.log.warning("[WARN] Unsupported image type %s; skipping.", image_type)
+        state.stats.record_warning()
+        return False
+
+    settings = settings_by_mode.get(mode)
+    if settings is None:
+        state.log.warning("[WARN] No settings for backdrop mode; skipping.")
+        state.stats.record_warning()
+        return False
+
+    total = item.backdrop_count or 0
+    
+    if total == 0:
+        state.log.info("Item %s has no backdrops; skipping.", item.id)
+        state.stats.record_skip(count_processed=False)
+        return False
+
+    # Phase 1: Fetch & stage - fetch all originals to disk with original extensions
+    # TODO: Consider using a TemporaryDirectory for staging when backups are disabled.
+    staging_dir = None
+    if not dry_run:
+        staging_dir = get_staging_dir(backup_root, item.id)
+    deletions_started = False
+
+    def cleanup_staging_on_failure() -> None:
+        if dry_run or deletions_started:
+            return
+        cleanup_staging_dir(backup_root, item.id)
+    
+    staged_files: list[tuple[int, Path | None, str]] = []  # (index, file_path, content_type)
+    
+    for src_index in range(total):
+        label = f"{item.name} [{item.id}] backdrop #{src_index}"
+        
+        result = jf_client.get_item_image(item_id=item.id, image_type="Backdrop", index=src_index)
+        if result is None:
+            state.log.error("[ERROR] Backdrop fetch failed at call %d for item %s; aborting before normalization.", src_index, item.id)
+            state.stats.record_error(label, "fetch failed")
+            cleanup_staging_on_failure()
+            return False
+        
+        data, content_type = result
+
+        # Stage the file with original extension
+        if not dry_run and staging_dir:
+            try:
+                ext = guess_extension_from_content_type(content_type)
+                staged_path = staging_dir / f"{src_index}{ext}"
+                staged_path.write_bytes(data)
+            except Exception as exc:
+                state.log.error(
+                    "[ERROR] Failed to stage backdrop index %d for item %s: %s",
+                    src_index,
+                    item.id,
+                    exc,
+                )
+                state.stats.record_error(label, f"staging failed: {exc}")
+                cleanup_staging_on_failure()
+                return False
+
+            staged_files.append((src_index, staged_path, content_type))
+            state.log.debug(
+                "  -> Staged backdrop index %d: %s",
+                src_index,
+                staged_path,
+            )
+        else:
+            # In dry-run, keep in memory for phase 2
+            staged_files.append((src_index, None, content_type))
+    
+    if len(staged_files) != total:
+        state.log.error("[ERROR] Fetch phase failed: expected %d backdrops, got %d for item %s.", total, len(staged_files), item.id)
+        state.stats.record_error(item.id, f"Fetch failed: expected {total}, got {len(staged_files)}")
+        cleanup_staging_on_failure()
+        return False
+    
+    # Phase 2: Normalize & prepare - normalize staged files to memory
+    normalized_payloads: list[tuple[int, bytes, str]] = []  # (index, payload_bytes, content_type)
+    
+    for src_index, staged_path, original_content_type in staged_files:
+        label = f"{item.name} [{item.id}] backdrop #{src_index}"
+
+        if dry_run:
+            state.log.debug(
+                "[DRY-RUN] Would process backdrop index %d for item %s.",
+                src_index,
+                item.id,
+            )
+            state.stats.record_success()
+            normalized_payloads.append((src_index, b"", original_content_type or "application/octet-stream"))
+            continue
+
+        if staged_path is None:
+            state.log.error("[ERROR] Missing staged file for backdrop index %d on item %s.", src_index, item.id)
+            state.stats.record_error(label, "staged file missing")
+            cleanup_staging_on_failure()
+            return False
+
+        try:
+            data = staged_path.read_bytes()
+        except Exception as e:
+            state.log.error("[ERROR] Backdrop normalization failed at index %d for item %s: failed to read staged file: %s", src_index, item.id, e)
+            state.stats.record_error(label, f"read staged file failed: {e}")
+            cleanup_staging_on_failure()
+            return False
+
+        try:
+            _, normalized_bytes, normalized_content_type = _normalize_image_bytes(
                 item_id=item.id,
+                label=label,
                 image_type=image_type,
-                raw_bytes=data,
-                content_type=content_type,
+                data=data,
+                content_type=original_content_type,
+                mode=mode,
+                settings=settings,
                 make_backup=make_backup,
                 backup_root=backup_root,
                 backup_mode=backup_mode,
-                dry_run=dry_run,
+                dry_run=False,
+                backdrop_index=src_index,
             )
-
-            def upload_original() -> tuple[bool, str | None]:
-                before_failures = len(state.api_failures)
-                upload_ok = jf_client.set_item_image_bytes(
-                    item.id,
-                    image_type,
-                    data,
-                    content_type or "application/octet-stream",
-                    failures=state.api_failures,
-                )
-                return upload_ok, state.latest_api_error(before_failures)
-
-            no_scale_result = handle_no_scale(
-                plan=plan,
-                dry_run=dry_run,
-                force_upload=force_upload_noscale,
-                upload_fn=upload_original,
-                record_label=label,
-                default_error="API upload failed for NO_SCALE image",
-                stats=state.stats,
-                skip_when_no_scale=bool(mode in ("logo", "thumb") and not force_upload_noscale),
-            )
-            if no_scale_result is not None:
-                return no_scale_result
-
-            if dry_run:
-                state.stats.record_success()
-                return True
-
-            orig_color_count = (
-                get_palette_color_count(img) if (mode == "logo" and orig_mode == "P") else None
-            )
-            normalized_img, normalized_content_type, fmt = build_normalized_image(
-                img=img,
-                mode=mode,
-                target_width=settings.target_width,
-                target_height=settings.target_height,
-                new_width=plan.new_width,
-                new_height=plan.new_height,
-                orig_mode=orig_mode,
-                orig_color_count=orig_color_count,
-                no_padding=settings.no_padding,
-            )
-            payload = encode_image_to_bytes(
-                normalized_img=normalized_img,
-                fmt=fmt,
-                jpeg_quality=settings.jpeg_quality,
-                webp_quality=settings.webp_quality,
-            )
-
-            before_failures = len(state.api_failures)
-            upload_ok = jf_client.set_item_image_bytes(
-                item.id,
-                image_type,
-                payload,
-                normalized_content_type,
-                failures=state.api_failures,
-            )
-            if upload_ok:
-                state.stats.record_success()
-                return True
-
-            upload_error = state.latest_api_error(before_failures)
-            state.stats.record_error(label, upload_error or "API upload failed")
+        except Exception as exc:
+            state.log.exception("[ERROR] Backdrop normalization failed at index %d for item %s", src_index, item.id)
+            state.stats.record_error(label, str(exc))
+            cleanup_staging_on_failure()
             return False
 
-    except Exception as e:
-        state.log.exception("[ERROR] Failed to process %s", label)
-        state.stats.record_error(label, str(e))
+        normalized_payloads.append((src_index, normalized_bytes, normalized_content_type))
+    
+    if len(normalized_payloads) != total:
+        state.log.error("[ERROR] Normalize phase failed: expected %d backdrops, got %d for item %s.", total, len(normalized_payloads), item.id)
+        state.stats.record_error(item.id, f"Normalize failed: expected {total}, got {len(normalized_payloads)}")
+        cleanup_staging_on_failure()
         return False
+    
+    # Phase 3: Delete - remove all originals from server
+    if dry_run:
+        state.log.debug(
+            "[DRY-RUN] Would delete %d original backdrops for item %s.",
+            total,
+            item.id,
+        )
+    else:
+        deletions_started = True
+        for _ in range(total):
+            delete_ok = jf_client.delete_image(item.id, image_type, 0)
+            if not delete_ok:
+                state.log.error("[ERROR] Failed to delete original backdrop at index 0 for item %s; aborting without upload.", item.id)
+                state.stats.record_error(item.id, "delete phase failed")
+                return False
+        
+        # Verify all originals deleted via 404 check
+        verification = jf_client.get_item_image_head(
+            item_id=item.id,
+            image_type="Backdrop",
+            index=0,
+            retry=False,  # keep this fast and avoid retry backoff during verification
+        )
+        if verification is not None:
+            state.log.error("[ERROR] 404 verification failed for item %s; images still exist at index 0. Aborting upload phase.", item.id)
+            state.stats.record_error(item.id, "404 verification failed")
+            return False
+        
+        state.log.debug("  -> All %d original backdrops deleted and verified (404) for item %s.", total, item.id)
+    
+    # Phase 4: Upload - upload normalized payloads to indices 0 to total-1
+    any_upload_failed = False
+    if dry_run:
+        state.log.debug(
+            "[DRY-RUN] Would upload %d backdrops for item %s at indices 0 to %d.",
+            total,
+            item.id,
+            total - 1,
+        )
+    else:
+        for upload_index, (src_index, payload_bytes, content_type) in enumerate(normalized_payloads):
+            label = f"{item.name} [{item.id}] backdrop #{src_index} -> upload index {upload_index}"
+
+            upload_ok = jf_client.set_item_image_bytes(
+                item_id=item.id,
+                image_type=image_type,
+                data=payload_bytes,
+                content_type=content_type,
+                backdrop_index=upload_index,
+                failures=state.api_failures,
+            )
+            if not upload_ok:
+                state.log.error(
+                    "[ERROR] Failed to upload normalized backdrop at index %d for item %s.",
+                    upload_index,
+                    item.id,
+                )
+                state.stats.record_error(label, "upload failed")
+                any_upload_failed = True
+                # Do not abort; try to upload remaining backdrops
+                continue
+
+            state.stats.record_success()
+            state.log.debug(
+                "  -> Uploaded backdrop index %d for item %s.",
+                upload_index,
+                item.id,
+            )
+
+    # Phase 5: Cleanup & finalize
+    if not dry_run:
+        if any_upload_failed:
+            # Keep staged originals for manual inspection when uploads fail.
+            state.log.error(
+                "[ERROR] One or more backdrop uploads failed for item %s; retaining staged originals at %s.",
+                item.id,
+                staging_dir,
+            )
+        else:
+            cleanup_staging_dir(backup_root, item.id)
+
+    if not dry_run and any_upload_failed:
+        return False
+
+    state.log.info("[SUCCESS] All backdrops processed for item %s.", item.id)
+    return True
 
 
 def process_discovered_items(
@@ -222,9 +566,18 @@ def process_discovered_items(
     backup_root: Path,
     backup_mode: str,
 ) -> None:
+    """Iterate discovered items and normalize the enabled image types via API calls, tracking progress stats."""
     enabled_set = set(enabled_image_types)
-    total_images = sum(len(item.image_types & enabled_set) for item in items)
-    processed_images = 0
+    
+    total_images = 0 #FIXME Move to state.stats.total_images?
+    for item in items:
+        for image_type in (item.image_types & enabled_set):
+            if image_type == "Backdrop":
+                total_images += (item.backdrop_count or 1)
+            else:
+                total_images += 1
+    
+    processed_images = 0 #FIXME Move to state.stats.processed_images?
 
     state.stats.record_images_found(total_images)
 
@@ -233,10 +586,13 @@ def process_discovered_items(
         return
 
     for item in items:
+        if not (item.image_types & enabled_set):
+            continue
+        state.stats.record_item_processed(item.id)
         for image_type in sorted(item.image_types):
             if image_type not in enabled_set:
                 continue
-            processed_images += 1
+            increment = (item.backdrop_count or 1) if image_type == "Backdrop" else 1 #FIXME Migrate counting to normalize_item_image_api and normalize_item_backdrops_api.
             normalize_item_image_api(
                 item=item,
                 image_type=image_type,
@@ -248,168 +604,13 @@ def process_discovered_items(
                 backup_root=backup_root,
                 backup_mode=backup_mode,
             )
+            processed_images += increment
             if processed_images % 25 == 0 or processed_images == total_images:
                 state.log.info(
                     "Progress: %s/%s images processed via API.",
                     processed_images,
                     total_images,
                 )
-
-
-def _locate_backup_file(backup_root: Path, target_id: str, image_type: str) -> Path | None:
-    """
-    Locate a backup file for a specific target id and image type, if present.
-
-    Searches under <backup_root>/<first2>/<target_id>/ for filenames that map to the given Jellyfin image_type
-    using the configured FILENAME_CONFIG mapping. Returns None when the directory or matching file is missing.
-    """
-    target_dir = backup_root / target_id[:2] / target_id
-    if not target_dir.exists():
-        return None
-
-    for child in target_dir.iterdir():
-        if child.is_file() and image_type_from_filename(child.name) == image_type:
-            return child
-    return None
-
-
-def restore_from_backups(
-    *,
-    backup_root: Path,
-    jf_client: JellyfinClient,
-    operations: list[str],
-    dry_run: bool,
-) -> None:
-    if not backup_root.exists():
-        state.log.critical("Backup directory does not exist: %s", backup_root)
-        state.stats.record_error("restore", "Backup directory missing")
-        raise SystemExit(1)
-
-    operation_set = set(operations)
-    restored = 0
-
-    for dirpath, _, filenames in os.walk(backup_root):
-        for fname in filenames:
-            image_type = image_type_from_filename(fname)
-            if not image_type:
-                continue
-            mode = IMAGE_TYPE_TO_MODE.get(image_type)
-            if mode not in operation_set:
-                continue
-
-            path = Path(dirpath) / fname
-            item_id = path.parent.name
-            if len(item_id) < 2:
-                continue
-
-            try:
-                data = path.read_bytes()
-            except Exception as e:
-                state.log.error("Failed to read backup %s: %s", path, e)
-                state.stats.record_error(str(path), f"read failed: {e}")
-                continue
-
-            if dry_run:
-                state.log.info("DRY RUN - Would restore backup %s for %s", path, item_id)
-                state.stats.record_success()
-                restored += 1
-                continue
-
-            content_type = content_type_from_extension(path.suffix)
-            before_failures = len(state.api_failures)
-
-            if mode == "profile":
-                upload_ok = jf_client.set_user_profile_image(
-                    user_id=item_id,
-                    data=data,
-                    content_type=content_type,
-                    failures=state.api_failures,
-                )
-            else:
-                upload_ok = jf_client.set_item_image_bytes(
-                    item_id=item_id,
-                    image_type=image_type,
-                    data=data,
-                    content_type=content_type,
-                    failures=state.api_failures,
-                )
-
-            upload_error = state.latest_api_error(before_failures)
-            if upload_ok:
-                restored += 1
-                state.log.info("[RESTORE] Uploaded backup %s for %s", path, item_id)
-                state.stats.record_success()
-            else:
-                state.stats.record_error(str(path), upload_error or "restore upload failed")
-
-    state.log.info("Restore completed. Uploaded %s backup images.", restored)
-
-
-def restore_single_from_backup(
-    *,
-    backup_root: Path,
-    jf_client: JellyfinClient,
-    mode: str,
-    target_id: str,
-    dry_run: bool,
-) -> bool:
-    """
-    Restore a single asset (logo, thumb, or profile) from the backup directory.
-
-    The caller supplies a target Jellyfin id and the normalization mode; the function resolves the backup file,
-    infers content-type from the file extension, and either uploads it or logs a dry-run message. Upload failures
-    are recorded in state.api_failures and RunStats for visibility to the caller.
-    """
-    image_type = MODE_TO_IMAGE_TYPE.get(mode)
-    if not image_type:
-        state.log.critical("Unsupported mode '%s' for restore.", mode)
-        state.stats.record_error("restore", f"unsupported mode {mode}")
-        return False
-
-    backup_file = _locate_backup_file(backup_root, target_id, image_type)
-    if backup_file is None:
-        state.log.error("No backup found for %s (mode=%s).", target_id, mode)
-        state.stats.record_error(target_id, "Backup not found")
-        return False
-
-    try:
-        data = backup_file.read_bytes()
-    except Exception as exc:
-        state.log.error("Failed to read backup %s: %s", backup_file, exc)
-        state.stats.record_error(str(backup_file), f"read failed: {exc}")
-        return False
-
-    if dry_run:
-        state.log.info("DRY RUN - Would restore %s for %s from %s", image_type, target_id, backup_file)
-        state.stats.record_success()
-        return True
-
-    content_type = content_type_from_extension(backup_file.suffix)
-    before_failures = len(state.api_failures)
-    if mode == "profile":
-        upload_ok = jf_client.set_user_profile_image(
-            user_id=target_id,
-            data=data,
-            content_type=content_type,
-            failures=state.api_failures,
-        )
-    else:
-        upload_ok = jf_client.set_item_image_bytes(
-            item_id=target_id,
-            image_type=image_type,
-            data=data,
-            content_type=content_type,
-            failures=state.api_failures,
-        )
-
-    upload_error = state.latest_api_error(before_failures)
-    if upload_ok:
-        state.log.info("[RESTORE] Uploaded backup %s for %s", backup_file, target_id)
-        state.stats.record_success()
-        return True
-
-    state.stats.record_error(str(backup_file), upload_error or "restore upload failed")
-    return False
 
 
 def process_libraries_via_api(
@@ -424,6 +625,7 @@ def process_libraries_via_api(
     backup_root: Path,
     backup_mode: str,
 ) -> None:
+    """Discover libraries/items for the selected operations and process their images through the API workflow."""
     discovery = build_discovery_settings(cfg, operations)
     enabled_image_types = [
         image_type
@@ -476,6 +678,7 @@ def normalize_profile_user(
     backup_root: Path,
     backup_mode: str,
 ) -> bool:
+    """Normalize a single Jellyfin user profile image via the API, updating stats and logging errors."""
     user_id = user.get("Id")
     if not user_id:
         state.log.warning("[API-SKIP] Missing user Id in user record, skipping.")
@@ -594,6 +797,7 @@ def process_profiles(
     backup_root: Path,
     backup_mode: str,
 ) -> None:
+    """Normalize profile images for all active users by delegating to normalize_profile_user."""
     users = jf_client.list_users(is_disabled=False)
     if not users:
         state.log.warning("[WARN] No active users returned from Jellyfin; skipping profile processing.")
@@ -634,16 +838,40 @@ def process_single_item_api(
         state.stats.record_error("single", f"Unsupported mode {mode}")
         raise SystemExit(1)
 
+    state.stats.record_item_processed(item_id)
+
+    raw: dict[str, Any] | None = None
+    backdrop_count: int | None = None
+    if image_type == "Backdrop":
+        from jfin_core.discovery import _item_backdrop_count
+
+        raw = jf_client.get_item(item_id)
+        if raw is None:
+            state.log.critical(
+                "Failed to fetch item %s for single-backdrop mode.",
+                item_id,
+            )
+            state.stats.record_error("single", "item fetch failed")
+            return False
+
+        backdrop_count = _item_backdrop_count(raw)
+        if backdrop_count == 0:
+            state.log.info("Item %s has no backdrops; nothing to do.", item_id)
+            state.stats.record_skip(count_processed=False)
+            return False
+
     dummy_item = DiscoveredItem(
         id=item_id,
-        name=item_id,
-        type="Item",
-        parent_id=None,
+        name=(raw.get("Name", item_id) if raw else item_id),
+        type=(raw.get("Type", "Item") if raw else "Item"),
+        parent_id=(raw.get("ParentId") if raw else None),
         library_id=None,
         library_name=None,
+        backdrop_count=backdrop_count,
         image_types={image_type},
     )
-    state.stats.record_images_found(1)
+    
+    state.stats.record_images_found(backdrop_count or 1)
     state.log.info("Processing single item %s as %s", item_id, mode)
     return normalize_item_image_api(
         item=dummy_item,
@@ -670,6 +898,7 @@ def process_single_profile(
     backup_root: Path,
     backup_mode: str,
 ) -> None:
+    """Handle normalization for a single profile by username, aborting cleanly on missing data or restore requests."""
     if is_restore:
         state.log.warning("Restore is not supported for profile images; skipping.")
         state.stats.record_warning()

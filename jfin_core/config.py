@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import copy
 import sys
-import textwrap
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
@@ -13,12 +12,20 @@ except ModuleNotFoundError:  # pragma: no cover - fallback for Python <3.11
     import tomli as tomllib  # type: ignore[no-redef]
 
 from . import state
-from .constants import APP_VERSION, DEFAULT_CONFIG_NAME, DEFAULT_ITEM_TYPES, MODE_TO_IMAGE_TYPE, VALID_MODES
+from .constants import (
+    APP_VERSION,
+    DEFAULT_CONFIG_NAME,
+    DEFAULT_ITEM_TYPES,
+    MODE_TO_IMAGE_TYPE,
+    VALID_MODES,
+    DEFAULT_TOML_TEMPLATE,
+    SECTION_KEY_MAP,
+)
 
 
 @dataclass
 class ModeRuntimeSettings:
-    """Runtime-normalized settings for a single mode (logo/thumb/profile)."""
+    """Runtime settings for logo, thumb, and profile modes."""
 
     target_width: int
     target_height: int
@@ -37,127 +44,27 @@ class DiscoverySettings:
     include_item_types: list[str]
     enable_image_types: list[str]
     recursive: bool
-    image_type_limit: int
 
 
 class ConfigError(Exception):
     """Raised when configuration files are missing, invalid, or unsupported."""
 
 
-DEFAULT_TOML_TEMPLATE = textwrap.dedent(
-    """\
-    # Jellyfin Image Normalizer configuration (TOML)
-
-    [server]
-    # Required Jellyfin base URL including protocol (e.g. https://media.example.com). Default: placeholder.
-    jf_url = "https://your-jellyfin-url-here"
-    # Required Jellyfin API key with library access. Default: placeholder.
-    jf_api_key = "YOUR_API_KEY_HERE"
-
-    [api]
-    # Verify TLS certificates for HTTPS connections (bool). Default: True.
-    verify_tls = true
-    # HTTP timeout in seconds for Jellyfin requests. Default: 15.0 seconds.
-    timeout = 15
-    # Delay between API calls in milliseconds. Default: 100 ms.
-    jf_delay_ms = 100
-    # Number of retry attempts for GET/POST operations. Default: 3.
-    api_retry_count = 3
-    # Initial retry backoff in milliseconds (doubles each attempt). Default: 500 ms.
-    api_retry_backoff_ms = 500
-    # Raise immediately when uploads fail instead of continuing. Default: False.
-    fail_fast = false
-    # When true, no POST/PUT/DELETE calls are issued (safety). Default: True.
-    dry_run = true
-
-    [backup]
-    # Save originals to backup_dir before uploads. Default: True.
-    backup = true
-    # partial backs up only scaled images; full backs up all images. Default: partial.
-    backup_mode = "partial"
-    # Root folder for backups (relative or absolute). Default: backup.
-    backup_dir = "backup"
-    # Re-upload originals even when no resize is needed. Default: False.
-    force_upload_noscale = false
-
-    [modes]
-    # Modes to run (logo|thumb|profile). Accepts a pipe-separated string or a string array. Default: logo|thumb|profile.
-    operations = ["logo", "thumb", "profile"]
-    # Jellyfin item types to process for logo/thumb discovery (movies|series). Accepts pipe-separated string or array. Default: movies|series.
-    item_types = "movies|series"
-
-    [logging]
-    # Path to log file. Default: jfin.log.
-    file_path = "jfin.log"
-    # Write logs to file. Default: True.
-    file_enabled = true
-    # File log level (INFO, DEBUG, etc.). Default: INFO.
-    file_level = "INFO"
-    # CLI log level. Default: INFO.
-    cli_level = "INFO"
-    # Suppress CLI logging except critical errors. Default: False.
-    silent = false
-
-    [libraries]
-    # Optional library name filters (list/pipe/comma). Default: empty (all media folders; filtered by item_types).
-    names = []
-
-    [logo]
-    # Canvas width for logos (pixels). Default: 800.
-    width = 800
-    # Canvas height for logos (pixels). Default: 310.
-    height = 310
-    # Block upscaling logos. Default: False.
-    no_upscale = false
-    # Block downscaling logos. Default: False.
-    no_downscale = false
-    # Skip transparent padding; resize only. Default: False.
-    no_padding = false
-
-    [thumb]
-    # Canvas width for thumbs/posters (pixels). Default: 1000.
-    width = 1000
-    # Canvas height for thumbs/posters (pixels). Default: 562.
-    height = 562
-    # Block upscaling thumbs. Default: False.
-    no_upscale = false
-    # Block downscaling thumbs. Default: False.
-    no_downscale = false
-    # JPEG quality (1-95) for thumbs. Default: 85.
-    jpeg_quality = 85
-
-    [profile]
-    # Canvas width for profile images (pixels). Default: 256.
-    width = 256
-    # Canvas height for profile images (pixels). Default: 256.
-    height = 256
-    # Block upscaling profiles. Default: False.
-    no_upscale = false
-    # Block downscaling profiles. Default: False.
-    no_downscale = false
-    # WebP quality (1-100) for profiles. Default: 80.
-    webp_quality = 80
-    """
-)
-
-
-SECTION_KEY_MAP = {
-    "server": ["jf_url", "jf_api_key"],
-    "api": ["verify_tls", "timeout", "jf_delay_ms", "api_retry_count", "api_retry_backoff_ms", "fail_fast", "dry_run"],
-    "backup": ["backup", "backup_mode", "backup_dir", "force_upload_noscale"],
-    "modes": ["operations", "item_types"],
-}
-
-
 def _merge_section_keys(cfg: dict[str, Any]) -> dict[str, Any]:
-    """Lift known section keys (server/api/backup/modes) to top-level if not already present."""
-    normalized_sections = {name.lower(): value for name, value in cfg.items() if isinstance(value, dict)}
+    """Lift known section keys to the top level when missing."""
+    normalized_sections = {
+        name.lower(): value
+        for name, value in cfg.items()
+        if isinstance(value, dict)
+    }
     for section, keys in SECTION_KEY_MAP.items():
         table = normalized_sections.get(section)
         if not isinstance(table, dict):
             continue
         for key in keys:
-            if key in table and (key not in cfg or isinstance(cfg.get(key), dict)):
+            if key in table and (
+                key not in cfg or isinstance(cfg.get(key), dict)
+            ):
                 cfg[key] = table[key]
     return cfg
 
@@ -169,10 +76,11 @@ def default_config_path() -> Path:
 
 
 def generate_default_config(config_path: Path) -> None:
-    """Create a starter TOML config file with safe defaults and placeholders."""
+    """Create a starter TOML config file with safe defaults."""
     if config_path.suffix.lower() != ".toml":
         state.log.critical(
-            "Config generation supports only TOML files. Please use a .toml extension (e.g. config.toml)."
+            "Config generation supports only TOML files. "
+            "Please use a .toml extension (e.g. config.toml)."
         )
         sys.exit(1)
 
@@ -181,29 +89,39 @@ def generate_default_config(config_path: Path) -> None:
         sys.exit(1)
 
     config_path.parent.mkdir(parents=True, exist_ok=True)
-    config_path.write_text(DEFAULT_TOML_TEMPLATE.strip() + "\n", encoding="utf-8")
+    config_path.write_text(
+        DEFAULT_TOML_TEMPLATE.strip() + "\n", encoding="utf-8")
 
     state.log.info("Config file generated at: %s", config_path)
-    state.log.info("Please edit this file to match your environment before running the script.")
+    state.log.info(
+        "Please edit this file to match your environment before running "
+        "the script."
+    )
 
 
 def load_config_from_path(config_path: Path) -> dict[str, Any]:
     """
     Load and parse the JFIN configuration file from the given path.
 
-    This function supports only TOML configuration files (`.toml`). The returned
-    dictionary is suitable for normalization into runtime settings (mode settings,
-    discovery options, logging, Jellyfin client configuration, etc.).
+    This function supports only TOML configuration files (`.toml`). The
+    resulting dictionary can be normalized into runtime settings (mode
+    options, discovery filters, logging, Jellyfin client configuration,
+    etc.).
 
     Raises:
-        ConfigError: if the file is missing, not a .toml file, or cannot be parsed.
+        ConfigError: if the file is missing, not a .toml file, or cannot
+            be parsed.
     """
     if config_path.suffix.lower() != ".toml":
-        raise ConfigError("Unsupported config format: expected a .toml file (e.g. config.toml).")
+        raise ConfigError(
+            "Unsupported config format: expected a .toml file "
+            "(e.g. config.toml)."
+        )
 
     if not config_path.exists():
         raise ConfigError(
-            f"Config file not found: {config_path}. Create one with --generate-config and review it before running."
+            f"Config file not found: {config_path}. Create one with "
+            "--generate-config and review it before running."
         )
 
     try:
@@ -211,19 +129,25 @@ def load_config_from_path(config_path: Path) -> dict[str, Any]:
             cfg = tomllib.load(f)
     except FileNotFoundError as exc:
         raise ConfigError(
-            f"Config file not found: {config_path}. Create one with --generate-config and review it before running."
+            f"Config file not found: {config_path}. Create one with "
+            "--generate-config and review it before running."
         ) from exc
     except Exception as exc:  # tomllib/tomli raise TOMLDecodeError subclasses
-        raise ConfigError(f"Failed to parse TOML config {config_path}: {exc}") from exc
+        raise ConfigError(
+            f"Failed to parse TOML config {config_path}: {exc}"
+        ) from exc
 
     if not isinstance(cfg, dict):
-        raise ConfigError(f"Invalid config structure in {config_path}: expected a TOML table at the root.")
+        raise ConfigError(
+            f"Invalid config structure in {config_path}: expected a "
+            "TOML table at the root."
+        )
 
     return _merge_section_keys(cfg)
 
 
 def load_config(config_path: Path) -> dict[str, Any]:
-    """Backward-compatible wrapper that logs and exits on configuration errors."""
+    """Log configuration errors and exit for backward compatibility."""
     try:
         return load_config_from_path(config_path)
     except ConfigError as exc:
@@ -236,27 +160,39 @@ def validate_config_types(cfg: dict[str, Any]) -> None:
     Validate the loaded configuration for required keys and expected types.
 
     Raises:
-        ConfigError: if required fields are missing/empty or if values have invalid types.
+        ConfigError: if required fields are missing/empty or values have
+            invalid types.
     """
     errors: list[str] = []
 
-    def expect_bool(container: dict[str, Any], key: str, context: str) -> None:
+    def expect_bool(
+        container: dict[str, Any], key: str, context: str
+    ) -> None:
         if key in container and not isinstance(container[key], bool):
             errors.append(f"{context}.{key} must be a boolean.")
 
-    def expect_int(container: dict[str, Any], key: str, context: str) -> None:
+    def expect_int(
+        container: dict[str, Any], key: str, context: str
+    ) -> None:
         if key in container:
             value = container[key]
             if isinstance(value, bool) or not isinstance(value, int):
                 errors.append(f"{context}.{key} must be an integer.")
 
-    def expect_number(container: dict[str, Any], key: str, context: str) -> None:
+    def expect_number(
+        container: dict[str, Any], key: str, context: str
+    ) -> None:
         if key in container:
             value = container[key]
             if isinstance(value, bool) or not isinstance(value, (int, float)):
                 errors.append(f"{context}.{key} must be a number.")
 
-    def expect_string(container: dict[str, Any], key: str, context: str, allow_empty: bool = True) -> None:
+    def expect_string(
+        container: dict[str, Any],
+        key: str,
+        context: str,
+        allow_empty: bool = True,
+    ) -> None:
         if key in container:
             value = container[key]
             if not isinstance(value, str):
@@ -267,13 +203,16 @@ def validate_config_types(cfg: dict[str, Any]) -> None:
     def expect_string_list(value: Any, context: str) -> None:
         if isinstance(value, str):
             return
-        if isinstance(value, list) and all(isinstance(item, str) for item in value):
+        if isinstance(value, list) and all(
+            isinstance(item, str) for item in value
+        ):
             return
         errors.append(f"{context} must be a string or a list of strings.")
 
     for required in ("jf_url", "jf_api_key"):
         if required not in cfg or cfg.get(required) is None:
-            errors.append(f"{required} is required and must be a non-empty string.")
+            errors.append(
+                f"{required} is required and must be a non-empty string.")
             continue
         expect_string(cfg, required, "config", allow_empty=False)
     expect_number(cfg, "timeout", "config")
@@ -310,15 +249,23 @@ def validate_config_types(cfg: dict[str, Any]) -> None:
     if libraries_cfg is not None:
         if isinstance(libraries_cfg, dict):
             if "names" in libraries_cfg:
-                expect_string_list(libraries_cfg["names"], "config.libraries.names")
+                expect_string_list(
+                    libraries_cfg["names"], "config.libraries.names"
+                )
             elif libraries_cfg:
-                errors.append("config.libraries.names is required when providing the libraries table.")
+                errors.append(
+                    "config.libraries.names is required when providing the "
+                    "libraries table."
+                )
         elif isinstance(libraries_cfg, (list, str)):
             pass
         else:
-            errors.append("config.libraries must be a table/object or a list/string of library names.")
+            errors.append(
+                "config.libraries must be a table/object or a list/string of "
+                "library names."
+            )
 
-    for mode in ("logo", "thumb", "profile"):
+    for mode in ("logo", "thumb", "profile", "backdrop"):
         mode_cfg = cfg.get(mode)
         if mode_cfg is None:
             continue
@@ -331,27 +278,38 @@ def validate_config_types(cfg: dict[str, Any]) -> None:
         expect_bool(mode_cfg, "no_downscale", f"config.{mode}")
         if mode == "logo":
             expect_bool(mode_cfg, "no_padding", f"config.{mode}")
-        if mode == "thumb":
+        if mode == "thumb" or mode == "backdrop":
             expect_int(mode_cfg, "jpeg_quality", f"config.{mode}")
         if mode == "profile":
             expect_int(mode_cfg, "webp_quality", f"config.{mode}")
 
         width = mode_cfg.get("width")
         height = mode_cfg.get("height")
-        if isinstance(width, int) and not isinstance(width, bool) and width <= 0:
+        if (
+            isinstance(width, int)
+            and not isinstance(width, bool)
+            and width <= 0
+        ):
             errors.append(f"config.{mode}.width must be greater than zero.")
-        if isinstance(height, int) and not isinstance(height, bool) and height <= 0:
+        if (
+            isinstance(height, int)
+            and not isinstance(height, bool)
+            and height <= 0
+        ):
             errors.append(f"config.{mode}.height must be greater than zero.")
-        if mode == "thumb":
+        if mode == "thumb" or mode == "backdrop":
             quality = mode_cfg.get("jpeg_quality")
             if isinstance(quality, int) and not isinstance(quality, bool):
                 if quality < 1 or quality > 95:
-                    errors.append("config.thumb.jpeg_quality must be between 1 and 95.")
+                    errors.append("jpeg_quality must be between 1 and 95.")
         if mode == "profile":
             quality = mode_cfg.get("webp_quality")
             if isinstance(quality, int) and not isinstance(quality, bool):
                 if quality < 1 or quality > 100:
-                    errors.append("config.profile.webp_quality must be between 1 and 100.")
+                    errors.append(
+                        "config.profile.webp_quality must be between "
+                        "1 and 100."
+                    )
 
     if errors:
         raise ConfigError("Invalid configuration values: " + "; ".join(errors))
@@ -381,7 +339,7 @@ def parse_str_list(value: Any) -> list[str]:
 
 def parse_item_types(value: Any) -> list[str]:
     """
-    Normalize item_types (movies/series) from string/array into canonical Jellyfin values.
+    Normalize item type filters into canonical Jellyfin values.
 
     Raises:
         ConfigError: when an unsupported item type is provided.
@@ -404,7 +362,8 @@ def parse_item_types(value: Any) -> list[str]:
         elif token == "series":
             mapped = "Series"
         else:
-            raise ConfigError("item_types must contain only movies and/or series.")
+            raise ConfigError(
+                "item_types must contain only movies and/or series.")
 
         if mapped not in canonical:
             canonical.append(mapped)
@@ -413,11 +372,12 @@ def parse_item_types(value: Any) -> list[str]:
 
 
 def parse_operations(arg_mode: str | None, cfg_ops: Any) -> list[str]:
-    """Resolve operations from CLI or config and validate against known modes."""
+    """Validate requested operations from CLI arguments or config."""
     source = arg_mode if arg_mode else cfg_ops
     if source is None:
         state.log.critical(
-            "Specify --mode or set 'operations' in config (e.g., operations = \"logo|thumb\" or ['logo', 'thumb'])."
+            "Specify --mode or set 'operations' in config "
+            '(e.g., operations = "logo|thumb" or ["logo", "thumb"]).'
         )
         sys.exit(1)
 
@@ -427,7 +387,8 @@ def parse_operations(arg_mode: str | None, cfg_ops: Any) -> list[str]:
         raw_ops = source
     else:
         state.log.critical(
-            "Operations must be a string like 'logo|thumb' or a list of modes in config."
+            "Operations must be a string like 'logo|thumb' or a list of modes "
+            "in config."
         )
         sys.exit(1)
 
@@ -474,19 +435,27 @@ def apply_cli_overrides(args: Any, cfg: dict[str, Any]) -> dict[str, Any]:
     if getattr(args, "backup", False):
         merged["backup"] = True
 
-    for mode in ("logo", "thumb", "profile"):
+    for mode in ("logo", "thumb", "profile", "backdrop"):
         if mode not in merged:
             merged[mode] = {}
         mode_cfg = merged[mode]
+
+        dim_override = getattr(args, f"{mode}_target_size", None)
+        if dim_override:
+            width, height = dim_override
+            mode_cfg["width"] = width
+            mode_cfg["height"] = height
 
         if getattr(args, "no_upscale", False):
             mode_cfg["no_upscale"] = True
         if getattr(args, "no_downscale", False):
             mode_cfg["no_downscale"] = True
-        if mode == "thumb" and getattr(args, "jpeg_quality", None) is not None:
-            mode_cfg["jpeg_quality"] = args.jpeg_quality
-        if mode == "profile" and getattr(args, "webp_quality", None) is not None:
-            mode_cfg["webp_quality"] = args.webp_quality
+        if mode == "thumb" and getattr(args, "thumb_jpeg_quality", None) is not None:
+            mode_cfg["jpeg_quality"] = args.thumb_jpeg_quality
+        if mode == "backdrop" and getattr(args, "backdrop_jpeg_quality", None) is not None:
+            mode_cfg["jpeg_quality"] = args.backdrop_jpeg_quality
+        if mode == "profile" and getattr(args, "profile_webp_quality", None) is not None:
+            mode_cfg["webp_quality"] = args.profile_webp_quality
 
     if getattr(args, "jf_delay_ms", None) is not None:
         merged["jf_delay_ms"] = args.jf_delay_ms
@@ -498,7 +467,7 @@ def apply_cli_overrides(args: Any, cfg: dict[str, Any]) -> dict[str, Any]:
 
 
 def validate_config_for_mode(cfg: dict[str, Any], mode: str) -> None:
-    """Ensure required top-level and mode-specific keys exist before running."""
+    """Ensure required top-level and mode-specific keys exist."""
     required_top = ["jf_url", "jf_api_key"]
     for key in required_top:
         if not cfg.get(key):
@@ -517,20 +486,26 @@ def validate_config_for_mode(cfg: dict[str, Any], mode: str) -> None:
 
 
 def _validate_positive_override(value: Any, label: str) -> int | None:
-    """Validate CLI width/height overrides and return a positive integer or None."""
+    """Validate CLI width/height overrides and return a positive integer."""
     if value is None:
         return None
     if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
-        raise ConfigError(f"{label} must be a positive integer (got {value!r}).")
+        raise ConfigError(
+            f"{label} must be a positive integer (got {value!r}).")
     return value
 
 
-def _derive_canvas_dimensions(base_width: int, base_height: int, arg_width: Any, arg_height: Any) -> tuple[int, int]:
+def _derive_canvas_size(
+    base_width: int,
+    base_height: int,
+    arg_width: Any,
+    arg_height: Any,
+) -> tuple[int, int]:
     """
-    Compute the target canvas dimensions using CLI overrides when provided.
+    Compute target canvas size using CLI overrides when provided.
 
-    The missing side is inferred proportionally from the configured aspect ratio.
-    Results are clamped to a minimum of 1px to avoid zero-dimension distortions.
+    The missing side is inferred from the configured aspect ratio.
+    Results are clamped to at least 1 px to avoid zero-dimension distortions.
     """
     override_w = _validate_positive_override(arg_width, "CLI width override")
     override_h = _validate_positive_override(arg_height, "CLI height override")
@@ -538,38 +513,53 @@ def _derive_canvas_dimensions(base_width: int, base_height: int, arg_width: Any,
     if override_w is not None and override_h is not None:
         return override_w, override_h
     if override_w is not None and base_width > 0:
-        inferred_height = max(1, int(round(base_height * (override_w / base_width))))
+        inferred_height = max(
+            1, int(round(base_height * (override_w / base_width))))
         return override_w, inferred_height
     if override_h is not None and base_height > 0:
-        inferred_width = max(1, int(round(base_width * (override_h / base_height))))
+        inferred_width = max(
+            1, int(round(base_width * (override_h / base_height))))
         return inferred_width, override_h
 
     return base_width, base_height
 
 
-def build_mode_runtime_settings(mode: str, mode_cfg: dict[str, Any], args: Any) -> ModeRuntimeSettings:
+def build_mode_runtime_settings(
+    mode: str, mode_cfg: dict[str, Any], args: Any
+) -> ModeRuntimeSettings:
     """
-    Prepare runtime settings for a mode, combining config and CLI overrides.
+    Prepare runtime settings for a mode using config and CLI overrides.
 
     Raises:
         ConfigError: if CLI width/height overrides are not positive integers.
     """
     base_width = mode_cfg["width"]
     base_height = mode_cfg["height"]
-    arg_width = getattr(args, "width", None)
-    arg_height = getattr(args, "height", None)
 
-    target_width, target_height = _derive_canvas_dimensions(base_width, base_height, arg_width, arg_height)
+    dim_override = getattr(args, f"{mode}_target_size", None)
+    if dim_override:
+        target_width, target_height = dim_override
+        if target_width <= 0 or target_height <= 0:
+            raise ConfigError(
+                f"{mode} target size must be positive integers (got {dim_override})."
+            )
+    else:
+        target_width, target_height = _derive_canvas_size(
+            base_width, base_height, None, None)
 
-    allow_upscale = not (mode_cfg.get("no_upscale", False) or getattr(args, "no_upscale", False))
-    allow_downscale = not (mode_cfg.get("no_downscale", False) or getattr(args, "no_downscale", False))
+    allow_upscale = not (mode_cfg.get("no_upscale", False)
+                         or getattr(args, "no_upscale", False))
+    allow_downscale = not (mode_cfg.get("no_downscale", False)
+                           or getattr(args, "no_downscale", False))
     no_padding = bool(
-        mode_cfg.get("no_padding", False) or (getattr(args, "no_padding", False) and mode == "logo")
+        mode_cfg.get("no_padding", False) or (
+            getattr(args, "no_padding", False) and mode == "logo")
     )
 
     jpeg_quality = int(mode_cfg.get("jpeg_quality", 85))
     jpeg_quality = max(1, min(95, jpeg_quality))
-    webp_quality = int(mode_cfg.get("webp_quality", 80)) if "webp_quality" in mode_cfg else 80
+    webp_quality = int(mode_cfg.get("webp_quality", 80)
+                       ) if "webp_quality" in mode_cfg else 80
     webp_quality = max(1, min(100, webp_quality))
 
     return ModeRuntimeSettings(
@@ -583,8 +573,10 @@ def build_mode_runtime_settings(mode: str, mode_cfg: dict[str, Any], args: Any) 
     )
 
 
-def build_discovery_settings(cfg: dict[str, Any], operations: list[str]) -> DiscoverySettings:
-    """Build discovery settings including hardcoded item/image type filters."""
+def build_discovery_settings(
+    cfg: dict[str, Any], operations: list[str]
+) -> DiscoverySettings:
+    """Build discovery settings with item and image filters."""
     libraries_cfg = cfg.get("libraries")
     library_names: list[str] = []
     if isinstance(libraries_cfg, dict):
@@ -604,7 +596,6 @@ def build_discovery_settings(cfg: dict[str, Any], operations: list[str]) -> Disc
         include_item_types=include_item_types,
         enable_image_types=enable_image_types,
         recursive=True,
-        image_type_limit=1,
     )
 
 
