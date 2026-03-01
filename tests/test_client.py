@@ -1,7 +1,7 @@
 import base64
 import requests
 import pytest
-from jfin_core.client import JellyfinClient
+from jfin.client import JellyfinClient
 from unittest.mock import Mock
 
 class FakeResponse:

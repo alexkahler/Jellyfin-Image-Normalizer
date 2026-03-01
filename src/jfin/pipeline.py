@@ -892,7 +892,7 @@ def process_single_item_api(
     raw: dict[str, Any] | None = None
     backdrop_count: int | None = None
     if image_type == "Backdrop":
-        from jfin_core.discovery import _item_backdrop_count
+        from .discovery import _item_backdrop_count
 
         raw = jf_client.get_item(item_id)
         if raw is None:

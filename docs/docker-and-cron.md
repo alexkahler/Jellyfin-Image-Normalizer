@@ -2,11 +2,11 @@
 
 ## Running JFIN as a Scheduled Cron Job
 
-You can use all CLI flags when setting up your cron job, enabling you to fully customize how and when `jfin.py` processes your images, including with different config files via `--config "/path/to/custom/config.toml"` for different Jellyfin installs:
+You can use all CLI flags when setting up your cron job, enabling you to fully customize how and when `python -m jfin` processes your images, including with different config files via `--config "/path/to/custom/config.toml"` for different Jellyfin installs:
 
 ```bash
-0 3 * * * /usr/bin/python3 /path/to/jfin.py -s
-````
+0 3 * * * cd /path/to/jellyfin-image-normalizer && PYTHONPATH=src /usr/bin/python3 -m jfin -s
+```
 
 `-s` / `--silent` suppresses **CLI output only** — the run will still produce logs using whatever file logger you configured in `config.toml`.
 This keeps cron quiet while preserving full logging.
@@ -14,7 +14,7 @@ This keeps cron quiet while preserving full logging.
 If you prefer to capture CLI output as well, you can redirect it:
 
 ```bash
-0 3 * * * /usr/bin/python3 /path/to/jfin.py >> /var/log/jfin_cron.log 2>&1
+0 3 * * * cd /path/to/jellyfin-image-normalizer && PYTHONPATH=src /usr/bin/python3 -m jfin >> /var/log/jfin_cron.log 2>&1
 ```
 
 ---
@@ -43,7 +43,7 @@ If you use [LinuxServer.io’s Jellyfin](https://docs.linuxserver.io/images/dock
 
 **How to set it up:**
 
-1. Create a `scripts` folder under `/config` for your `jfin.py` + config.
+1. Create a `scripts` folder under `/config` for your repository checkout + config.
 2. Install the universal-cron and universal-package-install mod by updating your Docker compose.
 3. Add `INSTALL_PACKAGES=python3` and `INSTALL_PIP_PACKAGES=requests|Pillow|tomli`
 4. After the mod generates `/config/crontabs/root`, edit that file to schedule JFIN.

@@ -8,8 +8,8 @@ This document explains how the Jellyfin Image Normalizer CLI works so a new team
 - Safety first: dry-run defaults are baked in; writes require explicit config/CLI approval. Backups are stored before uploads when enabled.
 
 ## Architecture at a Glance
-- Entry point: `jfin.py` parses CLI flags, loads/merges config, validates modes, and dispatches to the pipeline.
-- Core package `jfin_core/`:
+- Entry point: `python -m jfin` (implemented in `src/jfin/cli.py`) parses CLI flags, loads/merges config, validates modes, and dispatches to the pipeline.
+- Core package `src/jfin/`:
   - `config.py`: TOML config loading/generation, CLI overrides, discovery settings, mode runtime settings, client factory.
   - `client.py`: `JellyfinClient` (requests + retry/backoff, dry-run/write gates, image uploads/downloads).
   - `discovery.py`: library and item discovery (`/Library/MediaFolders` + `/Items`), containers (`LibraryRef`, `DiscoveredItem`).
@@ -21,7 +21,7 @@ This document explains how the Jellyfin Image Normalizer CLI works so a new team
 - Tests: `tests/` covers config parsing, imaging decisions, client dry-run safety, discovery, and pipeline behavior (with mocks).
 
 ## Configuration Model (`config.toml`)
-- Location: defaults to `config.toml` beside the repo root (`jfin_core/config.py:default_config_path`). Generate a starter file with `python jfin.py --generate-config` (optionally `--config <path>.toml`, no other operational flags allowed).
+- Location: defaults to repo-root `config.toml` (`src/jfin/config.py:default_config_path`). Generate a starter file with `python -m jfin --generate-config` (optionally `--config <path>.toml`, no other operational flags allowed).
 - Format: TOML only. Comments are inline `#` entries.
 - Sections: grouped defaults under `[server]`, `[api]`, `[backup]`, `[modes]` (plus `[logging]`, `[libraries]`, and mode sections). Keys are lifted to the root for runtime use; only the current schema is supported.
 - Required: `jf_url` (base URL) and `jf_api_key` (used in the MediaBrowser Authorization header), non-empty strings.
@@ -59,9 +59,9 @@ padding = "add"
 padding_remove_sensitivity = 0
 ```
 
-## CLI Entrypoints (`jfin.py:parse_args`)
+## CLI Entrypoints (`src/jfin/cli.py:parse_args`)
 - Core flags: `--config`, `--generate-config`, `--test-jf`, `--mode` (logo|thumb|backdrop|profile), `--single <itemId|username>` (requires `--mode`), `--restore`, `--restore-all` (must be used alone except logging/config flags), `--dry-run`, `--backup`.
-- Config path: `--config <file>.toml` (defaults to `config.toml` beside the repo). Non-TOML paths are rejected.
+- Config path: `--config <file>.toml` (defaults to repo-root `config.toml`). Non-TOML paths are rejected.
 - Imaging overrides: `--logo-target-size`, `--thumb-target-size`, `--backdrop-target-size`, `--profile-target-size`, `--thumb-jpeg-quality`, `--backdrop-jpeg-quality`, `--profile-webp-quality`, `--no-upscale`, `--no-downscale`, `--logo-padding` (logo only), `--force-upload-noscale`. Target size use `WIDTHxHEIGHT` (positive integers).
 - Discovery overrides: `--item-types` (movies|series) to override `[modes].item_types` for `/Items` discovery; values are case-insensitive and parsed like the config setting.
 - Jellyfin overrides: `--jf-url`, `--jf-api-key`, `--libraries`, `--item-types`, `--jf-delay-ms`.
@@ -113,7 +113,7 @@ padding_remove_sensitivity = 0
 - Plan cover resize; optional backup using image type `Primary`. NO_SCALE is treated the same as items (with optional forced upload).
 - Build profile image (RGBA cover/crop) and encode as WebP with configured quality. Upload through `set_user_profile_image` (DELETE existing then POST). Dry-run short-circuits uploads.
 
-## Imaging Rules (`jfin_core/imaging.py`)
+## Imaging Rules (`src/jfin/imaging.py`)
 - `make_scale_plan` computes scale + target size and labels decision (`SCALE_UP`, `SCALE_DOWN`, `NO_SCALE`). Scaling respects `allow_upscale` / `allow_downscale`; disallowed directions clamp to 1.0 (no resize).
 - `handle_no_scale` centralizes NO_SCALE behavior (success unless forced upload fails).
 - Mode builders:
@@ -124,7 +124,7 @@ padding_remove_sensitivity = 0
 - EXIF orientation: `apply_exif_orientation` uses transpose but avoids rotating tall images when orientation implies swap and height >= width.
 - Color stats: `get_palette_color_count` attempts to retain palette size for logos (used only when original mode is `P`).
 
-## Jellyfin API Touchpoints (`jfin_core/client.py`)
+## Jellyfin API Touchpoints (`src/jfin/client.py`)
 - GET helpers with retry/backoff: `_get`, `_get_json`; use the MediaBrowser `Authorization` header (`Token`, `Client`, `Version`).
 - Discovery: `/System/Info` (connectivity test), `/Users` (profile mode), `/Library/MediaFolders`, `/Items` (library discovery), `/Items/<id>/Images/<type>`, `/UserImage?userId=<id>`.
 - Uploads:
@@ -133,7 +133,7 @@ padding_remove_sensitivity = 0
 - Safety gates: `_writes_allowed` blocks POST/DELETE when `dry_run` is true. `delay` enforces per-request sleep after successful GET/POST/DELETE.
 - Failure reporting: `_post_image` appends failure dicts to `state.api_failures` (with item/user id, image_type, path, error) and honors `fail_fast` to raise on first failure.
 
-## Backup and Restore (`jfin_core/backup.py`, `pipeline.restore_from_backups`, `restore_single_from_backup`)
+## Backup and Restore (`src/jfin/backup.py`, `pipeline.restore_from_backups`, `restore_single_from_backup`)
 - Backup filenames derive from Jellyfin image type via `FILENAME_CONFIG` (`Logo`->`logo.png`, `Thumb`->`landscape.jpg`, `Primary`->`profile.*`).
 - Directory scheme: `<backup_root>/<first2_of_id>/<full_id>/<stem>.<ext>` to avoid large single directories.
 - `backup_mode`: `partial` backs up only SCALE_UP/DOWN images; `full` backs up all decisions. Existing backups are overwritten only when bytes differ (with log notes).
@@ -146,7 +146,7 @@ padding_remove_sensitivity = 0
 - `--silent` suppresses stdout logs (critical still to stderr); verbose enables DEBUG for CLI handler.
 
 ## Key Data Classes and Helpers
-- `ModeRuntimeSettings` (`jfin_core/config.py`): resolved per-mode sizes, scaling flags, qualities, padding.
+- `ModeRuntimeSettings` (`src/jfin/config.py`): resolved per-mode sizes, scaling flags, qualities, padding.
 - `DiscoverySettings` (`config.py`): library filters, item type filters, and image query settings.
 - `LibraryRef`, `DiscoveredItem` (`discovery.py`): carry ids, names, collection types, and discovered image types.
 - `ScalePlan` (`imaging.py`): resize decision, factors, and original/target size; used for reporting and NO_SCALE handling.
@@ -154,10 +154,10 @@ padding_remove_sensitivity = 0
 
 ## Config Migration Notes
 - Runtime config is TOML-only (`config.toml` default). Non-TOML paths raise a configuration error.
-- Generate a commented template with `python jfin.py --generate-config` (or `--config <path>.toml`).
+- Generate a commented template with `python -m jfin --generate-config` (or `--config <path>.toml`).
 
 ## Development and Testing Notes
 - Dependencies (`requirements.txt`): Pillow, requests, pytest (for local testing).
-- Run tests with `python -m pytest`. Tests rely on mocks/stubs; no live Jellyfin calls are performed.
+- Run tests with `PYTHONPATH=src python -m pytest` (PowerShell: `$env:PYTHONPATH="src"; python -m pytest`). Tests rely on mocks/stubs; no live Jellyfin calls are performed.
 - Config tests cover TOML parsing/validation; runtime JSON configs are no longer supported.
-- When adding a new image mode, update `jfin_core/constants.py` (`MODE_CONFIG`, `IMAGE_TYPE_TO_MODE`, `MODE_TO_IMAGE_TYPE`, `FILENAME_CONFIG`), extend config parsing, and add a normalization branch in `imaging.build_normalized_image` plus pipeline wiring.
+- When adding a new image mode, update `src/jfin/constants.py` (`MODE_CONFIG`, `IMAGE_TYPE_TO_MODE`, `MODE_TO_IMAGE_TYPE`, `FILENAME_CONFIG`), extend config parsing, and add a normalization branch in `imaging.build_normalized_image` plus pipeline wiring.

@@ -2,8 +2,8 @@ import argparse
 
 import pytest
 
-from jfin_core import state
-from jfin_core.config import (
+from jfin import state
+from jfin.config import (
     apply_cli_overrides,
     build_discovery_settings,
     build_mode_runtime_settings,

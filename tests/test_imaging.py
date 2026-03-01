@@ -3,8 +3,8 @@ import io
 from PIL import Image
 from typing import Literal, Optional
 
-from jfin_core import state
-from jfin_core.imaging import (
+from jfin import state
+from jfin.imaging import (
     ScalePlan,
     fit_contain_and_pad_image,
     build_normalized_image,
@@ -123,7 +123,7 @@ import pytest
 from pathlib import Path
 from PIL import Image
 
-from jfin_core.imaging import cover_and_crop_image
+from jfin.imaging import cover_and_crop_image
 
 
 def test_cover_and_crop_centers_correct_region() -> None:

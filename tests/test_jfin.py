@@ -3,7 +3,7 @@ import sys
 
 import pytest
 
-from jfin import (
+from jfin.cli import (
     main,
     parse_args,
     validate_generate_config_args,
@@ -12,8 +12,8 @@ from jfin import (
     warn_unrecommended_aspect_ratios,
     warn_unused_cli_overrides,
 )
-from jfin_core import state
-from jfin_core.config import ModeRuntimeSettings
+from jfin import state
+from jfin.config import ModeRuntimeSettings
 
 
 @pytest.mark.parametrize(
@@ -81,7 +81,7 @@ def test_validate_test_jf_args_allows_connection_and_logging_flags(argv):
 
 
 def test_parse_args_requires_single_value(monkeypatch):
-    monkeypatch.setattr(sys, "argv", ["jfin.py", "--single"])
+    monkeypatch.setattr(sys, "argv", ["jfin", "--single"])
     with pytest.raises(SystemExit):
         parse_args()
 
@@ -103,7 +103,7 @@ def test_single_requires_explicit_mode(tmp_path, monkeypatch):
     monkeypatch.setattr(
         sys,
         "argv",
-        ["jfin.py", "--config", str(cfg_path), "--single", "item123"],
+        ["jfin", "--config", str(cfg_path), "--single", "item123"],
     )
     with pytest.raises(SystemExit) as excinfo:
         main()
@@ -242,7 +242,7 @@ def test_backup_disallowed_with_restore(tmp_path, monkeypatch):
     monkeypatch.setattr(
         sys,
         "argv",
-        ["jfin.py", "--config", str(cfg_path), "--restore", "--backup"],
+        ["jfin", "--config", str(cfg_path), "--restore", "--backup"],
     )
     with pytest.raises(SystemExit) as excinfo:
         main()

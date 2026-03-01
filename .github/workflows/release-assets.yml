@@ -20,11 +20,12 @@ jobs:
         run: |
           mkdir -p release
 
-          # Copy your core package directory
-          cp -r jfin_core release/
+          # Copy package sources
+          mkdir -p release/src
+          cp -r src/jfin release/src/
 
           # Copy root-level files
-          cp config.example.toml jfin.py LICENSE README.md requirements.txt release/
+          cp config.example.toml LICENSE README.md requirements.txt release/
 
           # Optionally include CHANGELOG.md if it exists
           if [ -f CHANGELOG.md ]; then

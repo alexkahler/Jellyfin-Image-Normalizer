@@ -6,13 +6,13 @@ from typing import cast, TypedDict
 
 from PIL import Image
 
-from jfin_core import backup as backup_mod
-from jfin_core import pipeline as pipeline_mod
-from jfin_core.client import JellyfinClient
-from jfin_core.config import ModeRuntimeSettings
-from jfin_core.discovery import DiscoveredItem
-from jfin_core.imaging import ScalePlan, fit_contain_and_pad_image
-from jfin_core.pipeline import (
+from jfin import backup as backup_mod
+from jfin import pipeline as pipeline_mod
+from jfin.client import JellyfinClient
+from jfin.config import ModeRuntimeSettings
+from jfin.discovery import DiscoveredItem
+from jfin.imaging import ScalePlan, fit_contain_and_pad_image
+from jfin.pipeline import (
     normalize_item_image_api,
     normalize_item_backdrops_api,
     process_single_item_api,
@@ -163,7 +163,7 @@ def test_normalize_item_image_api_dry_run_skips_upload(rgb_image_bytes, tmp_path
 
 
 def test_process_item_image_payload_dry_run_no_upload(rgb_image_bytes, tmp_path, fake_state: FakeState):
-    from jfin_core.pipeline import _process_item_image_payload
+    from jfin.pipeline import _process_item_image_payload
 
     client = StubClient(rgb_image_bytes(size=(200, 100)))
     settings = ModeRuntimeSettings(
@@ -1040,7 +1040,7 @@ def png_bytes(img: Image.Image) -> bytes:
 
 
 def test_logo_padding_remove_crops_before_scale_plan(tmp_path, fake_state: FakeState):
-    from jfin_core.pipeline import _normalize_image_bytes
+    from jfin.pipeline import _normalize_image_bytes
 
     target_w, target_h = 100, 50
     canvas = Image.new("RGBA", (target_w, target_h), (0, 0, 0, 0))
@@ -1082,7 +1082,7 @@ def test_logo_padding_remove_crops_before_scale_plan(tmp_path, fake_state: FakeS
 
 
 def test_logo_padding_add_vs_none_affects_canvas(rgb_image_bytes, tmp_path, fake_state: FakeState):
-    from jfin_core.pipeline import _normalize_image_bytes
+    from jfin.pipeline import _normalize_image_bytes
 
     data = rgb_image_bytes(size=(50, 50))
     base_kwargs: NormalizeImageBytesKwargs = {
@@ -1130,7 +1130,7 @@ def test_logo_padding_add_vs_none_affects_canvas(rgb_image_bytes, tmp_path, fake
 
 
 def test_logo_padding_add_pads_when_scale_plan_is_no_scale(tmp_path, fake_state: FakeState):
-    from jfin_core.pipeline import _normalize_image_bytes
+    from jfin.pipeline import _normalize_image_bytes
 
     target_w, target_h = 800, 310
     img = Image.new("RGBA", (800, 157), (10, 20, 30, 255))
@@ -1169,7 +1169,7 @@ def test_logo_padding_add_pads_when_scale_plan_is_no_scale(tmp_path, fake_state:
 
 
 def test_logo_padding_remove_warns_on_fully_transparent(tmp_path, fake_state: FakeState):
-    from jfin_core.pipeline import _normalize_image_bytes
+    from jfin.pipeline import _normalize_image_bytes
 
     img = Image.new("RGBA", (100, 50), (0, 0, 0, 0))
     data = png_bytes(img)
@@ -1203,7 +1203,7 @@ def test_logo_padding_remove_warns_on_fully_transparent(tmp_path, fake_state: Fa
 
 
 def test_logo_padding_remove_warns_when_crop_noops_at_target_size(tmp_path, fake_state: FakeState):
-    from jfin_core.pipeline import _normalize_image_bytes
+    from jfin.pipeline import _normalize_image_bytes
 
     target_w, target_h = 100, 50
     img = Image.new("RGBA", (target_w, target_h), (0, 0, 0, 0))
@@ -1246,7 +1246,7 @@ def test_logo_padding_remove_warns_when_crop_noops_at_target_size(tmp_path, fake
 
 
 def test_logo_padding_add_then_remove_roundtrip_rgba(tmp_path, fake_state: FakeState):
-    from jfin_core.pipeline import _normalize_image_bytes
+    from jfin.pipeline import _normalize_image_bytes
 
     base = Image.new("RGBA", (40, 20), (10, 20, 30, 255))
     padded = fit_contain_and_pad_image(

@@ -9,7 +9,7 @@ This page collects small but useful patterns and best practices that don't fit i
 If you manually replace an image inside your Jellyfin metadata folder and Jellyfin refuses to acknowledge it (cache might not be updated or the old image size is still shown), you can force JFIN to re-upload the file:
 
 ```bash
-python jfin.py --mode logo --single <item_uuid> \
+python -m jfin --mode logo --single <item_uuid> \
   --force-upload-noscale \
   --logo-target-size <image_width>x<image_height>
 ```
@@ -23,7 +23,7 @@ This forces Jellyfin to associate the new file with the item, even if the size d
 If your logos are already at the canvas size (e.g. `800x310`) but include lots of transparent border padding, you can crop that border **before** any scale planning/resizing:
 
 ```bash
-python jfin.py --mode logo --logo-padding remove
+python -m jfin --mode logo --logo-padding remove
 ```
 
 Config equivalent:
@@ -44,7 +44,7 @@ Use `--item-types` to constrain discovery to specific Jellyfin item types. This 
 
 ```bash
 # Only process series for logo/thumb discovery
-python jfin.py --mode logo --item-types series
+python -m jfin --mode logo --item-types series
 ```
 
 You can also combine values: `--item-types movies|series` (default) or set the same option in `config.toml` under `[modes].item_types`.
@@ -56,10 +56,10 @@ You can also combine values: `--item-types movies|series` (default) or set the s
 If you want to re-normalize specific images for a specific item (for example after changing artwork in Jellyfin), you can target the item directly. Use `--mode` to filter which image types run:
 
 ```bash
-python jfin.py --mode=backdrop --single <item_uuid>
+python -m jfin --mode=backdrop --single <item_uuid>
 
 # Or multiple image types at once:
-python jfin.py --mode=logo|thumb|backdrop --single <item_uuid>
+python -m jfin --mode=logo|thumb|backdrop --single <item_uuid>
 ```
 
 Behind the scenes JFIN will:

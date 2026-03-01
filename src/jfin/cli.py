@@ -25,14 +25,14 @@ def parse_size_pair(value: str) -> tuple[int, int]:
         )
     return width, height
 
-from jfin_core import state
-from jfin_core.backup import (
+from . import state
+from .backup import (
     normalize_backup_mode,
     restore_from_backups,
     restore_single_item_from_backup,
 )   
-from jfin_core.client import JellyfinClient
-from jfin_core.config import (
+from .client import JellyfinClient
+from .config import (
     apply_cli_overrides,
     build_jellyfin_client_from_config,
     build_mode_runtime_settings,
@@ -45,15 +45,15 @@ from jfin_core.config import (
     validate_config_types,
     validate_config_for_mode,
 )
-from jfin_core.constants import (
+from .constants import (
     DEFAULT_CONFIG_NAME,
     RECOMMENDED_ASPECT_LABEL_BY_MODE,
     RECOMMENDED_CANVAS_BY_MODE,
     VALID_MODES,
 )
-from jfin_core.discovery import find_user_by_name
-from jfin_core.logging_utils import log_run_start, log_run_summary, setup_logging
-from jfin_core.pipeline import (
+from .discovery import find_user_by_name
+from .logging_utils import log_run_start, log_run_summary, setup_logging
+from .pipeline import (
     process_libraries_via_api,
     process_profiles,
     process_single_profile,
@@ -77,7 +77,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--config",
         help=(
-            f"Path to TOML config file (default: {DEFAULT_CONFIG_NAME} next to script)."
+            f"Path to TOML config file (default: {DEFAULT_CONFIG_NAME} in repo root)."
         ),
     )
 

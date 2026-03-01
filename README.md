@@ -174,7 +174,7 @@ At a glance, JFIN gives you:
 
 ### Installation
 
-Requires **Python 3.11+**.
+Requires **Python 3.10+**.
 
 ```bash
 git clone https://github.com/alexkahler/Jellyfin-Image-Normalizer.git
@@ -186,10 +186,24 @@ Or download the ZIP directly from GitHub.
 
 This gives you:
 
-* `jfin.py` – the CLI entry point
-* `jfin_core/` – the overengineered engine room
+* `src/jfin/cli.py` - the CLI module entrypoint (run with `python -m jfin`)
+* `src/jfin/` – the overengineered engine room
 
 You can ignore the other files in the folder if you only plan to run the script.
+
+Set the module path once from the repo root:
+
+```bash
+# POSIX (bash/zsh/sh)
+export PYTHONPATH=src
+```
+
+```powershell
+# PowerShell
+$env:PYTHONPATH = "src"
+```
+
+All command examples below assume `PYTHONPATH=src` is set.
 
 ### Quick Start
 
@@ -206,7 +220,7 @@ You can ignore the other files in the folder if you only plan to run the script.
 2. **Generate a config template**
 
    ```bash
-   python jfin.py --generate-config
+   python -m jfin --generate-config
    ```
 
 3. **Edit your `config.toml`**
@@ -241,7 +255,7 @@ You can ignore the other files in the folder if you only plan to run the script.
 4. **Test connectivity (no images harmed)**
 
    ```bash
-   python jfin.py --test-jf
+   python -m jfin --test-jf
    ```
 
    Every normal run now performs this pre-flight check automatically and will exit early with a clear error if Jellyfin is down, rejecting the API key, or reporting that it is shutting down.
@@ -249,7 +263,7 @@ You can ignore the other files in the folder if you only plan to run the script.
 5. **Do a full dry-run**
 
    ```bash
-   python jfin.py --dry-run
+   python -m jfin --dry-run
    ```
 
    This will:
@@ -271,10 +285,10 @@ You can ignore the other files in the folder if you only plan to run the script.
    Then run:
 
    ```bash
-   python jfin.py
+   python -m jfin
    ```
 
-   > ❗ Remember to use `--config` flag if your `config.toml` does not live with `jfin.py`.
+   > ❗ Remember to use `--config` if your config file is not at the default repo-root path (`config.toml`).
 
    Now the magic happens (plus backups, if enabled).
 
@@ -287,50 +301,50 @@ You can ignore the other files in the folder if you only plan to run the script.
 Normalize according to settings in `config.toml`:
 
 ```bash
-python jfin.py
+python -m jfin
 ```
 
 Overwrite mode in `config.toml` and only fix logos:
 
 ```bash
-python jfin.py --mode=logo
+python -m jfin --mode=logo
 ```
 
 Override logo size and disable padding (for the minimalists):
 
 ```bash
-python jfin.py --mode=logo \
+python -m jfin --mode=logo \
   --logo-target-size 500x200 --logo-padding none
 ```
 
 Override mode and fix thumbs (and resize those “4K thumbs”):
 
 ```bash
-python jfin.py --mode=thumb --thumb-target-size 1000x562
+python -m jfin --mode=thumb --thumb-target-size 1000x562
 ```
 
 Normalize selected images for a single item:
 
 ```bash
-python jfin.py --mode=logo|thumb|backdrop --single <item_uuid>
+python -m jfin --mode=logo|thumb|backdrop --single <item_uuid>
 ```
 
 Override mode and process profile images for a single user (profile-only):
 
 ```bash
-python jfin.py --mode=profile --single some_username
+python -m jfin --mode=profile --single some_username
 ```
 
 Restore logos from backups (all items for one mode):
 
 ```bash
-python jfin.py --mode=logo --restore
+python -m jfin --mode=logo --restore
 ```
 
 Restore everything:
 
 ```bash
-python jfin.py --restore-all
+python -m jfin --restore-all
 ```
 
 ### When should you *not* use this?
@@ -397,14 +411,14 @@ For internal architecture and layout, see: [Technical Notes](docs/TECHNICAL_NOTE
 
 ## Development
 
-* Code lives in `jfin_core/`
-* CLI entry is `jfin.py`
+* Code lives in `src/jfin/`
+* CLI entry is `python -m jfin` (`src/jfin/cli.py`)
 * Dependencies are listed in `requirements.txt`
 
 Run tests:
 
 ```bash
-python -m pytest
+PYTHONPATH=src python -m pytest
 ```
 
 More details about the processing pipeline, classes, config TOML, and CLI entrypoints are documented in:

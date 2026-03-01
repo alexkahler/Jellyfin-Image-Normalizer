@@ -2,8 +2,8 @@ import pytest
 from pathlib import Path
 from unittest.mock import Mock
 
-from jfin_core import backup as backup_mod
-from jfin_core.backup import (
+from jfin import backup as backup_mod
+from jfin.backup import (
     backup_path_for_image,
     guess_extension_from_content_type,
     image_type_from_filename,
@@ -13,7 +13,7 @@ from jfin_core.backup import (
     save_backup,
     should_backup_for_plan,
 )
-from jfin_core.client import JellyfinClient
+from jfin.client import JellyfinClient
 
 
 def test_should_backup_for_plan_modes():

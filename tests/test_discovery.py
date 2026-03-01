@@ -1,7 +1,7 @@
 import pytest
 
-from jfin_core.config import DiscoverySettings
-from jfin_core.discovery import (
+from jfin.config import DiscoverySettings
+from jfin.discovery import (
     LibraryRef,
     discover_all_library_items,
     discover_libraries,

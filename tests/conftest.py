@@ -6,11 +6,12 @@ import pytest
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
-# Ensure the real repo root is importable even when tests live behind reparse points.
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+SRC = ROOT / "src"
+# Ensure the src layout package is importable even when tests live behind reparse points.
+if str(SRC) not in sys.path:
+    sys.path.insert(0, str(SRC))
 
-from jfin_core import state
+from jfin import state
 
 
 @pytest.fixture(autouse=True)

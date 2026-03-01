@@ -61,7 +61,11 @@ def setup_logging(cfg: dict[str, Any], args: Any) -> tuple[logging.LoggerAdapter
     file_level_name = logging_cfg.get("file_level", "INFO")
     file_level = _parse_log_level(file_level_name)
     file_path_cfg = logging_cfg.get("file_path")
-    file_path = Path(file_path_cfg).expanduser() if file_path_cfg else Path(__file__).with_name("jfin.log")
+    file_path = (
+        Path(file_path_cfg).expanduser()
+        if file_path_cfg
+        else Path(__file__).resolve().parents[2] / "jfin.log"
+    )
 
     logger = logging.getLogger("jfin")
     logger.setLevel(logging.DEBUG)

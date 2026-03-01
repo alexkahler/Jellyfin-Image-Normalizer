@@ -1,7 +1,4 @@
-"""
-Core package for Jellyfin Image Normalizer helpers.
-The CLI entry point remains jfin.py.
-"""
+"""Core package for Jellyfin Image Normalizer."""
 
 __all__ = [
     "backup",

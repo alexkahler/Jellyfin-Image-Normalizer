@@ -74,8 +74,8 @@ def _merge_section_keys(cfg: dict[str, Any]) -> dict[str, Any]:
 
 def default_config_path() -> Path:
     """Return the default config path relative to the repository root."""
-    package_root = Path(__file__).resolve().parent.parent
-    return package_root / DEFAULT_CONFIG_NAME
+    repo_root = Path(__file__).resolve().parents[2]
+    return repo_root / DEFAULT_CONFIG_NAME
 
 
 def generate_default_config(config_path: Path) -> None:
