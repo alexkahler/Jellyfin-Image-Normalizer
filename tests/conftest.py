@@ -11,7 +11,7 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from jfin import state
+from jfin import state  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -25,6 +25,7 @@ def reset_state():
 @pytest.fixture
 def rgb_image_bytes():
     """Factory fixture that builds simple RGB images and returns raw bytes."""
+
     def _factory(size=(120, 60), color=(255, 0, 0), fmt="PNG") -> bytes:
         img = Image.new("RGB", size, color)
         buf = io.BytesIO()

@@ -67,7 +67,11 @@ def _plan_and_backup_image(
         pad_to_canvas=bool(fit_mode == "fit" and settings.logo_padding == "add"),
     )
 
-    if make_backup and not dry_run and should_backup_for_plan(plan.decision, backup_mode):
+    if (
+        make_backup
+        and not dry_run
+        and should_backup_for_plan(plan.decision, backup_mode)
+    ):
         save_backup(
             backup_root=backup_root,
             item_id=item_id,
@@ -118,16 +122,15 @@ def _normalize_image_bytes(
     """
     Return the normalized payload bytes, normalized content-type, and scale plan for a single image.
     """
-    def has_pixels_above_alpha_threshold(
-        src: Image.Image, sensitivity: float
-    ) -> bool:
+
+    def has_pixels_above_alpha_threshold(src: Image.Image, sensitivity: float) -> bool:
         rgba = src if src.mode == "RGBA" else src.convert("RGBA")
         alpha = rgba.getchannel("A")
         mask = alpha.point([255 if a > sensitivity else 0 for a in range(256)])
         return mask.getbbox() is not None
 
-    with Image.open(io.BytesIO(data)) as img:
-        img = apply_exif_orientation(img)
+    with Image.open(io.BytesIO(data)) as opened_img:
+        img: Image.Image = apply_exif_orientation(opened_img)
         orig_mode = img.mode
         fit_mode = "fit" if mode == "logo" else "cover"
 
@@ -140,11 +143,10 @@ def _normalize_image_bytes(
         cropped = False
         if mode == "logo" and settings.logo_padding == "remove":
             sensitivity = settings.logo_padding_remove_sensitivity
-            fully_transparent = not has_pixels_above_alpha_threshold(
-                img, sensitivity
-            )
+            fully_transparent = not has_pixels_above_alpha_threshold(img, sensitivity)
             before_size = img.size
-            img, cropped = remove_padding_from_logo(img, sensitivity)
+            cropped_img, cropped = remove_padding_from_logo(img, sensitivity)
+            img = cropped_img
 
             if fully_transparent:
                 state.log.warning(
@@ -153,9 +155,14 @@ def _normalize_image_bytes(
                     sensitivity,
                 )
                 state.stats.record_warning()
-            elif (not cropped) and img.size == before_size and img.size == (
-                settings.target_width,
-                settings.target_height,
+            elif (
+                (not cropped)
+                and img.size == before_size
+                and img.size
+                == (
+                    settings.target_width,
+                    settings.target_height,
+                )
             ):
                 state.log.warning(
                     "[WARN] Logo padding removal may have failed: image "
@@ -262,7 +269,9 @@ def _process_item_image_payload(
             # For backdrops we always want a final asset, so do not skip uploads.
             skip_when_no_scale = False
         else:
-            skip_when_no_scale = bool(mode in ("logo", "thumb") and not force_upload_noscale)
+            skip_when_no_scale = bool(
+                mode in ("logo", "thumb") and not force_upload_noscale
+            )
 
         no_scale_result = handle_no_scale(
             plan=plan,
@@ -329,16 +338,18 @@ def normalize_item_image_api(
             backup_root=backup_root,
             backup_mode=backup_mode,
         )
-    
+
     mode = IMAGE_TYPE_TO_MODE.get(image_type)
     if not mode:
         state.log.warning("[WARN] Unsupported image type %s; skipping.", image_type)
         state.stats.record_warning()
         return False
-    
+
     settings = settings_by_mode.get(mode)
     if settings is None:
-        state.log.warning("[WARN] No settings for mode '%s'; skipping %s.", mode, image_type)
+        state.log.warning(
+            "[WARN] No settings for mode '%s'; skipping %s.", mode, image_type
+        )
         state.stats.record_warning()
         return False
 
@@ -392,7 +403,7 @@ def normalize_item_backdrops_api(
         return False
 
     total = item.backdrop_count or 0
-    
+
     if total == 0:
         state.log.info("Item %s has no backdrops; skipping.", item.id)
         state.stats.record_skip(count_processed=False)
@@ -408,27 +419,35 @@ def normalize_item_backdrops_api(
         if dry_run or deletions_started:
             return
         cleanup_staging_dir(backup_root, item.id)
-    
-    staged_files: list[tuple[int, Path | None, str]] = []  # (index, file_path, content_type)
-    
+
+    staged_files: list[
+        tuple[int, Path | None, str]
+    ] = []  # (index, file_path, content_type)
+
     for src_index in range(total):
         label = f"{item.name} [{item.id}] backdrop #{src_index}"
-        
-        result = jf_client.get_item_image(item_id=item.id, image_type="Backdrop", index=src_index)
+
+        result = jf_client.get_item_image(
+            item_id=item.id, image_type="Backdrop", index=src_index
+        )
         if result is None:
-            state.log.error("[ERROR] Backdrop fetch failed at call %d for item %s; aborting before normalization.", src_index, item.id)
+            state.log.error(
+                "[ERROR] Backdrop fetch failed at call %d for item %s; aborting before normalization.",
+                src_index,
+                item.id,
+            )
             state.stats.record_error(label, "fetch failed")
             cleanup_staging_on_failure()
             return False
-        
+
         data, content_type = result
 
         # Stage the file with original extension
         if not dry_run and staging_dir:
             try:
                 ext = guess_extension_from_content_type(content_type)
-                staged_path = staging_dir / f"{src_index}{ext}"
-                staged_path.write_bytes(data)
+                staged_file_path = staging_dir / f"{src_index}{ext}"
+                staged_file_path.write_bytes(data)
             except Exception as exc:
                 state.log.error(
                     "[ERROR] Failed to stage backdrop index %d for item %s: %s",
@@ -440,26 +459,35 @@ def normalize_item_backdrops_api(
                 cleanup_staging_on_failure()
                 return False
 
-            staged_files.append((src_index, staged_path, content_type))
+            staged_files.append((src_index, staged_file_path, content_type))
             state.log.debug(
                 "  -> Staged backdrop index %d: %s",
                 src_index,
-                staged_path,
+                staged_file_path,
             )
         else:
             # In dry-run, keep in memory for phase 2
             staged_files.append((src_index, None, content_type))
-    
+
     if len(staged_files) != total:
-        state.log.error("[ERROR] Fetch phase failed: expected %d backdrops, got %d for item %s.", total, len(staged_files), item.id)
-        state.stats.record_error(item.id, f"Fetch failed: expected {total}, got {len(staged_files)}")
+        state.log.error(
+            "[ERROR] Fetch phase failed: expected %d backdrops, got %d for item %s.",
+            total,
+            len(staged_files),
+            item.id,
+        )
+        state.stats.record_error(
+            item.id, f"Fetch failed: expected {total}, got {len(staged_files)}"
+        )
         cleanup_staging_on_failure()
         return False
-    
+
     # Phase 2: Normalize & prepare - normalize staged files to memory
-    normalized_payloads: list[tuple[int, bytes, str]] = []  # (index, payload_bytes, content_type)
-    
-    for src_index, staged_path, original_content_type in staged_files:
+    normalized_payloads: list[
+        tuple[int, bytes, str]
+    ] = []  # (index, payload_bytes, content_type)
+
+    for src_index, staged_path_opt, original_content_type in staged_files:
         label = f"{item.name} [{item.id}] backdrop #{src_index}"
 
         if dry_run:
@@ -469,19 +497,30 @@ def normalize_item_backdrops_api(
                 item.id,
             )
             state.stats.record_success()
-            normalized_payloads.append((src_index, b"", original_content_type or "application/octet-stream"))
+            normalized_payloads.append(
+                (src_index, b"", original_content_type or "application/octet-stream")
+            )
             continue
 
-        if staged_path is None:
-            state.log.error("[ERROR] Missing staged file for backdrop index %d on item %s.", src_index, item.id)
+        if staged_path_opt is None:
+            state.log.error(
+                "[ERROR] Missing staged file for backdrop index %d on item %s.",
+                src_index,
+                item.id,
+            )
             state.stats.record_error(label, "staged file missing")
             cleanup_staging_on_failure()
             return False
 
         try:
-            data = staged_path.read_bytes()
+            data = staged_path_opt.read_bytes()
         except Exception as e:
-            state.log.error("[ERROR] Backdrop normalization failed at index %d for item %s: failed to read staged file: %s", src_index, item.id, e)
+            state.log.error(
+                "[ERROR] Backdrop normalization failed at index %d for item %s: failed to read staged file: %s",
+                src_index,
+                item.id,
+                e,
+            )
             state.stats.record_error(label, f"read staged file failed: {e}")
             cleanup_staging_on_failure()
             return False
@@ -502,19 +541,33 @@ def normalize_item_backdrops_api(
                 backdrop_index=src_index,
             )
         except Exception as exc:
-            state.log.exception("[ERROR] Backdrop normalization failed at index %d for item %s", src_index, item.id)
+            state.log.exception(
+                "[ERROR] Backdrop normalization failed at index %d for item %s",
+                src_index,
+                item.id,
+            )
             state.stats.record_error(label, str(exc))
             cleanup_staging_on_failure()
             return False
 
-        normalized_payloads.append((src_index, normalized_bytes, normalized_content_type))
-    
+        normalized_payloads.append(
+            (src_index, normalized_bytes, normalized_content_type)
+        )
+
     if len(normalized_payloads) != total:
-        state.log.error("[ERROR] Normalize phase failed: expected %d backdrops, got %d for item %s.", total, len(normalized_payloads), item.id)
-        state.stats.record_error(item.id, f"Normalize failed: expected {total}, got {len(normalized_payloads)}")
+        state.log.error(
+            "[ERROR] Normalize phase failed: expected %d backdrops, got %d for item %s.",
+            total,
+            len(normalized_payloads),
+            item.id,
+        )
+        state.stats.record_error(
+            item.id,
+            f"Normalize failed: expected {total}, got {len(normalized_payloads)}",
+        )
         cleanup_staging_on_failure()
         return False
-    
+
     # Phase 3: Delete - remove all originals from server
     if dry_run:
         state.log.debug(
@@ -527,10 +580,13 @@ def normalize_item_backdrops_api(
         for _ in range(total):
             delete_ok = jf_client.delete_image(item.id, image_type, 0)
             if not delete_ok:
-                state.log.error("[ERROR] Failed to delete original backdrop at index 0 for item %s; aborting without upload.", item.id)
+                state.log.error(
+                    "[ERROR] Failed to delete original backdrop at index 0 for item %s; aborting without upload.",
+                    item.id,
+                )
                 state.stats.record_error(item.id, "delete phase failed")
                 return False
-        
+
         # Verify all originals deleted via 404 check
         verification = jf_client.get_item_image_head(
             item_id=item.id,
@@ -539,12 +595,19 @@ def normalize_item_backdrops_api(
             retry=False,  # keep this fast and avoid retry backoff during verification
         )
         if verification is not None:
-            state.log.error("[ERROR] 404 verification failed for item %s; images still exist at index 0. Aborting upload phase.", item.id)
+            state.log.error(
+                "[ERROR] 404 verification failed for item %s; images still exist at index 0. Aborting upload phase.",
+                item.id,
+            )
             state.stats.record_error(item.id, "404 verification failed")
             return False
-        
-        state.log.debug("  -> All %d original backdrops deleted and verified (404) for item %s.", total, item.id)
-    
+
+        state.log.debug(
+            "  -> All %d original backdrops deleted and verified (404) for item %s.",
+            total,
+            item.id,
+        )
+
     # Phase 4: Upload - upload normalized payloads to indices 0 to total-1
     any_upload_failed = False
     if dry_run:
@@ -555,7 +618,9 @@ def normalize_item_backdrops_api(
             total - 1,
         )
     else:
-        for upload_index, (src_index, payload_bytes, content_type) in enumerate(normalized_payloads):
+        for upload_index, (src_index, payload_bytes, content_type) in enumerate(
+            normalized_payloads
+        ):
             label = f"{item.name} [{item.id}] backdrop #{src_index} -> upload index {upload_index}"
 
             upload_ok = jf_client.set_item_image_bytes(
@@ -617,15 +682,15 @@ def process_discovered_items(
 ) -> None:
     """Iterate discovered items and normalize the enabled image types via API calls, tracking progress stats."""
     enabled_set = set(enabled_image_types)
-    
+
     total_images = 0
     for item in items:
-        for image_type in (item.image_types & enabled_set):
+        for image_type in item.image_types & enabled_set:
             if image_type == "Backdrop":
-                total_images += (item.backdrop_count or 1)
+                total_images += item.backdrop_count or 1
             else:
                 total_images += 1
-    
+
     processed_images = 0
 
     state.stats.record_images_found(total_images)
@@ -737,7 +802,9 @@ def normalize_profile_user(
     user_label = profile_display_name(user)
 
     if not user.get("PrimaryImageTag"):
-        state.log.info("[SKIP] %s has no PrimaryImageTag; skipping profile image.", user_label)
+        state.log.info(
+            "[SKIP] %s has no PrimaryImageTag; skipping profile image.", user_label
+        )
         state.stats.record_skip(count_processed=True)
         return False
 
@@ -750,8 +817,8 @@ def normalize_profile_user(
     data, content_type = image_response
 
     try:
-        with Image.open(io.BytesIO(data)) as img:
-            img = apply_exif_orientation(img)
+        with Image.open(io.BytesIO(data)) as opened_img:
+            img: Image.Image = apply_exif_orientation(opened_img)
             orig_mode = img.mode
 
             plan = _plan_and_backup_image(
@@ -849,7 +916,9 @@ def process_profiles(
     """Normalize profile images for all active users by delegating to normalize_profile_user."""
     users = jf_client.list_users(is_disabled=False)
     if not users:
-        state.log.warning("[WARN] No active users returned from Jellyfin; skipping profile processing.")
+        state.log.warning(
+            "[WARN] No active users returned from Jellyfin; skipping profile processing."
+        )
         state.stats.record_warning()
         return
     available_profiles = sum(1 for user in users if user.get("PrimaryImageTag"))
@@ -919,7 +988,7 @@ def process_single_item_api(
         backdrop_count=backdrop_count,
         image_types={image_type},
     )
-    
+
     state.stats.record_images_found(backdrop_count or 1)
     state.log.info("Processing single item %s as %s", item_id, mode)
     return normalize_item_image_api(

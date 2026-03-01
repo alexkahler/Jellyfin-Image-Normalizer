@@ -69,7 +69,7 @@ def test_load_config_from_path_parses_toml_and_builds_mode(tmp_path):
         profile_webp_quality=None,
         item_types=None,
     )
-    settings = build_mode_runtime_settings("logo", cfg["logo"], args)     
+    settings = build_mode_runtime_settings("logo", cfg["logo"], args)
     assert settings.target_width == 640
     assert settings.target_height == 360
     assert settings.allow_upscale is False
@@ -233,7 +233,7 @@ def test_build_mode_runtime_settings_respects_cli_overrides():
         "jpeg_quality": 85,
         "webp_quality": 75,
     }
-    settings = build_mode_runtime_settings("logo", mode_cfg, args)        
+    settings = build_mode_runtime_settings("logo", mode_cfg, args)
     assert settings.target_width == 400
     assert settings.target_height == 300
     assert settings.allow_upscale is False

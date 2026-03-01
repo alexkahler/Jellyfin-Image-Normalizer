@@ -109,6 +109,7 @@ def test_single_requires_explicit_mode(tmp_path, monkeypatch):
         main()
     assert excinfo.value.code == 1
 
+
 def test_warn_unused_cli_overrides_flags_when_not_used(caplog):
     args = argparse.Namespace(
         logo_target_size=None,
@@ -139,7 +140,9 @@ def test_warn_unused_cli_overrides_flags_when_not_used(caplog):
         ("thumb", {"profile_webp_quality": 80}, "--profile-webp-quality has no effect"),
     ],
 )
-def test_warn_unused_cli_overrides_incompatible_flags(mode, kwargs, expected_substr, caplog):
+def test_warn_unused_cli_overrides_incompatible_flags(
+    mode, kwargs, expected_substr, caplog
+):
     base_args = dict(
         logo_target_size=None,
         thumb_target_size=None,
@@ -186,9 +189,7 @@ def test_warns_when_no_upscale_and_no_downscale_both_set(caplog):
         ("logo", 800, 520),
     ],
 )
-def test_warn_unrecommended_aspect_ratios_warns_on_mismatch(
-    mode, width, height
-):
+def test_warn_unrecommended_aspect_ratios_warns_on_mismatch(mode, width, height):
     settings = ModeRuntimeSettings(
         target_width=width,
         target_height=height,

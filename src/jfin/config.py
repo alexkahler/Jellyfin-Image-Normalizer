@@ -6,10 +6,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, cast
 
-try:
-    import tomllib  # type: ignore[attr-defined]
-except ModuleNotFoundError:  # pragma: no cover - fallback for Python <3.11
-    import tomli as tomllib  # type: ignore[no-redef]
+if sys.version_info >= (3, 11):
+    import tomllib
+else:  # pragma: no cover - runtime fallback for Python <3.11
+    import tomli as tomllib
 
 from . import state
 from .constants import (
@@ -56,18 +56,14 @@ class ConfigError(Exception):
 def _merge_section_keys(cfg: dict[str, Any]) -> dict[str, Any]:
     """Lift known section keys to the top level when missing."""
     normalized_sections = {
-        name.lower(): value
-        for name, value in cfg.items()
-        if isinstance(value, dict)
+        name.lower(): value for name, value in cfg.items() if isinstance(value, dict)
     }
     for section, keys in SECTION_KEY_MAP.items():
         table = normalized_sections.get(section)
         if not isinstance(table, dict):
             continue
         for key in keys:
-            if key in table and (
-                key not in cfg or isinstance(cfg.get(key), dict)
-            ):
+            if key in table and (key not in cfg or isinstance(cfg.get(key), dict)):
                 cfg[key] = table[key]
     return cfg
 
@@ -92,13 +88,11 @@ def generate_default_config(config_path: Path) -> None:
         sys.exit(1)
 
     config_path.parent.mkdir(parents=True, exist_ok=True)
-    config_path.write_text(
-        DEFAULT_TOML_TEMPLATE.strip() + "\n", encoding="utf-8")
+    config_path.write_text(DEFAULT_TOML_TEMPLATE.strip() + "\n", encoding="utf-8")
 
     state.log.info("Config file generated at: %s", config_path)
     state.log.info(
-        "Please edit this file to match your environment before running "
-        "the script."
+        "Please edit this file to match your environment before running the script."
     )
 
 
@@ -117,8 +111,7 @@ def load_config_from_path(config_path: Path) -> dict[str, Any]:
     """
     if config_path.suffix.lower() != ".toml":
         raise ConfigError(
-            "Unsupported config format: expected a .toml file "
-            "(e.g. config.toml)."
+            "Unsupported config format: expected a .toml file (e.g. config.toml)."
         )
 
     if not config_path.exists():
@@ -136,9 +129,7 @@ def load_config_from_path(config_path: Path) -> dict[str, Any]:
             "--generate-config and review it before running."
         ) from exc
     except Exception as exc:  # tomllib/tomli raise TOMLDecodeError subclasses
-        raise ConfigError(
-            f"Failed to parse TOML config {config_path}: {exc}"
-        ) from exc
+        raise ConfigError(f"Failed to parse TOML config {config_path}: {exc}") from exc
 
     if not isinstance(cfg, dict):
         raise ConfigError(
@@ -168,23 +159,17 @@ def validate_config_types(cfg: dict[str, Any]) -> None:
     """
     errors: list[str] = []
 
-    def expect_bool(
-        container: dict[str, Any], key: str, context: str
-    ) -> None:
+    def expect_bool(container: dict[str, Any], key: str, context: str) -> None:
         if key in container and not isinstance(container[key], bool):
             errors.append(f"{context}.{key} must be a boolean.")
 
-    def expect_int(
-        container: dict[str, Any], key: str, context: str
-    ) -> None:
+    def expect_int(container: dict[str, Any], key: str, context: str) -> None:
         if key in container:
             value = container[key]
             if isinstance(value, bool) or not isinstance(value, int):
                 errors.append(f"{context}.{key} must be an integer.")
 
-    def expect_number(
-        container: dict[str, Any], key: str, context: str
-    ) -> None:
+    def expect_number(container: dict[str, Any], key: str, context: str) -> None:
         if key in container:
             value = container[key]
             if isinstance(value, bool) or not isinstance(value, (int, float)):
@@ -206,16 +191,13 @@ def validate_config_types(cfg: dict[str, Any]) -> None:
     def expect_string_list(value: Any, context: str) -> None:
         if isinstance(value, str):
             return
-        if isinstance(value, list) and all(
-            isinstance(item, str) for item in value
-        ):
+        if isinstance(value, list) and all(isinstance(item, str) for item in value):
             return
         errors.append(f"{context} must be a string or a list of strings.")
 
     for required in ("jf_url", "jf_api_key"):
         if required not in cfg or cfg.get(required) is None:
-            errors.append(
-                f"{required} is required and must be a non-empty string.")
+            errors.append(f"{required} is required and must be a non-empty string.")
             continue
         expect_string(cfg, required, "config", allow_empty=False)
     expect_number(cfg, "timeout", "config")
@@ -252,9 +234,7 @@ def validate_config_types(cfg: dict[str, Any]) -> None:
     if libraries_cfg is not None:
         if isinstance(libraries_cfg, dict):
             if "names" in libraries_cfg:
-                expect_string_list(
-                    libraries_cfg["names"], "config.libraries.names"
-                )
+                expect_string_list(libraries_cfg["names"], "config.libraries.names")
             elif libraries_cfg:
                 errors.append(
                     "config.libraries.names is required when providing the "
@@ -283,33 +263,25 @@ def validate_config_types(cfg: dict[str, Any]) -> None:
             if "no_padding" in mode_cfg:
                 state.log.warning(
                     "Config key 'logo.no_padding' has been removed. "
-                    "Use logo.padding = \"none\" instead of no_padding=true."
+                    'Use logo.padding = "none" instead of no_padding=true.'
                 )
                 state.stats.record_warning()
                 errors.append(
                     "config.logo.no_padding has been removed. "
-                    "Use logo.padding = \"none\" instead of no_padding=true."
+                    'Use logo.padding = "none" instead of no_padding=true.'
                 )
             expect_string(mode_cfg, "padding", f"config.{mode}")
             expect_number(mode_cfg, "padding_remove_sensitivity", f"config.{mode}")
         if mode == "thumb" or mode == "backdrop":
-            expect_int(mode_cfg, "jpeg_quality", f"config.{mode}")        
+            expect_int(mode_cfg, "jpeg_quality", f"config.{mode}")
         if mode == "profile":
-            expect_int(mode_cfg, "webp_quality", f"config.{mode}")        
+            expect_int(mode_cfg, "webp_quality", f"config.{mode}")
 
         width = mode_cfg.get("width")
         height = mode_cfg.get("height")
-        if (
-            isinstance(width, int)
-            and not isinstance(width, bool)
-            and width <= 0
-        ):
+        if isinstance(width, int) and not isinstance(width, bool) and width <= 0:
             errors.append(f"config.{mode}.width must be greater than zero.")
-        if (
-            isinstance(height, int)
-            and not isinstance(height, bool)
-            and height <= 0
-        ):
+        if isinstance(height, int) and not isinstance(height, bool) and height <= 0:
             errors.append(f"config.{mode}.height must be greater than zero.")
         if mode == "thumb" or mode == "backdrop":
             quality = mode_cfg.get("jpeg_quality")
@@ -321,8 +293,7 @@ def validate_config_types(cfg: dict[str, Any]) -> None:
             if isinstance(quality, int) and not isinstance(quality, bool):
                 if quality < 1 or quality > 100:
                     errors.append(
-                        "config.profile.webp_quality must be between "
-                        "1 and 100."
+                        "config.profile.webp_quality must be between 1 and 100."
                     )
         if mode == "logo":
             padding = mode_cfg.get("padding")
@@ -330,8 +301,7 @@ def validate_config_types(cfg: dict[str, Any]) -> None:
                 normalized = padding.strip().lower()
                 if normalized not in {"add", "remove", "none"}:
                     errors.append(
-                        "config.logo.padding must be one of "
-                        "\"add\", \"remove\", or \"none\"."
+                        'config.logo.padding must be one of "add", "remove", or "none".'
                     )
             sensitivity = mode_cfg.get("padding_remove_sensitivity")
             if isinstance(sensitivity, (int, float)) and not isinstance(
@@ -390,11 +360,10 @@ def parse_item_types(value: Any) -> list[str]:
         token = part.strip().lower()
         if token in {"movie", "movies"}:
             mapped = "Movie"
-        elif token == "series":
+        elif token == "series":  # nosec B105
             mapped = "Series"
         else:
-            raise ConfigError(
-                "item_types must contain only movies and/or series.")
+            raise ConfigError("item_types must contain only movies and/or series.")
 
         if mapped not in canonical:
             canonical.append(mapped)
@@ -483,9 +452,15 @@ def apply_cli_overrides(args: Any, cfg: dict[str, Any]) -> dict[str, Any]:
             mode_cfg["no_downscale"] = True
         if mode == "thumb" and getattr(args, "thumb_jpeg_quality", None) is not None:
             mode_cfg["jpeg_quality"] = args.thumb_jpeg_quality
-        if mode == "backdrop" and getattr(args, "backdrop_jpeg_quality", None) is not None:
+        if (
+            mode == "backdrop"
+            and getattr(args, "backdrop_jpeg_quality", None) is not None
+        ):
             mode_cfg["jpeg_quality"] = args.backdrop_jpeg_quality
-        if mode == "profile" and getattr(args, "profile_webp_quality", None) is not None:
+        if (
+            mode == "profile"
+            and getattr(args, "profile_webp_quality", None) is not None
+        ):
             mode_cfg["webp_quality"] = args.profile_webp_quality
 
     if getattr(args, "jf_delay_ms", None) is not None:
@@ -521,8 +496,7 @@ def _validate_positive_override(value: Any, label: str) -> int | None:
     if value is None:
         return None
     if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
-        raise ConfigError(
-            f"{label} must be a positive integer (got {value!r}).")
+        raise ConfigError(f"{label} must be a positive integer (got {value!r}).")
     return value
 
 
@@ -544,12 +518,10 @@ def _derive_canvas_size(
     if override_w is not None and override_h is not None:
         return override_w, override_h
     if override_w is not None and base_width > 0:
-        inferred_height = max(
-            1, int(round(base_height * (override_w / base_width))))
+        inferred_height = max(1, int(round(base_height * (override_w / base_width))))
         return override_w, inferred_height
     if override_h is not None and base_height > 0:
-        inferred_width = max(
-            1, int(round(base_width * (override_h / base_height))))
+        inferred_width = max(1, int(round(base_width * (override_h / base_height))))
         return inferred_width, override_h
 
     return base_width, base_height
@@ -576,17 +548,21 @@ def build_mode_runtime_settings(
             )
     else:
         target_width, target_height = _derive_canvas_size(
-            base_width, base_height, None, None)
+            base_width, base_height, None, None
+        )
 
-    allow_upscale = not (mode_cfg.get("no_upscale", False)
-                         or getattr(args, "no_upscale", False))
-    allow_downscale = not (mode_cfg.get("no_downscale", False)
-                           or getattr(args, "no_downscale", False))       
+    allow_upscale = not (
+        mode_cfg.get("no_upscale", False) or getattr(args, "no_upscale", False)
+    )
+    allow_downscale = not (
+        mode_cfg.get("no_downscale", False) or getattr(args, "no_downscale", False)
+    )
 
     jpeg_quality = int(mode_cfg.get("jpeg_quality", 85))
     jpeg_quality = max(1, min(95, jpeg_quality))
-    webp_quality = int(mode_cfg.get("webp_quality", 80)
-                       ) if "webp_quality" in mode_cfg else 80
+    webp_quality = (
+        int(mode_cfg.get("webp_quality", 80)) if "webp_quality" in mode_cfg else 80
+    )
     webp_quality = max(1, min(100, webp_quality))
 
     logo_padding: LogoPadding = "add"
@@ -607,15 +583,16 @@ def build_mode_runtime_settings(
         logo_padding = cast(LogoPadding, cfg_padding)
 
         sensitivity = mode_cfg.get("padding_remove_sensitivity", 0)
-        if isinstance(sensitivity, (int, float)) and not isinstance(
-            sensitivity, bool
-        ):
+        if isinstance(sensitivity, (int, float)) and not isinstance(sensitivity, bool):
             logo_padding_remove_sensitivity = float(sensitivity)
-        if (0.0 > logo_padding_remove_sensitivity
-                or logo_padding_remove_sensitivity > 255.0):
+        if (
+            0.0 > logo_padding_remove_sensitivity
+            or logo_padding_remove_sensitivity > 255.0
+        ):
             raise ConfigError(
                 f"logo.padding_remove_sensitivity must be between 0 and 255. "
-                "(got {logo_padding_remove_sensitivity}).")
+                f"(got {logo_padding_remove_sensitivity})."
+            )
 
     return ModeRuntimeSettings(
         target_width=target_width,

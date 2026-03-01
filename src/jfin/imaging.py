@@ -210,7 +210,7 @@ def apply_exif_orientation(img: Image.Image) -> Image.Image:
 
 
 def get_palette_color_count(img: Image.Image) -> int | None:
-    """Estimate number of colors used in a paletted image (up to 256)."""  
+    """Estimate number of colors used in a paletted image (up to 256)."""
     try:
         colors = img.getcolors(maxcolors=1 << 24)
         if colors is None:
@@ -309,7 +309,7 @@ def cover_and_crop_image(
     - If mode=None: keep the image's current mode (no conversions).
     """
     mode_upper = mode.upper() if mode is not None else None
-        
+
     # Pre-conversion rules
     if mode_upper == "RGB":
         if img.mode == "L":
@@ -374,16 +374,11 @@ def build_normalized_image(
         return normalized_img, "image/jpeg", "JPEG"
     if mode == "profile":
         normalized_img = cover_and_crop_image(
-            img,
-            target_width,
-            target_height,
-            new_width,
-            new_height,
-            mode="RGBA"
+            img, target_width, target_height, new_width, new_height, mode="RGBA"
         )
         state.log.debug("  -> Built normalized %s image in memory", "Profile")
         return normalized_img, "image/webp", "WEBP"
-    
+
     if mode == "backdrop":
         # For v1: reuse thumb’s cover+crop behaviour, but with backdrop-specific size.
         normalized_img = cover_and_crop_image(
@@ -396,7 +391,6 @@ def build_normalized_image(
         )
         state.log.debug("  -> Built normalized %s image in memory", "Backdrop")
         return normalized_img, "image/jpeg", "JPEG"
-
 
     raise ValueError(f"Unsupported mode: {mode}")
 

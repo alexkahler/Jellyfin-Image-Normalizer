@@ -49,12 +49,18 @@ def _parse_log_level(name: str | None, default: str = "INFO") -> int:
     return mapping.get(str(name).upper(), logging.INFO)
 
 
-def setup_logging(cfg: dict[str, Any], args: Any) -> tuple[logging.LoggerAdapter, dict[str, Any]]:
+def setup_logging(
+    cfg: dict[str, Any], args: Any
+) -> tuple[logging.LoggerAdapter, dict[str, Any]]:
     """Configure logging handlers/adapters based on config/CLI args and return the adapter plus effective settings."""
     logging_cfg = cfg.get("logging", {}) or {}
 
     silent = bool(getattr(args, "silent", False) or logging_cfg.get("silent", False))
-    cli_level_name = "DEBUG" if getattr(args, "verbose", False) else logging_cfg.get("cli_level", "INFO")
+    cli_level_name = (
+        "DEBUG"
+        if getattr(args, "verbose", False)
+        else logging_cfg.get("cli_level", "INFO")
+    )
     cli_level = _parse_log_level(cli_level_name)
 
     file_enabled = bool(logging_cfg.get("file_enabled", True))

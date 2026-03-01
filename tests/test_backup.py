@@ -37,7 +37,14 @@ def test_normalize_backup_mode_defaults_to_partial():
         ("451bok", "Backdrop", 0, ".jpg", Path("45") / "451bok" / "backdrop.jpg"),
     ],
 )
-def test_backup_path_for_image(tmp_path: Path, item_id: str, image_type: str, ext: str, expected_rel: Path, backdrop_index: int | None) -> None:
+def test_backup_path_for_image(
+    tmp_path: Path,
+    item_id: str,
+    image_type: str,
+    ext: str,
+    expected_rel: Path,
+    backdrop_index: int | None,
+) -> None:
     path = backup_path_for_image(tmp_path, item_id, image_type, ext, backdrop_index)
 
     expected = tmp_path / expected_rel
@@ -57,7 +64,6 @@ def test_backup_path_for_image(tmp_path: Path, item_id: str, image_type: str, ex
         ("bac543", "Primary", "image/jpeg", None, "profile"),
         # Thumb
         ("321acb", "Thumb", "image/jpeg", None, "landscape"),
-        
         ("432fda", "Backdrop", "image/jpeg", 0, "backdrop"),
     ],
 )
@@ -104,13 +110,15 @@ def test_save_backup_writes_files(
         ("unknownfile.png", None, True),
     ],
 )
-def test_image_type_from_filename(filename: str, expected: str | None, should_raise: bool) -> None:
+def test_image_type_from_filename(
+    filename: str, expected: str | None, should_raise: bool
+) -> None:
     if should_raise:
         with pytest.raises(ValueError):
             image_type_from_filename(filename)
     else:
         assert image_type_from_filename(filename) == expected
-        
+
 
 @pytest.mark.parametrize(
     "content_type, expected_ext",
@@ -170,7 +178,7 @@ class FakeStats:
     def record_warning(self, count_processed: bool | None = None) -> None:
         self.warnings += 1
 
-    def record_skip(self, count_processed: bool | None = None) -> None:   
+    def record_skip(self, count_processed: bool | None = None) -> None:
         self.skips += 1
 
     def record_error(self, *args, **kwargs) -> None:
@@ -209,10 +217,13 @@ def jf_client() -> Mock:
     client.set_item_image_bytes.return_value = True
     client.set_user_profile_image.return_value = True
     return client
+
+
 # =============================================================================
 
 # Tests: restore_from_backups
 # =============================================================================
+
 
 @pytest.mark.parametrize(
     "case,"
@@ -263,7 +274,7 @@ def jf_client() -> Mock:
             ["logo.png", "landscape.jpg", "backdrop.jpg", "backdrop1.jpg"],
             ["logo"],
             False,
-            [("Logo", None)],   # only logo is restored
+            [("Logo", None)],  # only logo is restored
             0,
             1,
             0,
@@ -276,7 +287,7 @@ def jf_client() -> Mock:
             True,
             [("Logo", None), ("Thumb", None), ("Backdrop", 0), ("Backdrop", 1)],
             0,
-            4,   # four would-be restores -> four successes in dry_run
+            4,  # four would-be restores -> four successes in dry_run
             0,
         ),
         # 6) Unknown files are ignored (no uploads, no errors)
@@ -309,9 +320,9 @@ def jf_client() -> Mock:
             ["profile"],
             False,
             [],
-            1,   # only one profile upload
-            1,   # one success
-            1,   # one error recorded (e.g. "multiple profile backups found")
+            1,  # only one profile upload
+            1,  # one success
+            1,  # one error recorded (e.g. "multiple profile backups found")
         ),
         # 9) Mixed valid and invalid files: only valid backdrops are restored
         (
@@ -321,8 +332,8 @@ def jf_client() -> Mock:
             False,
             [("Backdrop", 0)],
             0,
-            1,   # one successful restore
-            0,   # no errors; junk is just ignored
+            1,  # one successful restore
+            0,  # no errors; junk is just ignored
         ),
     ],
 )
@@ -348,6 +359,7 @@ def test_restore_from_backups_scenarios(
     - logo, profile, and landscape/thumb handling
     - multi-file scenarios per item
     """
+
     # --- Patch helpers / globals used by restore_from_backups -----------------
     # image_type_from_filename:
     #  - Backdrops (with or without index) -> "Backdrop"
@@ -366,6 +378,7 @@ def test_restore_from_backups_scenarios(
         if f == "landscape.jpg":
             return "Thumb"
         return None
+
     monkeypatch.setattr(
         backup_mod,
         "image_type_from_filename",
@@ -384,11 +397,13 @@ def test_restore_from_backups_scenarios(
         },
         raising=False,
     )
+
     # content_type_from_extension: keep it simple
     def fake_content_type_from_extension(ext: str) -> str:
         if ext == ".png":
             return "image/png"
         return "image/jpeg"
+
     monkeypatch.setattr(
         backup_mod,
         "content_type_from_extension",
@@ -444,8 +459,10 @@ def test_restore_from_backups_scenarios(
             assert kwargs["content_type"] in ("image/jpeg", "image/png")
             assert "failures" in kwargs
 
+
 # Tests: restore_single_from_backup
 # =============================================================================
+
 
 @pytest.mark.parametrize(
     "case, filenames, mode, dry_run,"
@@ -542,7 +559,7 @@ def test_restore_from_backups_scenarios(
             [],
             0,
             False,  # should return False
-            0,      # no successes
+            0,  # no successes
         ),
         # 9) Mode does not match available files: logo exists, but mode is thumb
         (
@@ -574,11 +591,11 @@ def test_restore_from_backups_scenarios(
             ["profile.jpg", "profile.png"],
             "profile",
             False,
-            [],   # expected_item_calls
-            1,    # one profile upload
-            True, # return value
-            1,    # one success
-        ), 
+            [],  # expected_item_calls
+            1,  # one profile upload
+            True,  # return value
+            1,  # one success
+        ),
     ],
 )
 def test_restore_single_from_backup_scenarios(

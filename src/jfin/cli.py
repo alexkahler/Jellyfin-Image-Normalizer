@@ -4,33 +4,12 @@ import sys
 from pathlib import Path
 from typing import Any, cast
 
-
-def parse_size_pair(value: str) -> tuple[int, int]:
-    """Parse WIDTHxHEIGHT size strings into a positive integer tuple for argparse."""
-    if not isinstance(value, str) or "x" not in value.lower():
-        raise argparse.ArgumentTypeError(
-            "Expected WIDTHxHEIGHT (e.g., 1000x562)."
-        )
-    width_str, height_str = value.lower().split("x", 1)
-    try:
-        width = int(width_str)
-        height = int(height_str)
-    except ValueError:
-        raise argparse.ArgumentTypeError(
-            "Width and height must be integers (e.g., 1000x562)."
-        )
-    if width <= 0 or height <= 0:
-        raise argparse.ArgumentTypeError(
-            "Width and height must be positive integers."
-        )
-    return width, height
-
 from . import state
 from .backup import (
     normalize_backup_mode,
     restore_from_backups,
     restore_single_item_from_backup,
-)   
+)
 from .client import JellyfinClient
 from .config import (
     apply_cli_overrides,
@@ -60,9 +39,28 @@ from .pipeline import (
     process_single_item_api,
 )
 
+CONFIG_ARG = "--config"  # nosec B105
+
+
+def parse_size_pair(value: str) -> tuple[int, int]:
+    """Parse WIDTHxHEIGHT size strings into a positive integer tuple for argparse."""
+    if not isinstance(value, str) or "x" not in value.lower():
+        raise argparse.ArgumentTypeError("Expected WIDTHxHEIGHT (e.g., 1000x562).")
+    width_str, height_str = value.lower().split("x", 1)
+    try:
+        width = int(width_str)
+        height = int(height_str)
+    except ValueError:
+        raise argparse.ArgumentTypeError(
+            "Width and height must be integers (e.g., 1000x562)."
+        )
+    if width <= 0 or height <= 0:
+        raise argparse.ArgumentTypeError("Width and height must be positive integers.")
+    return width, height
+
 
 def parse_args() -> argparse.Namespace:
-    #FIXME Missing docstring
+    """Parse CLI arguments for image normalization, restore, and utility flows."""
     parser = argparse.ArgumentParser(
         description=(
             "Normalize Jellyfin images (logos, thumbs, profiles) via the Jellyfin API.\n\n"
@@ -97,7 +95,9 @@ def parse_args() -> argparse.Namespace:
         "--mode",
         help=(
             "Image types to handle, e.g. 'logo', 'thumb', 'profile', 'backdrop', "
-            "or a pipe-separated list like '"'logo|thumb'"'. Overrides the config "
+            "or a pipe-separated list like '"
+            "logo|thumb"
+            "'. Overrides the config "
             "'operations' value if provided."
         ),
     )
@@ -267,7 +267,7 @@ def validate_generate_config_args(argv: list[str]) -> None:
     Permitted tokens: --generate-config, an optional --config path value, and CLI verbosity flags (-s/--silent, -v/--verbose).
     Any other operational or sizing flags trigger a fatal validation error before config generation runs.
     """
-    allowed = {"--generate-config", "--config", "--silent", "-s", "--verbose", "-v"}
+    allowed = {"--generate-config", CONFIG_ARG, "--silent", "-s", "--verbose", "-v"}
     extras: list[str] = []
     skip_next = False
 
@@ -276,10 +276,10 @@ def validate_generate_config_args(argv: list[str]) -> None:
             skip_next = False
             continue
 
-        if token == "--config":
+        if token == CONFIG_ARG:
             skip_next = True
             continue
-        if token.startswith("--config="):
+        if token.startswith(f"{CONFIG_ARG}="):
             continue
         if token in allowed:
             continue
@@ -287,8 +287,13 @@ def validate_generate_config_args(argv: list[str]) -> None:
         extras.append(token)
 
     if extras:
-        state.log.critical("--generate-config cannot be combined with other arguments (found: %s).", ", ".join(extras))
-        state.stats.record_error("arguments", "generate-config combined with other args")
+        state.log.critical(
+            "--generate-config cannot be combined with other arguments (found: %s).",
+            ", ".join(extras),
+        )
+        state.stats.record_error(
+            "arguments", "generate-config combined with other args"
+        )
         raise SystemExit(1)
 
 
@@ -298,7 +303,7 @@ def validate_restore_all_args(argv: list[str]) -> None:
 
     Allows only logging and config path flags alongside --restore-all.
     """
-    allowed = {"--restore-all", "--config", "--silent", "-s", "--verbose", "-v"}
+    allowed = {"--restore-all", CONFIG_ARG, "--silent", "-s", "--verbose", "-v"}
     extras: list[str] = []
     skip_next = False
 
@@ -307,10 +312,10 @@ def validate_restore_all_args(argv: list[str]) -> None:
             skip_next = False
             continue
 
-        if token == "--config":
+        if token == CONFIG_ARG:
             skip_next = True
             continue
-        if token.startswith("--config="):
+        if token.startswith(f"{CONFIG_ARG}="):
             continue
         if token in allowed:
             continue
@@ -318,7 +323,10 @@ def validate_restore_all_args(argv: list[str]) -> None:
         extras.append(token)
 
     if extras:
-        state.log.critical("--restore-all cannot be combined with other arguments (found: %s).", ", ".join(extras))
+        state.log.critical(
+            "--restore-all cannot be combined with other arguments (found: %s).",
+            ", ".join(extras),
+        )
         state.stats.record_error("arguments", "restore-all combined with other args")
         raise SystemExit(1)
 
@@ -351,7 +359,12 @@ def validate_test_jf_args(argv: list[str]) -> None:
         if token in {"--config", "--jf-url", "--jf-api-key", "--jf-delay-ms"}:
             skip_next = True
             continue
-        if token.startswith("--config=") or token.startswith("--jf-url=") or token.startswith("--jf-api-key=") or token.startswith("--jf-delay-ms="):
+        if (
+            token.startswith("--config=")
+            or token.startswith("--jf-url=")
+            or token.startswith("--jf-api-key=")
+            or token.startswith("--jf-delay-ms=")
+        ):
             continue
         if token in allowed:
             continue
@@ -382,13 +395,19 @@ def warn_unused_cli_overrides(args: argparse.Namespace, operations: list[str]) -
         )
         state.stats.record_warning()
     if args.thumb_jpeg_quality is not None and "thumb" not in ops:
-        state.log.warning("--thumb-jpeg-quality has no effect because 'thumb' mode is not selected.")
+        state.log.warning(
+            "--thumb-jpeg-quality has no effect because 'thumb' mode is not selected."
+        )
         state.stats.record_warning()
     if args.backdrop_jpeg_quality is not None and "backdrop" not in ops:
-        state.log.warning("--backdrop-jpeg-quality has no effect because 'backdrop' mode is not selected.")
+        state.log.warning(
+            "--backdrop-jpeg-quality has no effect because 'backdrop' mode is not selected."
+        )
         state.stats.record_warning()
     if args.profile_webp_quality is not None and "profile" not in ops:
-        state.log.warning("--profile-webp-quality has no effect because 'profile' mode is not selected.")
+        state.log.warning(
+            "--profile-webp-quality has no effect because 'profile' mode is not selected."
+        )
         state.stats.record_warning()
     if getattr(args, "logo_padding", None) is not None and "logo" not in ops:
         state.log.warning(
@@ -403,7 +422,9 @@ def warn_unused_cli_overrides(args: argparse.Namespace, operations: list[str]) -
     ]
     for mode, value, flag in dim_warnings:
         if value is not None and mode not in ops:
-            state.log.warning("%s has no effect because '%s' mode is not selected.", flag, mode)
+            state.log.warning(
+                "%s has no effect because '%s' mode is not selected.", flag, mode
+            )
             state.stats.record_warning()
     if getattr(args, "item_types", None) and not ({"logo", "thumb", "backdrop"} & ops):
         state.log.warning(
@@ -432,9 +453,7 @@ def warn_unrecommended_aspect_ratios(
         if actual_ratio == rec_ratio:
             continue
 
-        label = RECOMMENDED_ASPECT_LABEL_BY_MODE.get(
-            mode, f"{rec_width}x{rec_height}"
-        )
+        label = RECOMMENDED_ASPECT_LABEL_BY_MODE.get(mode, f"{rec_width}x{rec_height}")
         state.log.warning(
             "Unusual %s aspect ratio: configured %sx%s has %.2f (w/h); "
             "recommended %s (~%.2f), e.g. %sx%s.",
@@ -472,7 +491,9 @@ def run_preflight_check(jf_client: JellyfinClient) -> None:
 def main() -> None:
     args = parse_args()
 
-    config_path = Path(args.config).expanduser() if args.config else default_config_path()
+    config_path = (
+        Path(args.config).expanduser() if args.config else default_config_path()
+    )
 
     operations: list[str] = []
     run_started = False
@@ -519,7 +540,11 @@ def main() -> None:
         if args.restore_all:
             operations = sorted(VALID_MODES)
         else:
-            operations = ["test-jf"] if args.test_jf else parse_operations(args.mode, cfg.get("operations"))
+            operations = (
+                ["test-jf"]
+                if args.test_jf
+                else parse_operations(args.mode, cfg.get("operations"))
+            )
         restore_requested = bool(args.restore or args.restore_all)
         dry_run = bool(args.dry_run or cfg.get("dry_run", False))
         writes_enabled = not dry_run
@@ -550,8 +575,8 @@ def main() -> None:
                 state.stats.record_error("test-jf", "Missing jf_url/jf_api_key")
                 raise SystemExit(1)
 
-            jf_client = build_jellyfin_client_from_config(cfg)
-            ok = jf_client.test_connection()
+            test_jf_client = build_jellyfin_client_from_config(cfg)
+            ok = test_jf_client.test_connection()
             if ok:
                 state.stats.record_success()
             else:
@@ -559,7 +584,9 @@ def main() -> None:
             raise SystemExit(0 if ok else 1)
 
         if args.single and not args.mode:
-            state.log.critical("--single requires an explicit --mode to determine target type.")
+            state.log.critical(
+                "--single requires an explicit --mode to determine target type."
+            )
             state.stats.record_error("arguments", "--single missing --mode")
             raise SystemExit(1)
         warn_unused_cli_overrides(args, operations)
@@ -584,7 +611,9 @@ def main() -> None:
 
             mode_cfg = cfg[mode]
             try:
-                settings_by_mode[mode] = build_mode_runtime_settings(mode, mode_cfg, args)
+                settings_by_mode[mode] = build_mode_runtime_settings(
+                    mode, mode_cfg, args
+                )
             except ConfigError as exc:
                 state.log.critical(str(exc))
                 state.stats.record_error("configuration", str(exc))
@@ -596,20 +625,30 @@ def main() -> None:
             ops_set = set(operations)
             if "profile" in ops_set:
                 if operations != ["profile"]:
-                    state.log.critical("--single with profile mode cannot be combined with other modes.")
-                    state.stats.record_error("arguments", "--single profile combined with other modes")
+                    state.log.critical(
+                        "--single with profile mode cannot be combined with other modes."
+                    )
+                    state.stats.record_error(
+                        "arguments", "--single profile combined with other modes"
+                    )
                     raise SystemExit(1)
 
                 if restore_requested:
                     users = jf_client.list_users(is_disabled=False)
                     user = find_user_by_name(users, args.single)
                     if user is None:
-                        state.log.critical("User '%s' not found or disabled.", args.single)
-                        state.stats.record_error(args.single, "User not found or disabled")
+                        state.log.critical(
+                            "User '%s' not found or disabled.", args.single
+                        )
+                        state.stats.record_error(
+                            args.single, "User not found or disabled"
+                        )
                         raise SystemExit(1)
                     target_id = user.get("Id")
                     if not target_id:
-                        state.log.critical("Resolved user '%s' is missing an Id.", args.single)
+                        state.log.critical(
+                            "Resolved user '%s' is missing an Id.", args.single
+                        )
                         state.stats.record_error(args.single, "User missing Id")
                         raise SystemExit(1)
                     ok = restore_single_item_from_backup(
@@ -681,7 +720,9 @@ def main() -> None:
         opeation_modes = [m for m in operations if m in ("logo", "thumb", "backdrop")]
         if opeation_modes:
             if jf_client is None:
-                state.log.critical("Jellyfin client is required for library processing.")
+                state.log.critical(
+                    "Jellyfin client is required for library processing."
+                )
                 state.stats.record_error("configuration", "Missing Jellyfin client")
                 raise SystemExit(1)
 

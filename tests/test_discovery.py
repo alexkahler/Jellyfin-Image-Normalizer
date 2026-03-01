@@ -76,13 +76,25 @@ def test_discover_library_items_paginates():
     pages = [
         {
             "Items": [
-                {"Id": "1", "Name": "One", "Type": "Movie", "ParentId": "lib", "ImageTags": {"Thumb": "a"}}
+                {
+                    "Id": "1",
+                    "Name": "One",
+                    "Type": "Movie",
+                    "ParentId": "lib",
+                    "ImageTags": {"Thumb": "a"},
+                }
             ],
             "TotalRecordCount": 2,
         },
         {
             "Items": [
-                {"Id": "2", "Name": "Two", "Type": "Movie", "ParentId": "lib", "ImageTags": {"Thumb": "b"}}
+                {
+                    "Id": "2",
+                    "Name": "Two",
+                    "Type": "Movie",
+                    "ParentId": "lib",
+                    "ImageTags": {"Thumb": "b"},
+                }
             ],
             "TotalRecordCount": 2,
         },

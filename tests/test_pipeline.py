@@ -6,7 +6,6 @@ from typing import cast, TypedDict
 
 from PIL import Image
 
-from jfin import backup as backup_mod
 from jfin import pipeline as pipeline_mod
 from jfin.client import JellyfinClient
 from jfin.config import ModeRuntimeSettings
@@ -44,11 +43,21 @@ class StubClient:
         self.last_image_type = image_type
         return self.image_bytes, "image/png"
 
-    def set_item_image_bytes(self, item_id: str, image_type: str, data: bytes, content_type: str, backdrop_index=None, failures=None):
+    def set_item_image_bytes(
+        self,
+        item_id: str,
+        image_type: str,
+        data: bytes,
+        content_type: str,
+        backdrop_index=None,
+        failures=None,
+    ):
         self.upload_calls += 1
         return True
 
-    def set_user_profile_image(self, user_id: str, data: bytes, content_type: str, failures=None):
+    def set_user_profile_image(
+        self, user_id: str, data: bytes, content_type: str, failures=None
+    ):
         self.profile_uploads += 1
         return True
 
@@ -76,7 +85,7 @@ class FakeStats:
     def record_warning(self, count_processed: bool | None = None) -> None:
         self.warnings += 1
 
-    def record_skip(self, count_processed: bool | None = None) -> None:   
+    def record_skip(self, count_processed: bool | None = None) -> None:
         self.skips += 1
 
     def record_error(self, *args, **kwargs) -> None:
@@ -122,7 +131,9 @@ def jf_client() -> Mock:
 # =============================================================================
 
 
-def test_normalize_item_image_api_dry_run_skips_upload(rgb_image_bytes, tmp_path, fake_state: FakeState):
+def test_normalize_item_image_api_dry_run_skips_upload(
+    rgb_image_bytes, tmp_path, fake_state: FakeState
+):
     client = StubClient(rgb_image_bytes(size=(200, 100)))
     item = DiscoveredItem(
         id="item1",
@@ -162,7 +173,9 @@ def test_normalize_item_image_api_dry_run_skips_upload(rgb_image_bytes, tmp_path
     assert fake_state.stats.successes == 1
 
 
-def test_process_item_image_payload_dry_run_no_upload(rgb_image_bytes, tmp_path, fake_state: FakeState):
+def test_process_item_image_payload_dry_run_no_upload(
+    rgb_image_bytes, tmp_path, fake_state: FakeState
+):
     from jfin.pipeline import _process_item_image_payload
 
     client = StubClient(rgb_image_bytes(size=(200, 100)))
@@ -349,22 +362,22 @@ def test_full_backup_saves_no_scale_images(rgb_image_bytes, tmp_path):
         # 1) IMAGE_TYPE_TO_MODE does not contain "Backdrop" -> warning + False
         (
             "unsupported_image_type_mapping",
-            False,   # has_mode_mapping
-            True,    # has_settings (ignored)
-            3,       # backdrop_count
+            False,  # has_mode_mapping
+            True,  # has_settings (ignored)
+            3,  # backdrop_count
             [],
             [],
-            False,   # expected_return
-            1,       # expected_warnings
-            0,       # expected_skips
-            0,       # expected_errors
-            0,       # expected_successes
+            False,  # expected_return
+            1,  # expected_warnings
+            0,  # expected_skips
+            0,  # expected_errors
+            0,  # expected_successes
         ),
         # 2) No settings for backdrop mode -> warning + False
         (
             "missing_settings_for_backdrop_mode",
             True,
-            False,   # has_settings
+            False,  # has_settings
             3,
             [],
             [],
@@ -402,8 +415,8 @@ def test_full_backup_saves_no_scale_images(rgb_image_bytes, tmp_path):
             0,
             0,
         ),
-        # 5) All backdrops fetched and processed successfully -> True     
-        #    This is the main "happy path" spec for the 5-phase behavior. 
+        # 5) All backdrops fetched and processed successfully -> True
+        #    This is the main "happy path" spec for the 5-phase behavior.
         (
             "all_backdrops_ok",
             True,
@@ -423,15 +436,15 @@ def test_full_backup_saves_no_scale_images(rgb_image_bytes, tmp_path):
             True,
             True,
             3,
-            [1],   # backdrop index 1 fails to fetch
+            [1],  # backdrop index 1 fails to fetch
             [],
             False,
             0,
             0,
-            1,     # one error recorded
+            1,  # one error recorded
             0,
         ),
-        # 7) Fetch OK but normalization helper fails for one -> False     
+        # 7) Fetch OK but normalization helper fails for one -> False
         #    (helper is responsible for stats; we only assert return=False and no delete/upload)
         (
             "process_failure_on_one_backdrop",
@@ -439,7 +452,7 @@ def test_full_backup_saves_no_scale_images(rgb_image_bytes, tmp_path):
             True,
             3,
             [],
-            [2],   # processing fails for the 3rd backdrop
+            [2],  # processing fails for the 3rd backdrop
             False,
             0,
             0,
@@ -448,7 +461,6 @@ def test_full_backup_saves_no_scale_images(rgb_image_bytes, tmp_path):
         ),
     ],
 )
-
 def test_normalize_item_backdrops_api_scenarios(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -512,12 +524,12 @@ def test_normalize_item_backdrops_api_scenarios(
     item = DiscoveredItem(
         id="item123",
         name="Test Item",
-        type="Movie",          # or whatever fits your domain
+        type="Movie",  # or whatever fits your domain
         parent_id=None,
         library_id=None,
         library_name=None,
         backdrop_count=backdrop_count,
-        image_types=set(),     # empty is fine for this test
+        image_types=set(),  # empty is fine for this test
     )
 
     # Fake Jellyfin client: we want to observe get/delete/upload ordering
@@ -664,7 +676,7 @@ def test_normalize_item_backdrops_api_scenarios(
 
     # Phase 1: fetch-all originals
     # We expect at least 'total' calls, first 'total' are fetches for indices 0..total-1.
-    assert jf_client.get_item_image.call_count >= total, case 
+    assert jf_client.get_item_image.call_count >= total, case
     first_calls = jf_client.get_item_image.call_args_list[:total]
     fetch_indices = [call.kwargs["index"] for call in first_calls]
     assert fetch_indices == list(range(total)), case
@@ -676,7 +688,7 @@ def test_normalize_item_backdrops_api_scenarios(
 
     # Phase 3: delete-all originals using delete_image(index=0) exactly 'total' times
     assert jf_client.delete_image.call_count == total, case
-    
+
     def _delete_index(call):
         if "index" in call.kwargs:
             return call.kwargs["index"]
@@ -684,7 +696,9 @@ def test_normalize_item_backdrops_api_scenarios(
             return call.kwargs["image_index"]
         return call.args[2]
 
-    delete_indices = [_delete_index(call) for call in jf_client.delete_image.call_args_list]
+    delete_indices = [
+        _delete_index(call) for call in jf_client.delete_image.call_args_list
+    ]
     assert delete_indices == [0] * total, case
 
     # Phase 3b: ensure we verify via HEAD call for index 0
@@ -708,12 +722,18 @@ def test_normalize_item_backdrops_api_scenarios(
     # No uploads should happen before all deletions are issued.
     # We can enforce this by inspecting the global mock call sequence.
     all_calls = jf_client.mock_calls
-    first_delete_idx = next(i for i, c in enumerate(all_calls) if c[0] == "delete_image")
-    first_upload_idx = next(i for i, c in enumerate(all_calls) if c[0] == "set_item_image_bytes")
+    first_delete_idx = next(
+        i for i, c in enumerate(all_calls) if c[0] == "delete_image"
+    )
+    first_upload_idx = next(
+        i for i, c in enumerate(all_calls) if c[0] == "set_item_image_bytes"
+    )
     assert first_delete_idx < first_upload_idx, case
 
 
-def test_normalize_item_backdrops_api_dry_run_skips_normalization(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fake_state: FakeState) -> None:
+def test_normalize_item_backdrops_api_dry_run_skips_normalization(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fake_state: FakeState
+) -> None:
     """
     Dry-run mode should fetch metadata but skip normalization, deletions, and uploads.
     """
@@ -931,7 +951,9 @@ def test_process_single_item_uses_direct_item_id(rgb_image_bytes, tmp_path):
     assert pipeline_mod.state.stats.successes == 1
 
 
-def test_process_single_item_backdrop_uses_backdrop_tags_from_item(rgb_image_bytes, tmp_path):
+def test_process_single_item_backdrop_uses_backdrop_tags_from_item(
+    rgb_image_bytes, tmp_path
+):
     class BackdropClient(StubClient):
         def __init__(self, image_bytes: bytes):
             super().__init__(image_bytes)
@@ -1081,7 +1103,9 @@ def test_logo_padding_remove_crops_before_scale_plan(tmp_path, fake_state: FakeS
         assert out.size == (83, 50)
 
 
-def test_logo_padding_add_vs_none_affects_canvas(rgb_image_bytes, tmp_path, fake_state: FakeState):
+def test_logo_padding_add_vs_none_affects_canvas(
+    rgb_image_bytes, tmp_path, fake_state: FakeState
+):
     from jfin.pipeline import _normalize_image_bytes
 
     data = rgb_image_bytes(size=(50, 50))
@@ -1129,7 +1153,9 @@ def test_logo_padding_add_vs_none_affects_canvas(rgb_image_bytes, tmp_path, fake
         assert out_none.size == (60, 60)
 
 
-def test_logo_padding_add_pads_when_scale_plan_is_no_scale(tmp_path, fake_state: FakeState):
+def test_logo_padding_add_pads_when_scale_plan_is_no_scale(
+    tmp_path, fake_state: FakeState
+):
     from jfin.pipeline import _normalize_image_bytes
 
     target_w, target_h = 800, 310
@@ -1168,7 +1194,9 @@ def test_logo_padding_add_pads_when_scale_plan_is_no_scale(tmp_path, fake_state:
         assert out.size == (target_w, target_h)
 
 
-def test_logo_padding_remove_warns_on_fully_transparent(tmp_path, fake_state: FakeState):
+def test_logo_padding_remove_warns_on_fully_transparent(
+    tmp_path, fake_state: FakeState
+):
     from jfin.pipeline import _normalize_image_bytes
 
     img = Image.new("RGBA", (100, 50), (0, 0, 0, 0))
@@ -1202,7 +1230,9 @@ def test_logo_padding_remove_warns_on_fully_transparent(tmp_path, fake_state: Fa
     assert payload == data
 
 
-def test_logo_padding_remove_warns_when_crop_noops_at_target_size(tmp_path, fake_state: FakeState):
+def test_logo_padding_remove_warns_when_crop_noops_at_target_size(
+    tmp_path, fake_state: FakeState
+):
     from jfin.pipeline import _normalize_image_bytes
 
     target_w, target_h = 100, 50
@@ -1270,7 +1300,7 @@ def test_logo_padding_add_then_remove_roundtrip_rgba(tmp_path, fake_state: FakeS
         logo_padding="remove",
         logo_padding_remove_sensitivity=0,
     )
-    
+
     plan, payload, _ = _normalize_image_bytes(
         item_id="item",
         label="logo-roundtrip",

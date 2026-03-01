@@ -48,7 +48,9 @@ def discover_libraries(
 ) -> list[LibraryRef]:
     """List media folders and optionally filter by name."""
     if not discovery.library_names:
-        state.log.info("No library filters provided; skipping library lookup and querying all items.")
+        state.log.info(
+            "No library filters provided; skipping library lookup and querying all items."
+        )
         return []
 
     resp = jf_client.list_media_folders()
@@ -73,7 +75,11 @@ def discover_libraries(
             continue
         name = item.get("Name") or "<unknown>"
         collection_type_raw = item.get("CollectionType")
-        collection_type = collection_type_raw.lower() if isinstance(collection_type_raw, str) else None
+        collection_type = (
+            collection_type_raw.lower()
+            if isinstance(collection_type_raw, str)
+            else None
+        )
 
         if names_filter and _normalize_library_name(name) not in names_filter:
             continue
@@ -91,7 +97,9 @@ def discover_libraries(
             "Library filters present (%s) but none matched active libraries.",
             ", ".join(discovery.library_names),
         )
-        state.stats.record_error("discovery", "Library filters did not match any library")
+        state.stats.record_error(
+            "discovery", "Library filters did not match any library"
+        )
         raise SystemExit(1)
 
     if names_filter:
@@ -141,7 +149,12 @@ def discover_library_items(
     start_index = 0
     total_records: int | None = None
     label = f"library '{library.name}'" if library else "all libraries"
-    state.log.info("Scanning %s for image types %s (page_size=%s)", label, ",".join(enabled_types), page_size)
+    state.log.info(
+        "Scanning %s for image types %s (page_size=%s)",
+        label,
+        ",".join(enabled_types),
+        page_size,
+    )
 
     while True:
         resp = jf_client.query_items(
@@ -165,10 +178,12 @@ def discover_library_items(
             item_id = raw.get("Id")
             if not item_id:
                 continue
-            
+
             backdrop_count = _item_backdrop_count(raw)
 
-            matching_types = [it for it in enabled_types if _item_has_image_type(raw, it)]
+            matching_types = [
+                it for it in enabled_types if _item_has_image_type(raw, it)
+            ]
             if not matching_types:
                 continue
 
@@ -180,15 +195,14 @@ def discover_library_items(
                     parent_id=raw.get("ParentId"),
                     library_id=library.id if library else None,
                     library_name=library.name if library else None,
-                    backdrop_count=None
+                    backdrop_count=None,
                 )
-                
-            
+
             item = items[item_id]
             if backdrop_count and "Backdrop" in enabled_types:
                 # keep max in case of multiple pages
                 item.backdrop_count = max(item.backdrop_count or 0, backdrop_count)
-                
+
             for image_type in matching_types:
                 item.add_image_type(image_type)
 
@@ -240,7 +254,9 @@ def profile_display_name(user: dict[str, Any]) -> str:
     return f"{name} ({user_id})"
 
 
-def find_user_by_name(users: Iterable[dict[str, Any]], username: str) -> dict[str, Any] | None:
+def find_user_by_name(
+    users: Iterable[dict[str, Any]], username: str
+) -> dict[str, Any] | None:
     """Locate a user by Name (case-insensitive) from a user list."""
     username_lower = username.lower()
     for user in users:

@@ -1,7 +1,8 @@
 import io
-
-from PIL import Image
 from typing import Literal, Optional
+
+import pytest
+from PIL import Image
 
 from jfin import state
 from jfin.imaging import (
@@ -18,7 +19,14 @@ from jfin.imaging import (
 
 def test_make_scale_plan_upscale(rgb_image_bytes):
     img = Image.open(io.BytesIO(rgb_image_bytes(size=(100, 50))))
-    plan = make_scale_plan(img, target_w=200, target_h=100, fit_mode="fit", allow_upscale=True, allow_downscale=True)
+    plan = make_scale_plan(
+        img,
+        target_w=200,
+        target_h=100,
+        fit_mode="fit",
+        allow_upscale=True,
+        allow_downscale=True,
+    )
     assert plan.decision == "SCALE_UP"
     assert (plan.new_width, plan.new_height) == (200, 100)
 
@@ -71,7 +79,9 @@ def test_remove_padding_from_logo_crops_transparent_border() -> None:
     assert cropped.size == (6, 6)
 
 
-def test_remove_padding_from_logo_does_not_crop_when_border_is_not_transparent() -> None:
+def test_remove_padding_from_logo_does_not_crop_when_border_is_not_transparent() -> (
+    None
+):
     img = Image.new("RGBA", (10, 10), (10, 20, 30, 255))
     cropped, changed = remove_padding_from_logo(img, sensitivity=0)
     assert changed is False
@@ -118,14 +128,6 @@ def test_remove_padding_roundtrip_add_then_remove_restores_pixels() -> None:
     assert cropped.convert("RGBA").tobytes() == base.tobytes()
 
 
-# test_imaging.py
-import pytest
-from pathlib import Path
-from PIL import Image
-
-from jfin.imaging import cover_and_crop_image
-
-
 def test_cover_and_crop_centers_correct_region() -> None:
     """
     Use a tiny 4x2 patterned image so we can verify the crop picks the centered
@@ -165,12 +167,16 @@ def test_cover_and_crop_centers_correct_region() -> None:
     # Crop box in function: left = (4-2)//2 = 1, top = (2-2)//2 = 0
     # So we expect columns 1 and 2 from both rows
     expected_pixels = [
-        img.getpixel((1, 0)), img.getpixel((2, 0)),
-        img.getpixel((1, 1)), img.getpixel((2, 1)),
+        img.getpixel((1, 0)),
+        img.getpixel((2, 0)),
+        img.getpixel((1, 1)),
+        img.getpixel((2, 1)),
     ]
     actual_pixels = [
-        out.getpixel((0, 0)), out.getpixel((1, 0)),
-        out.getpixel((0, 1)), out.getpixel((1, 1)),
+        out.getpixel((0, 0)),
+        out.getpixel((1, 0)),
+        out.getpixel((0, 1)),
+        out.getpixel((1, 1)),
     ]
     assert actual_pixels == expected_pixels
 
@@ -222,10 +228,10 @@ def test_cover_and_crop_respects_target_size(
 @pytest.mark.parametrize(
     "input_mode, mode_arg, expected_mode",
     [
-        ("RGBA", None, "RGBA"),   # keep alpha
-        ("RGBA", "RGB", "RGB"),   # drop alpha
+        ("RGBA", None, "RGBA"),  # keep alpha
+        ("RGBA", "RGB", "RGB"),  # drop alpha
         ("RGB", "RGBA", "RGBA"),  # add alpha channel
-        ("L", "RGB", "RGB"),      # grayscale -> RGB
+        ("L", "RGB", "RGB"),  # grayscale -> RGB
     ],
 )
 def test_cover_and_crop_mode_conversion(
@@ -286,7 +292,7 @@ def test_cover_and_crop_preserves_alpha_when_mode_none() -> None:
 
     assert out.mode == "RGBA"
     assert out.size == (4, 4)
-    
+
     pixel = out.getpixel(center)
     # Help the type checker: for RGBA we expect a 4-tuple of ints
     assert isinstance(pixel, tuple)
@@ -308,7 +314,9 @@ def test_encode_image_to_bytes_roundtrip(rgb_image_bytes):
         orig_mode=img.mode,
         orig_color_count=None,
     )
-    payload = encode_image_to_bytes(normalized, fmt=fmt, jpeg_quality=80, webp_quality=80)
+    payload = encode_image_to_bytes(
+        normalized, fmt=fmt, jpeg_quality=80, webp_quality=80
+    )
     assert payload
     assert content_type == "image/jpeg"
 

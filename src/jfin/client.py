@@ -28,11 +28,9 @@ class JellyfinClient:
     dry_run: bool = True
     logger: Any = field(default_factory=lambda: state.log)
 
-
     def __post_init__(self) -> None:
         # Normalize base_url once to avoid repeated rstrip calls.
         self.base_url = self.base_url.rstrip("/")
-
 
     def _headers(self) -> dict[str, str]:
         """Return MediaBrowser auth headers for Jellyfin requests."""
@@ -42,7 +40,6 @@ class JellyfinClient:
             f'Version="{self.client_version}"'
         )
         return {"Authorization": auth_value}
-
 
     def _get(
         self,
@@ -69,13 +66,11 @@ class JellyfinClient:
                 )
             except Exception as e:
                 last_error = str(e)
-                resp = None
             else:
                 if resp.ok:
                     return resp
                 snippet = (resp.text or "")[:200].replace("\n", " ")
                 last_error = f"HTTP {resp.status_code} {snippet}"
-                resp = None
 
             self.logger.error(
                 "[API-ERROR] Attempt %s/%s failed for %s: %s",
@@ -89,7 +84,6 @@ class JellyfinClient:
                 backoff *= 2
 
         return None
-
 
     def _get_json(
         self,
@@ -114,7 +108,6 @@ class JellyfinClient:
             )
             return None
 
-
     def _head(
         self,
         url: str,
@@ -128,6 +121,7 @@ class JellyfinClient:
 
         attempts = 1 if not allow_retry else max(1, int(self.retry_count))
         backoff = 0.0 if not allow_retry else max(0.0, float(self.backoff_base))
+        last_error = None
 
         for attempt in range(1, attempts + 1):
             try:
@@ -139,24 +133,32 @@ class JellyfinClient:
                     verify=self.verify_tls,
                     stream=stream,
                 )
-            except Exception as e:
-                resp = None
+            except Exception as exc:
+                last_error = str(exc)
             else:
                 if resp.ok:
                     return resp
-                
+                snippet = (resp.text or "")[:200].replace("\n", " ")
+                last_error = f"HTTP {resp.status_code} {snippet}"
+
+            self.logger.error(
+                "[API-ERROR] Attempt %s/%s failed for %s: %s",
+                attempt,
+                attempts,
+                label,
+                last_error,
+            )
+
             if allow_retry and attempt < attempts and backoff > 0:
                 time.sleep(backoff)
                 backoff *= 2
 
         return None
 
-
     def _writes_allowed(self, action: str) -> bool:
         if self.dry_run:
             return False
         return True
-
 
     def _guess_content_type(self, image_path: Path) -> str | None:
         """Infer a basic content-type from a file suffix."""
@@ -166,7 +168,6 @@ class JellyfinClient:
         if suffix in (".jpg", ".jpeg"):
             return "image/jpeg"
         return "application/octet-stream"
-
 
     def test_connection(self) -> bool:
         """Verify /System/Info connectivity and server readiness.
@@ -192,7 +193,6 @@ class JellyfinClient:
                 )
             except Exception as exc:
                 last_error = f"Exception: {exc}"
-                resp = None
             else:
                 status = resp.status_code
                 if status == 401:
@@ -218,11 +218,9 @@ class JellyfinClient:
                         "HTTP 503 Service Unavailable (server starting or "
                         "temporarily unavailable). Try again later."
                     )
-                    resp = None
                 elif not resp.ok:
                     snippet = (resp.text or "")[:200].replace("\n", " ")
                     last_error = f"HTTP {status} {snippet}"
-                    resp = None
                 else:
                     try:
                         payload = resp.json()
@@ -239,9 +237,7 @@ class JellyfinClient:
                         )
                         return False
 
-                    if isinstance(payload, dict) and payload.get(
-                        "IsShuttingDown"
-                    ):
+                    if isinstance(payload, dict) and payload.get("IsShuttingDown"):
                         self.logger.error(
                             (
                                 "[API-ERROR] Jellyfin reported that it is "
@@ -267,7 +263,6 @@ class JellyfinClient:
 
         return False
 
-
     def list_users(
         self,
         is_disabled: bool | None = None,
@@ -288,7 +283,6 @@ class JellyfinClient:
 
         return data
 
-
     def list_media_folders(self) -> dict[str, Any] | None:
         """Fetch all media folders via /Library/MediaFolders."""
         url = f"{self.base_url}/Library/MediaFolders"
@@ -301,7 +295,6 @@ class JellyfinClient:
             )
             return None
         return data
-
 
     def query_items(
         self,
@@ -365,7 +358,6 @@ class JellyfinClient:
             return data
         return None
 
-
     def get_item_image(
         self,
         item_id: str,
@@ -382,11 +374,8 @@ class JellyfinClient:
         )
         if resp is None:
             return None
-        content_type = resp.headers.get(
-            "Content-Type", "application/octet-stream"
-        )
+        content_type = resp.headers.get("Content-Type", "application/octet-stream")
         return resp.content, content_type
-
 
     def get_item_image_head(
         self,
@@ -409,11 +398,8 @@ class JellyfinClient:
         )
         if resp is None:
             return None
-        content_type = resp.headers.get(
-            "Content-Type", "application/octet-stream"
-        )
+        content_type = resp.headers.get("Content-Type", "application/octet-stream")
         return resp.content, content_type
-
 
     def get_user_image(self, user_id: str) -> tuple[bytes, str] | None:
         """Fetch a user's profile image bytes and content type."""
@@ -427,11 +413,8 @@ class JellyfinClient:
         if resp is None:
             return None
 
-        content_type = resp.headers.get(
-            "Content-Type", "application/octet-stream"
-        )
+        content_type = resp.headers.get("Content-Type", "application/octet-stream")
         return resp.content, content_type
-
 
     def _post_image(
         self,
@@ -472,7 +455,6 @@ class JellyfinClient:
                 )
             except Exception as e:
                 last_error_msg = f"Exception: {e}"
-                resp = None
             else:
                 if resp.ok:
                     if success_message.startswith("[API]"):
@@ -506,7 +488,6 @@ class JellyfinClient:
 
         return False
 
-
     def set_item_image_bytes(
         self,
         item_id: str,
@@ -519,15 +500,12 @@ class JellyfinClient:
         """Upload an image for an item using in-memory bytes."""
         if image_type == "Backdrop" and backdrop_index is not None:
             url = (
-                f"{self.base_url}/Items/{item_id}/Images/{image_type}/"
-                f"{backdrop_index}"
+                f"{self.base_url}/Items/{item_id}/Images/{image_type}/{backdrop_index}"
             )
         elif image_type in ("Primary", "Thumb", "Logo"):
             url = f"{self.base_url}/Items/{item_id}/Images/{image_type}"
         else:
-            raise ValueError(
-                f"Unsupported image type for upload: {image_type}"
-            )
+            raise ValueError(f"Unsupported image type for upload: {image_type}")
 
         headers = {**self._headers(), "Content-Type": content_type}
 
@@ -536,9 +514,7 @@ class JellyfinClient:
             headers=headers,
             data=data,
             encode_base64=True,
-            success_message=(
-                f"[API] Updated {image_type} image for item {item_id}"
-            ),
+            success_message=(f"[API] Updated {image_type} image for item {item_id}"),
             error_label=f"item {item_id}, type {image_type}",
             action_label=f"item {item_id} (type {image_type})",
             failures=failures,
@@ -552,13 +528,12 @@ class JellyfinClient:
             ),
         )
 
-
     def set_item_image(
         self,
         item_id: str,
         image_type: str,
         image_path: Path,
-        backdrop_index: int | None, 
+        backdrop_index: int | None,
         failures: list[dict[str, Any]] | None = None,
     ) -> bool:
         """Upload an image for an item from a filesystem path."""
@@ -582,8 +557,7 @@ class JellyfinClient:
             return False
 
         content_type = (
-            self._guess_content_type(image_path)
-            or "application/octet-stream"
+            self._guess_content_type(image_path) or "application/octet-stream"
         )
         return self.set_item_image_bytes(
             item_id=item_id,
@@ -593,7 +567,6 @@ class JellyfinClient:
             backdrop_index=backdrop_index,
             failures=failures,
         )
-
 
     def set_user_image_bytes(
         self,
@@ -613,9 +586,7 @@ class JellyfinClient:
             headers=headers,
             data=data,
             encode_base64=True,
-            success_message=(
-                f"[API] Updated {image_type} image for user {user_id}"
-            ),
+            success_message=(f"[API] Updated {image_type} image for user {user_id}"),
             error_label=f"user {user_id}, type {image_type}",
             action_label=f"user {user_id} (type {image_type})",
             failures=failures,
@@ -629,7 +600,6 @@ class JellyfinClient:
             ),
         )
 
-
     def delete_image(
         self,
         uuid: str,
@@ -640,15 +610,10 @@ class JellyfinClient:
         if image_type == "Primary":
             url = f"{self.base_url}/UserImage?userId={uuid}"
         elif image_type == "Backdrop":
-            url = (
-                f"{self.base_url}/Items/{uuid}/Images/{image_type}/"
-                f"{image_index}"
-            )
+            url = f"{self.base_url}/Items/{uuid}/Images/{image_type}/{image_index}"
         else:
-            raise ValueError(
-                f"Unsupported image type for deletion: {image_type}"
-            )
-        
+            raise ValueError(f"Unsupported image type for deletion: {image_type}")
+
         headers = self._headers()
 
         if not self._writes_allowed(f"delete profile image for user {uuid}"):
@@ -679,17 +644,14 @@ class JellyfinClient:
             else:
                 if resp.ok:
                     self.logger.debug(
-                        (
-                            f"[API] Deleted image for uuid {uuid} type "
-                            f"{image_type}"
-                        )
+                        (f"[API] Deleted image for uuid {uuid} type {image_type}")
                     )
                     if self.delay > 0:
                         time.sleep(self.delay)
                     return True
                 snippet = (resp.text or "")[:200].replace("\n", " ")
                 last_error_msg = f"HTTP {resp.status_code} {snippet}"
-            
+
             self.logger.debug(
                 "  -> Attempt %s/%s failed at deleting image for uuid %s: %s",
                 attempt,
@@ -697,11 +659,11 @@ class JellyfinClient:
                 uuid,
                 last_error_msg,
             )
-            
+
             if attempt < attempts:
                 time.sleep(backoff)
                 backoff *= 2.0
-                
+
         if self.fail_fast:
             raise RuntimeError(
                 (
@@ -710,9 +672,8 @@ class JellyfinClient:
                     f"{last_error_msg}"
                 )
             )
-            
-        return False
 
+        return False
 
     def set_user_profile_image(
         self,
@@ -730,9 +691,7 @@ class JellyfinClient:
                 "user_id": user_id,
                 "image_type": "Primary",
                 "path": None,
-                "error": (
-                    "Failed to delete existing profile image before upload"
-                ),
+                "error": ("Failed to delete existing profile image before upload"),
             }
             if failures is not None:
                 failures.append(failure_entry)
@@ -759,7 +718,5 @@ class JellyfinClient:
                 "image_type": "Primary",
                 "path": None,
             },
-            fail_fast_prefix=(
-                f"[API] Upload failed for user {user_id} profile image"
-            ),
+            fail_fast_prefix=(f"[API] Upload failed for user {user_id} profile image"),
         )

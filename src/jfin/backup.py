@@ -22,8 +22,7 @@ def guess_extension_from_content_type(content_type: str | None) -> str:
         return ".jpg"
     if "webp" in ct:
         return ".webp"
-    raise ValueError(
-        f"Cannot guess file extension from content-type '{content_type}'")
+    raise ValueError(f"Cannot guess file extension from content-type '{content_type}'")
 
 
 def content_type_from_extension(extension: str) -> str:
@@ -35,8 +34,7 @@ def content_type_from_extension(extension: str) -> str:
         return "image/jpeg"
     if ext == ".webp":
         return "image/webp"
-    raise ValueError(
-        f"Cannot guess content-type from file extension '{extension}'")
+    raise ValueError(f"Cannot guess content-type from file extension '{extension}'")
 
 
 def backup_path_for_image(
@@ -60,7 +58,8 @@ def normalize_backup_mode(raw_mode: Any) -> str:
     mode = "partial" if raw_mode is None else str(raw_mode).strip().lower()
     if mode not in VALID_BACKUP_MODES:
         state.log.warning(
-            "Unknown backup_mode '%s'; defaulting to 'partial'.", raw_mode)
+            "Unknown backup_mode '%s'; defaulting to 'partial'.", raw_mode
+        )
         return "partial"
     return mode
 
@@ -138,7 +137,7 @@ def image_type_from_filename(filename: str) -> str | None:
         if stem == c:
             return img_type
         if img_type == "Backdrop" and re.fullmatch(
-            fr"{re.escape(c)}\d*",
+            rf"{re.escape(c)}\d*",
             stem,
         ):
             return img_type
@@ -158,7 +157,7 @@ def _extract_backdrop_index(filename: str) -> int | None:
     if not stem.startswith(backdrop_stem):
         return None
 
-    suffix = stem[len(backdrop_stem):]
+    suffix = stem[len(backdrop_stem) :]
     if suffix == "":
         return 0
     if suffix.isdigit():
@@ -179,11 +178,13 @@ def cleanup_staging_dir(backup_root: Path, item_id: str) -> None:
     if staging_dir.exists():
         try:
             import shutil
+
             shutil.rmtree(staging_dir)
             state.log.debug("  -> Staging directory removed: %s", staging_dir)
         except Exception as e:
             state.log.warning(
-                "Failed to remove staging directory %s: %s", staging_dir, e)
+                "Failed to remove staging directory %s: %s", staging_dir, e
+            )
 
 
 def cleanup_all_staging(backup_root: Path) -> None:
@@ -192,6 +193,7 @@ def cleanup_all_staging(backup_root: Path) -> None:
     if staging_parent.exists():
         try:
             import shutil
+
             # Only remove if empty
             if not any(staging_parent.iterdir()):
                 shutil.rmtree(staging_parent)
@@ -200,8 +202,7 @@ def cleanup_all_staging(backup_root: Path) -> None:
                     staging_parent,
                 )
         except Exception as e:
-            state.log.debug(
-                "Could not remove staging parent (may not be empty): %s", e)
+            state.log.debug("Could not remove staging parent (may not be empty): %s", e)
 
 
 def _restore_backup_payload(
@@ -263,8 +264,7 @@ def _restore_backup_payload(
         state.stats.record_success()
         return True
 
-    state.stats.record_error(
-        str(path), upload_error or "restore upload failed")
+    state.stats.record_error(str(path), upload_error or "restore upload failed")
     return False
 
 
@@ -288,14 +288,12 @@ def _restore_single_image_group(
     sorted_paths = sorted(paths)
     if len(sorted_paths) > 1:
         state.log.error(
-            "Multiple backups found for %s (%s); using %s and skipping "
-            "the rest.",
+            "Multiple backups found for %s (%s); using %s and skipping the rest.",
             item_id,
             image_type,
             sorted_paths[0],
         )
-        state.stats.record_error(
-            item_id, f"multiple {image_type} backups found")
+        state.stats.record_error(item_id, f"multiple {image_type} backups found")
 
     return int(
         _restore_backup_payload(
@@ -331,8 +329,7 @@ def _restore_backdrop_group(
         idx = _extract_backdrop_index(path.name)
         if idx is None:
             state.log.error(
-                "Invalid backdrop filename %s for item %s; skipping all "
-                "backdrops.",
+                "Invalid backdrop filename %s for item %s; skipping all backdrops.",
                 path.name,
                 item_id,
             )
@@ -340,13 +337,11 @@ def _restore_backdrop_group(
             return 0
         if idx in index_to_path:
             state.log.error(
-                "Duplicate backdrop index %d for item %s; skipping all "
-                "backdrops.",
+                "Duplicate backdrop index %d for item %s; skipping all backdrops.",
                 idx,
                 item_id,
             )
-            state.stats.record_error(
-                item_id, f"duplicate backdrop index {idx}")
+            state.stats.record_error(item_id, f"duplicate backdrop index {idx}")
             return 0
         index_to_path[idx] = path
 
@@ -357,13 +352,11 @@ def _restore_backdrop_group(
         or ordered_indices != list(range(ordered_indices[-1] + 1))
     ):
         state.log.error(
-            "Backdrop indices must start at 0 and be contiguous for item %s; "
-            "found %s",
+            "Backdrop indices must start at 0 and be contiguous for item %s; found %s",
             item_id,
             ordered_indices,
         )
-        state.stats.record_error(
-            item_id, "backdrop indices not contiguous from 0")
+        state.stats.record_error(item_id, "backdrop indices not contiguous from 0")
         return 0
 
     successes = 0
@@ -433,7 +426,7 @@ def restore_from_backups(
         for fname in filenames:
             try:
                 image_type = image_type_from_filename(fname)
-            except Exception:
+            except ValueError:
                 continue
             if not image_type:
                 continue
@@ -516,7 +509,7 @@ def restore_single_item_from_backup(
             continue
         try:
             img_type = image_type_from_filename(child.name)
-        except Exception:
+        except ValueError:
             continue
         if img_type:
             files_by_type.setdefault(img_type, []).append(child)

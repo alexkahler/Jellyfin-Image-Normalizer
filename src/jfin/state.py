@@ -65,7 +65,9 @@ downscaled_images: list[tuple[str, int, int, int, int]] = []
 dry_run = False
 
 # Default logger; configured at runtime by logging_utils.setup_logging
-log: logging.LoggerAdapter = logging.LoggerAdapter(logging.getLogger("jfin"), {"run_id": run_id})
+log: logging.LoggerAdapter = logging.LoggerAdapter(
+    logging.getLogger("jfin"), {"run_id": run_id}
+)
 
 
 def latest_api_error(prev_len: int) -> str | None:

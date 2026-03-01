@@ -4,6 +4,7 @@ import pytest
 from jfin.client import JellyfinClient
 from unittest.mock import Mock
 
+
 class FakeResponse:
     def __init__(self, status_code=200, content=b"", headers=None, text=""):
         self.status_code = status_code
@@ -130,13 +131,19 @@ def test_dry_run_blocks_post(monkeypatch):
 
     monkeypatch.setattr(requests, "post", fake_post)
     client = JellyfinClient(base_url="http://example", api_key="token", dry_run=True)
-    assert client.set_item_image_bytes("item1", "Logo", b"abc", "image/png", None) is True
+    assert (
+        client.set_item_image_bytes("item1", "Logo", b"abc", "image/png", None) is True
+    )
 
 
 def test_writes_allowed_without_extra_flag(monkeypatch):
-    monkeypatch.setattr(requests, "post", lambda *args, **kwargs: FakeResponse(status_code=200))
+    monkeypatch.setattr(
+        requests, "post", lambda *args, **kwargs: FakeResponse(status_code=200)
+    )
     client = JellyfinClient(base_url="http://example", api_key="token", dry_run=False)
-    assert client.set_item_image_bytes("item1", "Logo", b"abc", "image/png", None) is True
+    assert (
+        client.set_item_image_bytes("item1", "Logo", b"abc", "image/png", None) is True
+    )
 
 
 @pytest.mark.parametrize(
@@ -144,21 +151,34 @@ def test_writes_allowed_without_extra_flag(monkeypatch):
     [
         # Dry-run primary: no HTTP call, but still returns True
         ("Primary", None, False, None, None, "/UserImage?userId=testuuid", True, False),
-
         # Primary: 204 OK => True
         ("Primary", None, True, 204, True, "/UserImage?userId=testuuid", True, True),
-
         # Primary: 404 treated as failed => True
         ("Primary", None, True, 404, False, "/UserImage?userId=testuuid", False, True),
-
         # Primary: 500, not ok => False
         ("Primary", None, True, 500, False, "/UserImage?userId=testuuid", False, True),
-
         # Backdrop index 0: 204 OK => True
-        ("Backdrop", 0, True, 204, True, "/Items/testuuid/Images/Backdrop/0", True, True),
-
+        (
+            "Backdrop",
+            0,
+            True,
+            204,
+            True,
+            "/Items/testuuid/Images/Backdrop/0",
+            True,
+            True,
+        ),
         # Backdrop index 3: 204 treated as success => True
-        ("Backdrop", 3, True, 204, True, "/Items/testuuid/Images/Backdrop/3", True, True),
+        (
+            "Backdrop",
+            3,
+            True,
+            204,
+            True,
+            "/Items/testuuid/Images/Backdrop/3",
+            True,
+            True,
+        ),
     ],
 )
 def test_delete_image_parametrized(
@@ -179,7 +199,9 @@ def test_delete_image_parametrized(
     client.logger = Mock()
 
     # stub headers + writes_allowed
-    monkeypatch.setattr(client, "_headers", lambda: {"Authorization": "Token"}, raising=False)
+    monkeypatch.setattr(
+        client, "_headers", lambda: {"Authorization": "Token"}, raising=False
+    )
     monkeypatch.setattr(
         client,
         "_writes_allowed",
@@ -212,13 +234,11 @@ def test_delete_image_parametrized(
             assert mock_delete.call_count == 1
         else:
             assert mock_delete.call_count == client.retry_count
-        
-        
-            
+
         first_call = mock_delete.call_args_list[0]
         called_url = first_call.args[0]
         called_headers = mock_delete.call_args.kwargs["headers"]
-            
+
         assert called_url == client.base_url + expected_url_suffix
         assert called_headers == {"Authorization": "Token"}
 
@@ -231,9 +251,10 @@ def test_delete_image_unsupported_type_raises(monkeypatch):
         client.delete_image("testuuid", "Banner", None)
 
 
-
 def test_get_item_image_returns_content_type(monkeypatch):
-    def fake_get(url, headers=None, params=None, timeout=None, verify=None, stream=None):
+    def fake_get(
+        url, headers=None, params=None, timeout=None, verify=None, stream=None
+    ):
         return FakeResponse(
             status_code=200,
             content=b"payload",
@@ -247,7 +268,9 @@ def test_get_item_image_returns_content_type(monkeypatch):
 
 
 def test_get_item_image_head_404_returns_none(monkeypatch):
-    def fake_head(url, headers=None, params=None, timeout=None, verify=None, stream=None):
+    def fake_head(
+        url, headers=None, params=None, timeout=None, verify=None, stream=None
+    ):
         return FakeResponse(
             status_code=404,
             content=b"",
@@ -258,7 +281,9 @@ def test_get_item_image_head_404_returns_none(monkeypatch):
     monkeypatch.setattr(requests, "head", fake_head)
     monkeypatch.setattr("time.sleep", lambda *_args, **_kwargs: None)
 
-    client = JellyfinClient(base_url="http://example", api_key="token", retry_count=1, dry_run=False)
+    client = JellyfinClient(
+        base_url="http://example", api_key="token", retry_count=1, dry_run=False
+    )
     resp = client.get_item_image_head("abc", "Backdrop", index=0)
     assert resp is None
 
@@ -266,7 +291,9 @@ def test_get_item_image_head_404_returns_none(monkeypatch):
 def test_get_retries_on_failure(monkeypatch):
     calls = {"count": 0}
 
-    def fake_get(url, headers=None, params=None, timeout=None, verify=None, stream=None):
+    def fake_get(
+        url, headers=None, params=None, timeout=None, verify=None, stream=None
+    ):
         calls["count"] += 1
         if calls["count"] == 1:
             raise requests.exceptions.Timeout("boom")
@@ -275,7 +302,9 @@ def test_get_retries_on_failure(monkeypatch):
     monkeypatch.setattr(requests, "get", fake_get)
     monkeypatch.setattr("time.sleep", lambda *_args, **_kwargs: None)
 
-    client = JellyfinClient(base_url="http://example", api_key="token", retry_count=2, backoff_base=0.1)
+    client = JellyfinClient(
+        base_url="http://example", api_key="token", retry_count=2, backoff_base=0.1
+    )
     resp = client.get_item_image("abc", "Logo")
     assert resp == (b"ok", "application/octet-stream")
     assert calls["count"] == 2
