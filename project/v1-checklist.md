@@ -269,7 +269,7 @@ python -m pip_audit
 
 ### Observability Contract Inventory
 - [ ] [V1-OBS-001] v1 defines whether outcomes are exclusive or non-exclusive; the chosen model is documented and tested.
-- [ ] [V1-OBS-002] v1 outcome model is mutually exclusive by construction (each processed asset yields exactly one terminal outcome category), and aggregation is derived from those outcomes.
+- [ ] [V1-OBS-002] If v1 adopts exclusive outcomes: each processed asset yields exactly one terminal outcome category; aggregation is derived from those outcomes; this is documented and tested.
 
 ### Backup/Runtime Contract Inventory
 - [ ] [V1-BKP-001] Run manifest is written to `backup_root/run_<run_id>/manifest.json` with deterministic pathing, and this behavior is tested.
