@@ -1,0 +1,230 @@
+"""Unit tests for WI-004 characterization governance checks."""
+
+from __future__ import annotations
+
+import importlib
+import json
+import sys
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+ROOT = Path(__file__).resolve().parent.parent
+SCRIPTS_DIR = ROOT / "project" / "scripts"
+
+
+@pytest.fixture(scope="module")
+def characterization_modules():
+    """Import characterization checker modules from project/scripts."""
+    if str(SCRIPTS_DIR) not in sys.path:
+        sys.path.insert(0, str(SCRIPTS_DIR))
+
+    for module_name in (
+        "characterization_contract",
+        "characterization_checks",
+        "parity_contract",
+    ):
+        if module_name in sys.modules:
+            del sys.modules[module_name]
+
+    characterization_contract = importlib.import_module("characterization_contract")
+    characterization_checks = importlib.import_module("characterization_checks")
+    parity_contract = importlib.import_module("parity_contract")
+    return characterization_contract, characterization_checks, parity_contract
+
+
+def _escape_cell(value: str) -> str:
+    """Escape markdown pipe delimiters inside table cells."""
+    return value.replace("|", "\\|")
+
+
+def _render_table(columns: list[str], rows: list[dict[str, str]]) -> str:
+    """Serialize one markdown table with deterministic row/column ordering."""
+    lines = [
+        "| " + " | ".join(_escape_cell(column) for column in columns) + " |",
+        "| " + " | ".join(["---"] * len(columns)) + " |",
+    ]
+    for row in rows:
+        lines.append(
+            "| "
+            + " | ".join(_escape_cell(row.get(column, "")) for column in columns)
+            + " |"
+        )
+    return "\n".join(lines) + "\n"
+
+
+def _write_file(path: Path, content: str) -> None:
+    """Write UTF-8 text content to disk, creating parent directories."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+
+
+def _default_case_payload() -> dict[str, object]:
+    """Build a valid minimal baseline case payload."""
+    return {
+        "expected_exit_code": 0,
+        "expected_messages": [],
+        "expected_preflight": "not_reached",
+        "notes": "seed",
+    }
+
+
+def _build_valid_baseline_payload(required_ids: list[str]) -> dict[str, Any]:
+    """Build a valid baseline JSON payload for a set of required behavior IDs."""
+    return {
+        "version": 1,
+        "cases": {behavior_id: _default_case_payload() for behavior_id in required_ids},
+    }
+
+
+def _owner_test_for_behavior(behavior_id: str) -> tuple[str, str]:
+    """Map a behavior ID to deterministic owner test path/function names."""
+    function_name = f"test_{behavior_id.lower().replace('-', '_')}"
+    if behavior_id.startswith("CLI-"):
+        return (
+            "tests/characterization/cli_contract/test_cli_contract_characterization.py",
+            function_name,
+        )
+    return (
+        "tests/characterization/config_contract/test_config_contract_characterization.py",
+        function_name,
+    )
+
+
+def _write_owner_test_files(required_ids: list[str], repo_root: Path) -> None:
+    """Write deterministic owner test files containing required test functions."""
+    cli_functions: list[str] = []
+    cfg_functions: list[str] = []
+    for behavior_id in required_ids:
+        _path, function_name = _owner_test_for_behavior(behavior_id)
+        function_line = f"def {function_name}():\n    assert True\n"
+        if behavior_id.startswith("CLI-"):
+            cli_functions.append(function_line)
+        else:
+            cfg_functions.append(function_line)
+
+    _write_file(
+        repo_root
+        / "tests/characterization/cli_contract/test_cli_contract_characterization.py",
+        "\n".join(cli_functions) + "\n",
+    )
+    _write_file(
+        repo_root
+        / "tests/characterization/config_contract/test_config_contract_characterization.py",
+        "\n".join(cfg_functions) + "\n",
+    )
+
+
+def _build_valid_parity_rows(required_ids: list[str]) -> list[dict[str, str]]:
+    """Build valid parity matrix rows for required characterization behavior IDs."""
+    rows: list[dict[str, str]] = []
+    for behavior_id in required_ids:
+        baseline_file = (
+            "tests/characterization/baselines/cli_contract_baseline.json"
+            if behavior_id.startswith("CLI-")
+            else "tests/characterization/baselines/config_contract_baseline.json"
+        )
+        owner_path, owner_function = _owner_test_for_behavior(behavior_id)
+        rows.append(
+            {
+                "behavior_id": behavior_id,
+                "baseline_source": f"{baseline_file}#{behavior_id}",
+                "current_result": "matches-baseline",
+                "status": "preserved",
+                "owner_test": f"{owner_path}::{owner_function}",
+                "approval_ref": "n/a",
+                "notes": "seed",
+                "migration_note": "-",
+            }
+        )
+    return rows
+
+
+def _write_valid_artifacts(
+    tmp_path: Path,
+    characterization_contract,
+    parity_contract,
+) -> tuple[Path, Path, Path]:
+    """Write baseline files, owner test files, and parity matrix for passing checks."""
+    repo_root = tmp_path
+    cli_payload = _build_valid_baseline_payload(
+        characterization_contract.CLI_BEHAVIOR_IDS
+    )
+    cfg_payload = _build_valid_baseline_payload(
+        characterization_contract.CFG_BEHAVIOR_IDS
+    )
+
+    cli_baseline_path = (
+        repo_root / "tests/characterization/baselines/cli_contract_baseline.json"
+    )
+    cfg_baseline_path = (
+        repo_root / "tests/characterization/baselines/config_contract_baseline.json"
+    )
+    _write_file(cli_baseline_path, json.dumps(cli_payload, indent=2) + "\n")
+    _write_file(cfg_baseline_path, json.dumps(cfg_payload, indent=2) + "\n")
+
+    required_ids = characterization_contract.REQUIRED_CHARACTERIZATION_BEHAVIOR_IDS
+    _write_owner_test_files(required_ids, repo_root)
+
+    parity_rows = _build_valid_parity_rows(required_ids)
+    parity_text = _render_table(parity_contract.REQUIRED_PARITY_COLUMNS, parity_rows)
+    parity_path = repo_root / "project/parity-matrix.md"
+    _write_file(parity_path, parity_text)
+    return repo_root, cli_baseline_path, parity_path
+
+
+def test_characterization_check_valid_pass(characterization_modules, tmp_path: Path):
+    """Characterization checks should pass with valid artifacts and links."""
+    characterization_contract, characterization_checks, parity_contract = (
+        characterization_modules
+    )
+    repo_root, _baseline_path, _parity_path = _write_valid_artifacts(
+        tmp_path,
+        characterization_contract,
+        parity_contract,
+    )
+
+    result = characterization_checks.check_characterization_artifacts(repo_root)
+    assert not result.errors
+    assert not result.warnings
+
+
+def test_characterization_fails_when_baseline_file_missing(
+    characterization_modules,
+    tmp_path: Path,
+):
+    """Missing baseline files should fail characterization governance checks."""
+    characterization_contract, characterization_checks, parity_contract = (
+        characterization_modules
+    )
+    repo_root, cli_baseline_path, _parity_path = _write_valid_artifacts(
+        tmp_path,
+        characterization_contract,
+        parity_contract,
+    )
+    cli_baseline_path.unlink()
+
+    result = characterization_checks.check_characterization_artifacts(repo_root)
+    assert any("baseline file not found" in error for error in result.errors)
+
+
+def test_characterization_fails_when_required_behavior_id_missing(
+    characterization_modules,
+    tmp_path: Path,
+):
+    """Missing required IDs in baseline cases should fail characterization checks."""
+    characterization_contract, characterization_checks, parity_contract = (
+        characterization_modules
+    )
+    repo_root, cli_baseline_path, _parity_path = _write_valid_artifacts(
+        tmp_path,
+        characterization_contract,
+        parity_contract,
+    )
+    cli_payload = json.loads(cli_baseline_path.read_text(encoding="utf-8"))
+    del cli_payload["cases"][characterization_contract.CLI_BEHAVIOR_IDS[0]]
+    _write_file(cli_baseline_path, json.dumps(cli_payload, indent=2) + "\n")
+
+    result = characterization_checks.check_characterization_artifacts(repo_root)
+    assert any("missing required behavior_id" in error for error in result.errors)

@@ -433,8 +433,22 @@ Run parity-only validation:
 python project/scripts/verify_governance.py --check parity
 ```
 
+Run characterization linkage validation:
+
+```bash
+python project/scripts/verify_governance.py --check characterization
+```
+
+Run characterization suites:
+
+```bash
+PYTHONPATH=src python -m pytest -q tests/characterization/cli_contract/test_cli_contract_characterization.py
+PYTHONPATH=src python -m pytest -q tests/characterization/config_contract/test_config_contract_characterization.py
+```
+
 Verification command policy is tracked in `project/verification-contract.yml`.
 Parity artifacts are tracked in `project/parity-matrix.md` and `project/route-fence.md`.
+Characterization baselines are tracked in `tests/characterization/baselines/`.
 
 More details about the processing pipeline, classes, config TOML, and CLI entrypoints are documented in:
 

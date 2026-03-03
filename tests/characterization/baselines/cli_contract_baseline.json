@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "cases": {
+    "CLI-RESTORE-001": {
+      "expected_exit_code": 1,
+      "expected_stats": {
+        "errors": 1
+      },
+      "expected_messages": [
+        "--restore-all cannot be combined with other arguments"
+      ],
+      "expected_preflight": "not_reached",
+      "notes": "restore-all rejects operational flags."
+    },
+    "CLI-GENCFG-001": {
+      "expected_exit_code": 1,
+      "expected_stats": {
+        "errors": 1
+      },
+      "expected_messages": [
+        "--generate-config cannot be combined with other arguments"
+      ],
+      "expected_preflight": "not_reached",
+      "notes": "generate-config rejects operational flags."
+    },
+    "CLI-TESTJF-001": {
+      "expected_exit_code": 1,
+      "expected_stats": {
+        "errors": 1
+      },
+      "expected_messages": [
+        "--test-jf cannot be combined with other arguments"
+      ],
+      "expected_preflight": "not_reached",
+      "notes": "test-jf rejects operational flags."
+    },
+    "CLI-SINGLE-001": {
+      "expected_exit_code": 1,
+      "expected_stats": {
+        "errors": 1
+      },
+      "expected_messages": [
+        "--single requires an explicit --mode"
+      ],
+      "expected_preflight": "not_reached",
+      "notes": "single requires explicit mode selection."
+    },
+    "CLI-OVERRIDE-001": {
+      "expected_exit_code": 0,
+      "expected_stats": {
+        "warnings": 1
+      },
+      "expected_messages": [
+        "--thumb-jpeg-quality has no effect without 'thumb' mode selected."
+      ],
+      "expected_preflight": "mocked_ok",
+      "notes": "incompatible mode override emits warning."
+    },
+    "CLI-ASPECT-001": {
+      "expected_exit_code": 0,
+      "expected_stats": {
+        "warnings": 1
+      },
+      "expected_messages": [
+        "Unusual logo aspect ratio"
+      ],
+      "expected_preflight": "mocked_ok",
+      "notes": "non-recommended aspect ratio warning remains stable."
+    }
+  }
+}

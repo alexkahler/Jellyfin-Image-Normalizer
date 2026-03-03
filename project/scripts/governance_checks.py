@@ -7,6 +7,7 @@ import re
 from pathlib import Path
 from typing import Iterable
 
+from characterization_checks import check_characterization_artifacts
 from governance_contract import (
     CheckResult,
     GovernanceError,
@@ -16,7 +17,14 @@ from governance_contract import (
 )
 from parity_checks import check_parity_artifacts
 
-SUPPORTED_CHECKS = ("schema", "ci-sync", "loc", "python-version", "parity")
+SUPPORTED_CHECKS = (
+    "schema",
+    "ci-sync",
+    "loc",
+    "python-version",
+    "parity",
+    "characterization",
+)
 
 
 def check_ci_contract_sync(
@@ -211,6 +219,7 @@ def run_selected_checks(check_name: str, repo_root: Path) -> int:
             readme_path,
         ),
         "parity": lambda: check_parity_artifacts(repo_root),
+        "characterization": lambda: check_characterization_artifacts(repo_root),
     }
 
     selected_checks = SUPPORTED_CHECKS if check_name == "all" else (check_name,)
