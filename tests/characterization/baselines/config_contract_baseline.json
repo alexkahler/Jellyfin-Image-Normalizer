@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "cases": {
+    "CFG-TOML-001": {
+      "expected_exit_code": 0,
+      "expected_messages": [
+        "expected a .toml file"
+      ],
+      "expected_effective_config": {
+        "rejects_non_toml": true
+      },
+      "expected_preflight": "not_reached",
+      "notes": "non-TOML config paths are rejected."
+    },
+    "CFG-TOML-002": {
+      "expected_exit_code": 0,
+      "expected_effective_config": {
+        "operations": [
+          "logo"
+        ],
+        "logo_width": 640,
+        "logo_height": 360,
+        "logo_allow_upscale": false,
+        "logo_padding": "none"
+      },
+      "expected_preflight": "not_reached",
+      "notes": "TOML parsing and mode runtime settings are stable."
+    },
+    "CFG-TYPE-001": {
+      "expected_exit_code": 0,
+      "expected_messages": [
+        "Invalid configuration values",
+        "config.operations",
+        "config.backup"
+      ],
+      "expected_effective_config": {
+        "invalid_types_rejected": true
+      },
+      "expected_preflight": "not_reached",
+      "notes": "invalid field types must fail validation."
+    },
+    "CFG-CORE-001": {
+      "expected_exit_code": 0,
+      "expected_messages": [
+        "jf_url is required",
+        "jf_api_key is required"
+      ],
+      "expected_effective_config": {
+        "missing_core_fields_rejected": true
+      },
+      "expected_preflight": "not_reached",
+      "notes": "missing core credentials are rejected."
+    },
+    "CFG-OPS-001": {
+      "expected_exit_code": 0,
+      "expected_effective_config": {
+        "operations": [
+          "logo",
+          "thumb"
+        ]
+      },
+      "expected_preflight": "not_reached",
+      "notes": "operation list remains deduped and ordered."
+    },
+    "CFG-DISC-001": {
+      "expected_exit_code": 0,
+      "expected_effective_config": {
+        "include_item_types": [
+          "Series"
+        ],
+        "enable_image_types": [
+          "Logo",
+          "Primary"
+        ],
+        "library_names": [
+          "Movies",
+          "TV"
+        ]
+      },
+      "expected_preflight": "not_reached",
+      "notes": "discovery settings mapping remains stable."
+    },
+    "CFG-OVERRIDE-001": {
+      "expected_exit_code": 0,
+      "expected_effective_config": {
+        "logo_width": 321,
+        "logo_height": 123
+      },
+      "expected_preflight": "not_reached",
+      "notes": "CLI size overrides map to mode sections."
+    }
+  }
+}
