@@ -160,5 +160,6 @@ padding_remove_sensitivity = 0
 - Dependencies (`requirements.txt`): Pillow, requests, pytest (for local testing).
 - Run tests with `PYTHONPATH=src python -m pytest` (PowerShell: `$env:PYTHONPATH="src"; python -m pytest`). Tests rely on mocks/stubs; no live Jellyfin calls are performed.
 - Run governance checks with `python project/scripts/verify_governance.py --check all` to validate CI/contract sync, LOC policy, and Python version consistency.
+- Run parity-only checks with `python project/scripts/verify_governance.py --check parity` to validate `project/parity-matrix.md` and `project/route-fence.md`.
 - Config tests cover TOML parsing/validation; runtime JSON configs are no longer supported.
 - When adding a new image mode, update `src/jfin/constants.py` (`MODE_CONFIG`, `IMAGE_TYPE_TO_MODE`, `MODE_TO_IMAGE_TYPE`, `FILENAME_CONFIG`), extend config parsing, and add a normalization branch in `imaging.build_normalized_image` plus pipeline wiring.

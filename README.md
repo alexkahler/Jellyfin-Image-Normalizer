@@ -427,7 +427,14 @@ Run governance checks:
 python project/scripts/verify_governance.py --check all
 ```
 
+Run parity-only validation:
+
+```bash
+python project/scripts/verify_governance.py --check parity
+```
+
 Verification command policy is tracked in `project/verification-contract.yml`.
+Parity artifacts are tracked in `project/parity-matrix.md` and `project/route-fence.md`.
 
 More details about the processing pipeline, classes, config TOML, and CLI entrypoints are documented in:
 

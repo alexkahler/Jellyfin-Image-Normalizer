@@ -14,8 +14,9 @@ from governance_contract import (
     check_contract_schema,
     parse_verification_contract,
 )
+from parity_checks import check_parity_artifacts
 
-SUPPORTED_CHECKS = ("schema", "ci-sync", "loc", "python-version")
+SUPPORTED_CHECKS = ("schema", "ci-sync", "loc", "python-version", "parity")
 
 
 def check_ci_contract_sync(
@@ -209,6 +210,7 @@ def run_selected_checks(check_name: str, repo_root: Path) -> int:
             ci_path,
             readme_path,
         ),
+        "parity": lambda: check_parity_artifacts(repo_root),
     }
 
     selected_checks = SUPPORTED_CHECKS if check_name == "all" else (check_name,)
