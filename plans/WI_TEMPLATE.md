@@ -1,0 +1,15 @@
+# WI Template
+
+## 1. Objective
+
+## 2. In-scope / Out-of-scope
+
+## 3. Public interfaces affected
+
+## 4. Acceptance criteria
+
+## 5. Verification commands (<10 min)
+
+## 6. Rollback step
+
+## 7. Behavior-preservation statement

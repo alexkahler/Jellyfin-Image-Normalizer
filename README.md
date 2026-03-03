@@ -421,6 +421,14 @@ Run tests:
 PYTHONPATH=src python -m pytest
 ```
 
+Run governance checks:
+
+```bash
+python project/scripts/verify_governance.py --check all
+```
+
+Verification command policy is tracked in `project/verification-contract.yml`.
+
 More details about the processing pipeline, classes, config TOML, and CLI entrypoints are documented in:
 
 * [Technical Notes](docs/TECHNICAL_NOTES.md)
