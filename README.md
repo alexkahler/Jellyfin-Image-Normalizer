@@ -168,13 +168,13 @@ At a glance, JFIN gives you:
 
 - Jellyfin 10.11.4+
 - A Jellyfin API key
-- **Python 3.11+**
+- **Python 3.13+**
 
 > ✨ A full example configuration is included as `config.example.toml`.
 
 ### Installation
 
-Requires **Python 3.10+**.
+Requires **Python 3.13+**.
 
 ```bash
 git clone https://github.com/alexkahler/Jellyfin-Image-Normalizer.git

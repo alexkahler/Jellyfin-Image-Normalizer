@@ -6,10 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, cast
 
-if sys.version_info >= (3, 11):
-    import tomllib
-else:  # pragma: no cover - runtime fallback for Python <3.11
-    import tomli as tomllib
+import tomllib
 
 from . import state
 from .constants import (
