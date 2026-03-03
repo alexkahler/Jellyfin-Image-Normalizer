@@ -32,8 +32,6 @@ Change policy: any scope/contract change requires explicit addendum
 * Exit-code taxonomy redesign (beyond Track-1-compatible semantics)
 * Python baseline bump beyond current compatibility window
 
-> **Conflict resolution note:** v1 listed CLI subcommands, config schema redesign, exit-code taxonomy, and Python 3.13+ as v1 intended breaks. **Version 4 supersedes this**: all are deferred to Track 2.
-
 ---
 
 ## 2) Compact Repo Map (Current Baseline)
@@ -229,8 +227,6 @@ Change policy: any scope/contract change requires explicit addendum
 3. Pillow-specific transforms/encoding live only in imaging adapter.
 4. Domain must not import Pillow/requests/filesystem modules.
 
-> **Conflict resolution note:** v1 migration map proposed `domain/services/image_normalizer.py`. Later versions superseded this with “domain = decisions only; Pillow in adapter; orchestration in app.”
-
 ---
 
 ## 11) Observability and State Contract
@@ -276,8 +272,6 @@ Change policy: any scope/contract change requires explicit addendum
 | config_validate | n/a | v0 | WI-00X | pending |
 
 Route flips from `v0` to `v1` only when that row's parity tests are green.
-
-> Preserved from v1: “Route one workflow cell at a time through new use-case while preserving outputs.”
 
 ---
 
@@ -461,7 +455,7 @@ Create `/plans/WI_TEMPLATE.md` fields:
 4. Typed exception model from section 8.
 5. Central domain model types for mode/image invariants.
 
-> **Conflict resolution note:** v2 mentioned `bootstrap.run(command_request)`. v3/v4 explicitly prohibit a generic orchestration hub; use `bootstrap/container.py` + `bootstrap/main.py` + direct use-case calls instead.
+> v3/v4 explicitly prohibit a generic orchestration hub; use `bootstrap/container.py` + `bootstrap/main.py` + direct use-case calls instead.
 
 ---
 
@@ -494,7 +488,7 @@ Create `/plans/WI_TEMPLATE.md` fields:
 
 ## 23) LOC Policy Clarification
 
-1. > 300 LOC blocker applies to `src/` in Track 1.
+1. Above >300 LOC blocker applies to `src/` in Track 1.
 2. Existing oversized test files are allowed temporarily.
 3. Any **new** test file >300 LOC triggers non-blocking split review.
 
