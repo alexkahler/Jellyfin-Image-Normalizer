@@ -170,7 +170,7 @@ Change policy: any scope/contract change requires explicit addendum
 2. Main flow comprehension target is **≤3 files**.
 3. **Escape hatch:** shared interfaces/types/policies are allowed as explicit extras beyond the 3 main-flow files.
 4. Cross-cell imports are forbidden **except** shared contracts/services.
-5. Any cell file **>300 LOC** triggers split review.
+5. Any cell file **>200 LOC** triggers split review.
 
 ---
 
@@ -243,7 +243,7 @@ Change policy: any scope/contract change requires explicit addendum
 
 ## 12) Structure Validation Checklist (Gate)
 
-1. Fail if any `src/` file exceeds **500 LOC**.
+1. Fail if any `src/` file exceeds **300 LOC**.
 2. Fail if non-CLI modules use `sys.exit` or `SystemExit`.
 3. Fail if domain imports adapters/framework/IO.
 4. Fail if invariant mappings are duplicated outside `domain/model`.
@@ -402,16 +402,17 @@ Each slice must define:
 
 ## 19) Governance and Anti-Drift
 
-1. Add machine-parseable `VERIFY:` block in `AGENTS.md` (examples preserved from v2):
-
-   * `VERIFY: PYTHONPATH=src python -m pytest -q tests/test_config.py`
-   * `VERIFY: PYTHONPATH=src python -m pytest -q tests/test_imaging.py`
-2. CI `verify-contract` job parses and executes `VERIFY:` lines.
-3. If the `VERIFY:` block changes, CI must fail unless the workflow update is included in the same PR.
-4. CI drift checks validate AGENTS vs CI workflow consistency.
+1. CI defines and runs the verification contract (inside workflow or a repo contract file). 
+   - Verification contract is defined in CI workflow file(s) and/or project/verification-contract.yml.
+2. If the verification contract changes (CI workflow and/or a repo verification contract file), CI must be updated in the same PR.
+3. CI enforces:
+   - execution of verification commands
+   - file-size guard (>300 LOC in `src/`)
+   - required test jobs on pull requests
+4. AGENTS.md is a local operational guide and does not participate in CI drift validation.
 5. Python version consistency checks across docs/CI/metadata (preserved from v1/v2).
-6. `src/` file-size guard fails on >500 LOC.
-7. New test file >500 LOC triggers split review (non-blocking).
+6. `src/` file-size guard fails on >300 LOC.
+7. New test file >300 LOC triggers split review (non-blocking).
 
 ### WORK_ITEMS.md + /plans templates (preserved)
 
@@ -473,14 +474,14 @@ Create `/plans/WI_TEMPLATE.md` fields:
 5. Observability parity for run summaries and counters.
 6. Imaging parity via characterization + golden checks.
 7. Route fence test: command/mode dispatch must follow declared `route(v0|v1)` in the route-fence table.
-8. CI contract test: `VERIFY:` drift fails unless paired workflow update exists in the same PR.
+8. CI contract test: if verification workflow or verification contract file changes, CI must be updated in the same PR.
 9. Parity schema test: parity rows fail validation when required fields are missing.
 
 ---
 
 ## 22) Acceptance Criteria (Track 1 Done)
 
-1. No `src/` file >500 LOC.
+1. No `src/` file >300 LOC.
 2. No overlapping responsibilities across CLI/app/domain/adapters (single ownership boundaries).
 3. No global mutable runtime state in execution path.
 4. Dry-run dual gate proven by tests.
@@ -493,9 +494,9 @@ Create `/plans/WI_TEMPLATE.md` fields:
 
 ## 23) LOC Policy Clarification
 
-1. > 500 LOC blocker applies to `src/` in Track 1.
+1. > 300 LOC blocker applies to `src/` in Track 1.
 2. Existing oversized test files are allowed temporarily.
-3. Any **new** test file >500 LOC triggers non-blocking split review.
+3. Any **new** test file >300 LOC triggers non-blocking split review.
 
 ---
 
