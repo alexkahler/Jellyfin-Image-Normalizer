@@ -4,7 +4,7 @@ A very serious tool for a very specific job.
 
 ## API-based discovery
 
-- Talks only to Jellyfin’s HTTP API. No direct filesystem poking. *poke poke.*  
+- Talks only to Jellyfin's HTTP API. No direct filesystem poking. *poke poke.*  
 - External library support. Your artwork cohabitates with your Scarlett Johansson? No problem!  
 - Filters by library names (`My Awesome 4K Movies`, `Korean Reality`, etc.) when you want.
 - Limit it to a specific item type, like only `Movies` or `Series`.
@@ -33,18 +33,18 @@ A very serious tool for a very specific job.
 - Actually blocks POST/DELETE when:
   - `dry_run = true`, or  
   - Writes only happen when dry_run = false.  
-- Writes only happen when you scream “yes” in TOML.  
+- Writes only happen when you scream "yes" in TOML.  
 
 ## Ridiculous amount of configurability
 
 - Per-mode width/height, quality, and scaling rules:
   - `no_upscale`, `no_downscale`
   - `padding` (`remove` or `add`) / `padding_remove_sensitivity` (logo only)
-  - `force_upload_noscale` if you want re-uploads even when size doesn’t change
+  - `force_upload_noscale` if you want re-uploads even when size doesn't change
 - API behavior:
   - TLS verification, timeouts, throttle between requests  
   - Retry count and backoff  
-  - `fail_fast` mode for when you’re in a mood  
+  - `fail_fast` mode for when you're in a mood  
 - Logging:
   - CLI + file logging  
   - Verbose/silent modes  

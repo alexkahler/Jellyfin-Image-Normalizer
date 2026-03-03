@@ -380,7 +380,7 @@ def build_normalized_image(
         return normalized_img, "image/webp", "WEBP"
 
     if mode == "backdrop":
-        # For v1: reuse thumb’s cover+crop behaviour, but with backdrop-specific size.
+        # For v1: reuse thumb's cover+crop behaviour, but with backdrop-specific size.
         normalized_img = cover_and_crop_image(
             img,
             target_width,

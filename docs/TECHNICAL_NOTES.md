@@ -103,7 +103,7 @@ padding_remove_sensitivity = 0
       1. **Fetch & stage**: fetch all backdrops for indices `0..count-1`, infer file extension from content-type, and write originals to a per-item staging directory under `backup_root/staging/<itemId>`. Any fetch or staging failure aborts and cleans staging.
       2. **Normalize**: for each staged file, re-read bytes, call `_normalize_image_bytes` with `mode="backdrop"` and `backdrop_index` set to the source index, and keep normalized bytes in memory.
       3. **Delete originals**: delete all original backdrops on the server by repeatedly calling `DELETE /Items/<id>/Images/Backdrop/0` until the expected count is removed. Then issue a `HEAD` request for index 0 and require a 404-equivalent (no image) before continuing.
-      4. **Upload normalized set**: upload normalized payloads back as a dense index set `0..count-1`, preserving source ordering. Backdrops are always re-uploaded even when NO_SCALE, to keep Jellyfin’s automatically compacted indices consistent.
+      4. **Upload normalized set**: upload normalized payloads back as a dense index set `0..count-1`, preserving source ordering. Backdrops are always re-uploaded even when NO_SCALE, to keep Jellyfin's automatically compacted indices consistent.
       5. **Finalize staging**: when all uploads succeed, remove the staging directory; if any upload fails, retain staged originals on disk for manual inspection and return a failure result for that item.
   - Progress logged every 25 images.
 
@@ -119,7 +119,7 @@ padding_remove_sensitivity = 0
 - Mode builders:
   - Logo: optional padding policies via `logo.padding` (`add` | `remove` | `none`). When `remove`, JFIN crops transparent border padding (alpha threshold `logo.padding_remove_sensitivity`) **before** computing the scale plan; it never pads after. When `add`, it centers the resized logo on a transparent canvas. When `none`, it skips both add/remove padding and only rescales. Palette (`P`) is preserved by converting back with an adaptive palette and original color count when known; `LA` preserved. Output `image/png`. In `remove`, JFIN warns if the crop is a no-op on an already target-sized image (possible non-obvious border pixels) or if the image is fully transparent at the chosen threshold.
   - Thumb: convert to RGB, cover-scale then center-crop to canvas. Output JPEG with `jpeg_quality`, optimized + progressive.
-  - Backdrop: reuse thumb’s cover+crop behavior but with backdrop-specific target size. Always treated as RGB and encoded as JPEG with `jpeg_quality`.
+  - Backdrop: reuse thumb's cover+crop behavior but with backdrop-specific target size. Always treated as RGB and encoded as JPEG with `jpeg_quality`.
   - Profile: convert to RGBA, cover-scale then crop. Output WebP with `webp_quality` (method=6). Alpha preserved.
 - EXIF orientation: `apply_exif_orientation` uses transpose but avoids rotating tall images when orientation implies swap and height >= width.
 - Color stats: `get_palette_color_count` attempts to retain palette size for logos (used only when original mode is `P`).

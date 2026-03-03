@@ -29,4 +29,4 @@ Even at a glance, you can see what changes:
 - Ultra-wide logos no longer stretch across half the UI  
 - Tiny logos stop looking like afterthoughts  
 
-The result is a grid that looks intentional instead of “AI-was-left-unsupervised.”
+The result is a grid that looks intentional instead of "AI-was-left-unsupervised."

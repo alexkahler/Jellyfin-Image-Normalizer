@@ -21,7 +21,7 @@ If you prefer to capture CLI output as well, you can redirect it:
 
 ## Running JFIN inside the LSIO Jellyfin container (this is totally unecessary)
 
-If you use [LinuxServer.io’s Jellyfin](https://docs.linuxserver.io/images/docker-jellyfin/) image (which you probably should, thanks to PUID/PGID support, easy hardware-acceleration mods, and more), you can run JFIN *inside the Jellyfin container* using LSIO’s **universal-cron** and **universal-package-install** mod:
+If you use [LinuxServer.io's Jellyfin](https://docs.linuxserver.io/images/docker-jellyfin/) image (which you probably should, thanks to PUID/PGID support, easy hardware-acceleration mods, and more), you can run JFIN *inside the Jellyfin container* using LSIO's **universal-cron** and **universal-package-install** mod:
 
 * [universal-cron](https://github.com/linuxserver/docker-mods/tree/universal-cron)
 * [universal-package-install](https://github.com/linuxserver/docker-mods/tree/universal-package-install)

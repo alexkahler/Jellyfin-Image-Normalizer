@@ -26,7 +26,7 @@ Changed
   * New `backdrop` mode alongside `logo`, `thumb`, and `profile`, with a dedicated multi-phase API flow that fetches all backdrops, normalizes them in memory, deletes the originals, verifies via a 404 HEAD check, and re-uploads in same order.
   * New `[backdrop]` section in `config.toml`/`config.example.toml` with width/height and `jpeg_quality` settings, and discovery/processing wiring so backdrops are discovered via `BackdropImageTags` and included when `operations` contains `"backdrop"`.
 * Backdrop-aware backup/restore:
-  * Backups now support a `Backdrop` image type with filenames like `backdrop.jpg`, `backdrop1.jpg`, `backdrop2.jpg`, etc., and restore logic that enforces contiguous indices starting at 0 (any gap/duplicate is treated as an error and skips that item’s backdrops).
+  * Backups now support a `Backdrop` image type with filenames like `backdrop.jpg`, `backdrop1.jpg`, `backdrop2.jpg`, etc., and restore logic that enforces contiguous indices starting at 0 (any gap/duplicate is treated as an error and skips that item's backdrops).
   * CLI restore operations (`--restore`, `--restore-all`, `--restore --single`) now handle backdrops in addition to logos/thumbs/profiles, and keep behavior predictable in dry-run mode.
 * CLI and docs:
   * `--mode=backdrop` support for both library runs and `--single` item runs.
@@ -42,7 +42,7 @@ Changed
 ### Fixed
 * Clarified behavior and fixed edge cases in the backdrop pipeline:
   * Staging now guards against unknown or invalid content-types and I/O issues when writing staged files, logging a clear error and aborting safely instead of crashing.
-  * 404 handling for delete/verify is explicitly modeled as “image missing” only in the verification HEAD call, matching Jellyfin’s current behavior.
+  * 404 handling for delete/verify is explicitly modeled as "image missing" only in the verification HEAD call, matching Jellyfin's current behavior.
 
 ## 0.1.1
 * Added automatic pre-flight Jellyfin connectivity check before processing, with clear logging when unreachable.

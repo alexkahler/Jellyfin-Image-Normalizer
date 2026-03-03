@@ -88,7 +88,7 @@ interfering with day-to-day user data or UI personalization.
 
 ### Recommended pattern
 
-1. **Create a “maintenance” account**
+1. **Create a "maintenance" account**
    * Used for automation tools  
    * Used for plugin/configuration work  
    * Used for low-level or system-wide administrative operations  

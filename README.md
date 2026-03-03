@@ -1,8 +1,8 @@
 # Jellyfin Image Normalizer (JFIN)
 
-Because why *wouldn’t* you build a tiny CLI for image resizing and then wrap it in config files, retries, backups, and a miniature observability stack?
+Because why *wouldn't* you build a tiny CLI for image resizing and then wrap it in config files, retries, backups, and a miniature observability stack?
 
-JFIN (pronounced “jay-fin”, and absolutely *not* overthought) is a Python CLI that talks to the Jellyfin API, downloads your artwork, normalizes it, and uploads it back again — safely, cautiously, and with way more ceremony than strictly necessary.
+JFIN (pronounced "jay-fin", and absolutely *not* overthought) is a Python CLI that talks to the Jellyfin API, downloads your artwork, normalizes it, and uploads it back again — safely, cautiously, and with way more ceremony than strictly necessary.
 
 Think: Fiat 500 engine, bolted into a full DTM race chassis. Completely unnecessary.
 
@@ -56,10 +56,10 @@ Think: Fiat 500 engine, bolted into a full DTM race chassis. Completely unnecess
 JFIN is a safe-by-default CLI tool that:
 
 - Normalizes chaotic TMDb logos to a consistent canvas
-- Resizes misclassified “thumb” backdrops to sane size
+- Resizes misclassified "thumb" backdrops to sane size
 - Optimizes oversized user profile images
-- Talks only to Jellyfin’s HTTP API (no direct filesystem poking)
-- Supports dry-runs, backups, and restore helpers so it’s very hard to misuse
+- Talks only to Jellyfin's HTTP API (no direct filesystem poking)
+- Supports dry-runs, backups, and restore helpers so it's very hard to misuse
 
 If your Jellyfin UI looks inconsistent across devices, this tool exists for you.
 
@@ -78,7 +78,7 @@ Logos from TheMovieDatabase come in every size and ratio imaginable:
   - Logos jumping up and down between titles  
   - Some logos stretching across half the screen, others look tiny  
 
-**JFIN’s logo mode:**
+**JFIN's logo mode:**
 
 - Downloads logos through the Jellyfin API  
 - Standardizes them to a consistent canvas (default `800 x 310`)  
@@ -90,10 +90,10 @@ Logos from TheMovieDatabase come in every size and ratio imaginable:
 
 Result: logos that actually line up and behave. Your UI stops looking like a ransom collage.
 
-#### 2. “Thumbs” that are actually full-size backdrops
+#### 2. "Thumbs" that are actually full-size backdrops
 
 The TMDb plugin likes to classify certain backdrops with text as `Thumb` images.  
-That gives you “thumbs” that are:
+That gives you "thumbs" that are:
 
 - Full 4K, e.g. `3840 x 2160`
 - Stored as-is in your metadata folder  
@@ -104,21 +104,21 @@ Jellyfin handles that… but:
 - Your metadata folder gets bloated
 - You keep converting huge source files on-the-fly when there's a cache miss.
 
-**JFIN’s thumb mode:**
+**JFIN's thumb mode:**
 
 - Finds item thumbs via the API (respecting libraries, item types, and filters)
 - Rescales them to something sane (e.g. width `1000`, preserving aspect ratio via cover+crop)
 - Re-uploads optimized JPEGs with configurable quality  
 - Often cuts your thumb storage roughly in half (*results may vary; claims made are not indicative of actual performance*) without you ever noticing visually.
 
-You still get nice images — just without the “why is my metadata folder this big?” moment.
+You still get nice images — just without the "why is my metadata folder this big?" moment.
 
 #### 3. User profile images bypass the cache
 
 Profile images seem to dodge the normal caching pipeline.  
 Upload an 8MB+ selfie and Jellyfin will politely serve it on every dashboard view.
 
-**JFIN’s profile mode:**
+**JFIN's profile mode:**
 
 - Fetches all active users
 - Grabs their profile images directly
@@ -144,10 +144,10 @@ You can see real-world comparisons for Desktop (QHD), Tablet (WQXGA), and Mobile
 At a glance, JFIN gives you:
 
 - 🔍 **API-only discovery**
-  Talks only to Jellyfin’s HTTP API (no direct filesystem poking) with optional library filters and item types.
+  Talks only to Jellyfin's HTTP API (no direct filesystem poking) with optional library filters and item types.
 
 - 🖼 **Four focused modes**
-  `logo`, `thumb`, `backdrop`, and `profile` — each with its own canvas, format, and scaling rules tuned for Jellyfin’s UI.
+  `logo`, `thumb`, `backdrop`, and `profile` — each with its own canvas, format, and scaling rules tuned for Jellyfin's UI.
 
 - 🧪 **Safe-by-default behavior**  
   `dry_run = true` in the generated config, hard blocking of POST/DELETE while dry-run is on, and optional backups before any writes.
@@ -233,7 +233,7 @@ All command examples below assume `PYTHONPATH=src` is set.
    jf_api_key = "YOUR_API_KEY"
 
    [api]
-   dry_run    = true        # keep this true until you’re happy
+   dry_run    = true        # keep this true until you're happy
 
    [backup]
    backup     = true
@@ -274,7 +274,7 @@ All command examples below assume `PYTHONPATH=src` is set.
 
    > 💡 You can keep `dry_run = false` in `config.toml` and overwrite it using `--dry-run` from CLI for quick testing. Once you're ready, simply remove the CLI flag.
 
-6. **Enable actual uploads (when you’re ready)**
+6. **Enable actual uploads (when you're ready)**
 
    In `config.toml`:
 
@@ -317,7 +317,7 @@ python -m jfin --mode=logo \
   --logo-target-size 500x200 --logo-padding none
 ```
 
-Override mode and fix thumbs (and resize those “4K thumbs”):
+Override mode and fix thumbs (and resize those "4K thumbs"):
 
 ```bash
 python -m jfin --mode=thumb --thumb-target-size 1000x562
@@ -349,9 +349,9 @@ python -m jfin --restore-all
 
 ### When should you *not* use this?
 
-* If you’re happy with totally random logo sizes
-* If disk usage and avatar payloads don’t bother you at all
-* If the phrase “backup-aware dry-run image normalizer for a media server” makes you physically uncomfortable
+* If you're happy with totally random logo sizes
+* If disk usage and avatar payloads don't bother you at all
+* If the phrase "backup-aware dry-run image normalizer for a media server" makes you physically uncomfortable
 
 Otherwise, JFIN gives you:
 
@@ -363,18 +363,18 @@ Otherwise, JFIN gives you:
 
 ## ⚠️ And the obligatory Disclaimer: This is NOT a backup system
 
-JFIN includes a “backup” and “restore” function, but these are **not real backups** in the Jellyfin sense.
+JFIN includes a "backup" and "restore" function, but these are **not real backups** in the Jellyfin sense.
 
 Short version:
 
 * JFIN only backs up the image files it processed — nothing more, nothing less.
-* It does **not** back up Jellyfin’s database, item UUID mappings, watch history, playlists, subtitles, chapters, or anything outside the specific images JFIN touched.
+* It does **not** back up Jellyfin's database, item UUID mappings, watch history, playlists, subtitles, chapters, or anything outside the specific images JFIN touched.
 * If Jellyfin re-imports your media and UUIDs change, JFIN cannot restore images to items that no longer exist under the same ID.
 
 Jellyfin 10.11+ provides a robust, official, database-aware backup + restore.
-Use *that* for real server recovery, and treat JFIN’s backups as a convenience utility only.
+Use *that* for real server recovery, and treat JFIN's backups as a convenience utility only.
 
-> ❗ Full details and edge cases: [Backups, UUIDs, and what JFIN can’t restore](docs/backups-and-uuids.md)
+> ❗ Full details and edge cases: [Backups, UUIDs, and what JFIN can't restore](docs/backups-and-uuids.md)
 
 ---
 
@@ -395,7 +395,7 @@ Additional documentation lives in the `docs/` folder:
 
 ## Contributing
 
-Contributions, bug reports, and “why did you build *this*?” issues are all welcome.
+Contributions, bug reports, and "why did you build *this*?" issues are all welcome.
 
 If you want to hack on JFIN:
 
