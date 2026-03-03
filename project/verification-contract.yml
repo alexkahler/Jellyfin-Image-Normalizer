@@ -1,0 +1,19 @@
+version: 1
+python_version: "3.13"
+verification_commands:
+  - PYTHONPATH=src python -m pytest
+  - python -m ruff check .
+  - python -m ruff format --check .
+  - python -m mypy src
+  - python -m bandit -r src
+  - python -m pip_audit
+required_ci_jobs:
+  - test
+  - security
+  - quality
+  - governance
+loc_policy:
+  src_max_lines: 300
+  src_mode: block
+  tests_max_lines: 300
+  tests_mode: warn
