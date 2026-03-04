@@ -159,9 +159,13 @@ padding_remove_sensitivity = 0
 ## Development and Testing Notes
 - Dependencies (`requirements.txt`): Pillow, requests, pytest (for local testing).
 - Run tests with `PYTHONPATH=src python -m pytest` (PowerShell: `$env:PYTHONPATH="src"; python -m pytest`). Tests rely on mocks/stubs; no live Jellyfin calls are performed.
-- Run governance checks with `python project/scripts/verify_governance.py --check all` to validate CI/contract sync, LOC policy, and Python version consistency.
+- Run governance checks with `python project/scripts/verify_governance.py --check all` to validate CI/contract sync, LOC policy, and Python version consistency. Current Track 1 baseline includes known pre-existing LOC failures in `src/jfin/*`; WI-003 requires no additional failures beyond that baseline.
 - Run parity-only checks with `python project/scripts/verify_governance.py --check parity` to validate `project/parity-matrix.md` and `project/route-fence.md`.
-- Run characterization linkage checks with `python project/scripts/verify_governance.py --check characterization` to validate baseline schema, parity linkage, and owner test references for `CLI-*` and `CFG-*` IDs.
-- Characterization suites live in `tests/characterization/cli_contract/` and `tests/characterization/config_contract/`, with baseline contracts in `tests/characterization/baselines/`.
+- Run characterization linkage checks with `python project/scripts/verify_governance.py --check characterization` to validate baseline schema, parity linkage, owner test references, imaging manifest linkage, and artifact budgets for `CLI-*`, `CFG-*`, and `IMG-*` IDs.
+- Characterization suites live in `tests/characterization/cli_contract/`, `tests/characterization/config_contract/`, and `tests/characterization/imaging_contract/`, with baseline contracts in `tests/characterization/baselines/`.
+- Imaging golden artifacts are stored in `tests/golden/imaging/`:
+  - expected outputs: `tests/golden/imaging/expected/`
+  - real-ish fixtures: `tests/golden/imaging/fixtures/realish/`
+  - provenance policy: `tests/golden/imaging/fixtures/PROVENANCE.md`
 - Config tests cover TOML parsing/validation; runtime JSON configs are no longer supported.
 - When adding a new image mode, update `src/jfin/constants.py` (`MODE_CONFIG`, `IMAGE_TYPE_TO_MODE`, `MODE_TO_IMAGE_TYPE`, `FILENAME_CONFIG`), extend config parsing, and add a normalization branch in `imaging.build_normalized_image` plus pipeline wiring.

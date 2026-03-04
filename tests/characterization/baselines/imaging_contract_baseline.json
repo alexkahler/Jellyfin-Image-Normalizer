@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "cases": {
+    "IMG-SCALE-001": {
+      "expected_properties": {
+        "decision": "SCALE_UP",
+        "size": [
+          200,
+          100
+        ],
+        "mode": "RGB",
+        "format": "JPEG",
+        "content_type": "image/jpeg"
+      },
+      "golden_key": "img_scale_001_thumb_upscale",
+      "notes": "Upscale decision and thumb JPEG output remain stable."
+    },
+    "IMG-NOSCALE-001": {
+      "expected_properties": {
+        "decision": "NO_SCALE",
+        "size": [
+          100,
+          50
+        ],
+        "mode": "RGBA",
+        "format": "PNG",
+        "content_type": "image/png"
+      },
+      "golden_key": "img_noscale_001_logo_passthrough",
+      "notes": "No-scale imaging helper path preserves local uploader bypass and logo PNG output."
+    },
+    "IMG-LOGO-001": {
+      "expected_properties": {
+        "decision": "PADDING_REMOVED",
+        "size": [
+          6,
+          6
+        ],
+        "mode": "RGBA",
+        "format": "PNG",
+        "content_type": "image/png"
+      },
+      "golden_key": "img_logo_001_padding_removed",
+      "notes": "Transparent-border crop path remains stable for a real-ish logo fixture."
+    },
+    "IMG-CROP-001": {
+      "expected_properties": {
+        "decision": "COVER_CROP",
+        "size": [
+          2,
+          2
+        ],
+        "mode": "RGB",
+        "format": "JPEG",
+        "content_type": "image/jpeg"
+      },
+      "golden_key": "img_crop_001_cover_crop",
+      "notes": "Cover+crop center behavior remains stable."
+    },
+    "IMG-ENCODE-001": {
+      "expected_properties": {
+        "decision": "ENCODE_PROFILE",
+        "size": [
+          64,
+          64
+        ],
+        "mode": "RGBA",
+        "format": "WEBP",
+        "content_type": "image/webp"
+      },
+      "golden_key": "img_encode_001_profile_webp",
+      "notes": "Profile WebP encoding remains stable with tolerant diff."
+    }
+  }
+}

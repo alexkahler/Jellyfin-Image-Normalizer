@@ -427,6 +427,10 @@ Run governance checks:
 python project/scripts/verify_governance.py --check all
 ```
 
+Track 1 note: `--check all` currently reports known pre-existing LOC failures in
+`src/jfin/*`; WI-003 requires no additional governance failures beyond that
+known baseline.
+
 Run parity-only validation:
 
 ```bash
@@ -444,11 +448,13 @@ Run characterization suites:
 ```bash
 PYTHONPATH=src python -m pytest -q tests/characterization/cli_contract/test_cli_contract_characterization.py
 PYTHONPATH=src python -m pytest -q tests/characterization/config_contract/test_config_contract_characterization.py
+PYTHONPATH=src python -m pytest -q tests/characterization/imaging_contract/test_imaging_contract_characterization.py
 ```
 
 Verification command policy is tracked in `project/verification-contract.yml`.
 Parity artifacts are tracked in `project/parity-matrix.md` and `project/route-fence.md`.
 Characterization baselines are tracked in `tests/characterization/baselines/`.
+Imaging golden artifacts are tracked in `tests/golden/imaging/`.
 
 More details about the processing pipeline, classes, config TOML, and CLI entrypoints are documented in:
 

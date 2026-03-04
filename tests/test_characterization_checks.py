@@ -6,9 +6,12 @@ import importlib
 import json
 import sys
 from pathlib import Path
-from typing import Any
 
 import pytest
+from tests._characterization_test_helpers import (
+    build_valid_baseline_payload,
+    build_valid_imaging_manifest,
+)
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS_DIR = ROOT / "project" / "scripts"
@@ -60,30 +63,17 @@ def _write_file(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
-def _default_case_payload() -> dict[str, object]:
-    """Build a valid minimal baseline case payload."""
-    return {
-        "expected_exit_code": 0,
-        "expected_messages": [],
-        "expected_preflight": "not_reached",
-        "notes": "seed",
-    }
-
-
-def _build_valid_baseline_payload(required_ids: list[str]) -> dict[str, Any]:
-    """Build a valid baseline JSON payload for a set of required behavior IDs."""
-    return {
-        "version": 1,
-        "cases": {behavior_id: _default_case_payload() for behavior_id in required_ids},
-    }
-
-
 def _owner_test_for_behavior(behavior_id: str) -> tuple[str, str]:
     """Map a behavior ID to deterministic owner test path/function names."""
     function_name = f"test_{behavior_id.lower().replace('-', '_')}"
     if behavior_id.startswith("CLI-"):
         return (
             "tests/characterization/cli_contract/test_cli_contract_characterization.py",
+            function_name,
+        )
+    if behavior_id.startswith("IMG-"):
+        return (
+            "tests/characterization/imaging_contract/test_imaging_contract_characterization.py",
             function_name,
         )
     return (
@@ -96,11 +86,14 @@ def _write_owner_test_files(required_ids: list[str], repo_root: Path) -> None:
     """Write deterministic owner test files containing required test functions."""
     cli_functions: list[str] = []
     cfg_functions: list[str] = []
+    img_functions: list[str] = []
     for behavior_id in required_ids:
         _path, function_name = _owner_test_for_behavior(behavior_id)
         function_line = f"def {function_name}():\n    assert True\n"
         if behavior_id.startswith("CLI-"):
             cli_functions.append(function_line)
+        elif behavior_id.startswith("IMG-"):
+            img_functions.append(function_line)
         else:
             cfg_functions.append(function_line)
 
@@ -114,6 +107,11 @@ def _write_owner_test_files(required_ids: list[str], repo_root: Path) -> None:
         / "tests/characterization/config_contract/test_config_contract_characterization.py",
         "\n".join(cfg_functions) + "\n",
     )
+    _write_file(
+        repo_root
+        / "tests/characterization/imaging_contract/test_imaging_contract_characterization.py",
+        "\n".join(img_functions) + "\n",
+    )
 
 
 def _build_valid_parity_rows(required_ids: list[str]) -> list[dict[str, str]]:
@@ -123,7 +121,11 @@ def _build_valid_parity_rows(required_ids: list[str]) -> list[dict[str, str]]:
         baseline_file = (
             "tests/characterization/baselines/cli_contract_baseline.json"
             if behavior_id.startswith("CLI-")
-            else "tests/characterization/baselines/config_contract_baseline.json"
+            else (
+                "tests/characterization/baselines/imaging_contract_baseline.json"
+                if behavior_id.startswith("IMG-")
+                else "tests/characterization/baselines/config_contract_baseline.json"
+            )
         )
         owner_path, owner_function = _owner_test_for_behavior(behavior_id)
         rows.append(
@@ -148,12 +150,23 @@ def _write_valid_artifacts(
 ) -> tuple[Path, Path, Path]:
     """Write baseline files, owner test files, and parity matrix for passing checks."""
     repo_root = tmp_path
-    cli_payload = _build_valid_baseline_payload(
+    cli_payload = build_valid_baseline_payload(
         characterization_contract.CLI_BEHAVIOR_IDS
     )
-    cfg_payload = _build_valid_baseline_payload(
+    cfg_payload = build_valid_baseline_payload(
         characterization_contract.CFG_BEHAVIOR_IDS
     )
+    imaging_payload = build_valid_baseline_payload(
+        characterization_contract.IMG_BEHAVIOR_IDS,
+        imaging=True,
+    )
+    imaging_manifest = build_valid_imaging_manifest(
+        characterization_contract.IMG_BEHAVIOR_IDS
+    )
+    for behavior_id in characterization_contract.IMG_BEHAVIOR_IDS:
+        imaging_payload["cases"][behavior_id]["golden_key"] = (
+            f"golden-{behavior_id.lower()}"
+        )
 
     cli_baseline_path = (
         repo_root / "tests/characterization/baselines/cli_contract_baseline.json"
@@ -161,8 +174,23 @@ def _write_valid_artifacts(
     cfg_baseline_path = (
         repo_root / "tests/characterization/baselines/config_contract_baseline.json"
     )
+    imaging_baseline_path = (
+        repo_root / "tests/characterization/baselines/imaging_contract_baseline.json"
+    )
+    imaging_manifest_path = repo_root / "tests/golden/imaging/manifest.json"
     _write_file(cli_baseline_path, json.dumps(cli_payload, indent=2) + "\n")
     _write_file(cfg_baseline_path, json.dumps(cfg_payload, indent=2) + "\n")
+    _write_file(imaging_baseline_path, json.dumps(imaging_payload, indent=2) + "\n")
+    _write_file(imaging_manifest_path, json.dumps(imaging_manifest, indent=2) + "\n")
+
+    for behavior_id in characterization_contract.IMG_BEHAVIOR_IDS:
+        expected_relpath = (
+            f"tests/golden/imaging/expected/{behavior_id.lower()}_expected.png"
+        )
+        _write_file(repo_root / expected_relpath, "binary-seed")
+    _write_file(
+        repo_root / "tests/golden/imaging/fixtures/realish/fixture-seed.png", "seed"
+    )
 
     required_ids = characterization_contract.REQUIRED_CHARACTERIZATION_BEHAVIOR_IDS
     _write_owner_test_files(required_ids, repo_root)
