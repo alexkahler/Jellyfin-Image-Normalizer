@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "metadata": {
+    "python_version": "3.13.12",
+    "pillow_version": "12.1.1",
+    "generated_at": "2026-03-04T11:40:16Z"
+  },
+  "cases": {
+    "img_scale_001_thumb_upscale": {
+      "expected_path": "tests/golden/imaging/expected/img_scale_001_thumb_upscale.jpg",
+      "compare_mode": "tolerant",
+      "max_mean_abs_error": 2.0,
+      "max_diff_pixels": 12,
+      "tolerance_note": "JPEG encoding variance across environments."
+    },
+    "img_noscale_001_logo_passthrough": {
+      "expected_path": "tests/golden/imaging/expected/img_noscale_001_logo_passthrough.png",
+      "compare_mode": "exact"
+    },
+    "img_logo_001_padding_removed": {
+      "expected_path": "tests/golden/imaging/expected/img_logo_001_padding_removed.png",
+      "compare_mode": "exact"
+    },
+    "img_crop_001_cover_crop": {
+      "expected_path": "tests/golden/imaging/expected/img_crop_001_cover_crop.jpg",
+      "compare_mode": "tolerant",
+      "max_mean_abs_error": 2.0,
+      "max_diff_pixels": 8,
+      "tolerance_note": "JPEG roundtrip keeps center crop semantics with minor lossy drift."
+    },
+    "img_encode_001_profile_webp": {
+      "expected_path": "tests/golden/imaging/expected/img_encode_001_profile_webp.webp",
+      "compare_mode": "tolerant",
+      "max_mean_abs_error": 2.0,
+      "max_diff_pixels": 20,
+      "tolerance_note": "WebP encoder variance is accepted by MAE + diff-pixel guard."
+    }
+  }
+}
