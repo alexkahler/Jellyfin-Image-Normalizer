@@ -126,7 +126,7 @@ Intent:
 
 Implementation constraints:
 - Use stdlib only (no new dependency such as PyYAML).
-- Contract parser supports only this repo’s controlled YAML shape (documented in script docstring).
+- Contract parser supports only this repo's controlled YAML shape (documented in script docstring).
 - Non-zero exit on blocking failures; zero exit with warnings for non-blocking test-file size cases.
 
 Verification (targeted):

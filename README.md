@@ -443,6 +443,10 @@ Run characterization linkage validation:
 python project/scripts/verify_governance.py --check characterization
 ```
 
+`--check characterization` now also enforces the Surface Coverage Gate using
+`project/surface-coverage-index.json` and reports remaining unmapped CLI/config/
+observability items plus parity/test linkage gaps.
+
 Run architecture guard validation (WI-001 Slice 5):
 
 ```bash

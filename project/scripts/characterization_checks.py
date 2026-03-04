@@ -27,6 +27,7 @@ from characterization_contract import (
 )
 from governance_contract import CheckResult
 from parity_contract import REQUIRED_PARITY_COLUMNS, load_markdown_table
+from surface_coverage_checks import check_surface_coverage_artifacts
 
 
 def _load_and_validate_baselines(
@@ -334,5 +335,9 @@ def check_characterization_artifacts(repo_root: Path) -> CheckResult:
         label="imaging fixture artifact",
         result=result,
     )
+
+    surface_report = check_surface_coverage_artifacts(repo_root)
+    result.merge(surface_report.result)
+    setattr(result, "surface_report", surface_report)
 
     return result

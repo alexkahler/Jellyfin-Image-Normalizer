@@ -67,6 +67,9 @@ REQUIRED_BEHAVIOR_IDS = [
     "RST-SINGLE-001",
     "RST-REFUSE-001",
     "RST-PATH-001",
+    "OBS-SUMLOG-001",
+    "CFG-SCALEFLAGS-001",
+    "OBS-EXITCODE-001",
 ]
 REQUIRED_ROUTE_ROWS = [
     ("run", "logo"),

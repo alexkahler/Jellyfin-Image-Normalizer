@@ -193,6 +193,21 @@ def _print_check_result(check_name: str, result: CheckResult) -> None:
     """Print check output in a stable, CI-friendly format."""
     status = "PASS" if not result.errors else "FAIL"
     print(f"[{status}] {check_name}")
+    surface_report = getattr(result, "surface_report", None)
+    if surface_report is not None:
+        print(f"  INFO: Remaining unmapped CLI items: {surface_report.unmapped_cli_items}")
+        print(
+            "  INFO: Remaining unmapped config keys: "
+            f"{surface_report.unmapped_config_keys}"
+        )
+        print(
+            "  INFO: Remaining unmapped observability items: "
+            f"{surface_report.unmapped_observability_items}"
+        )
+        print(
+            "  INFO: Remaining parity/test linkage gaps: "
+            f"{surface_report.parity_test_linkage_gaps}"
+        )
     for warning in result.warnings:
         print(f"  WARN: {warning}")
     for error in result.errors:

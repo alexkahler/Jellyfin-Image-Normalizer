@@ -181,6 +181,271 @@ def _build_valid_parity_rows(required_ids: list[str]) -> list[dict[str, str]]:
     return rows
 
 
+def _write_surface_artifacts(
+    repo_root: Path,
+    characterization_contract,
+) -> None:
+    _write_file(repo_root / "src/jfin/__init__.py", "")
+    _write_file(
+        repo_root / "src/jfin/__main__.py",
+        "from .cli import parse_args\n\nif __name__ == '__main__':\n    parse_args()\n",
+    )
+    _write_file(
+        repo_root / "src/jfin/cli.py",
+        """
+import argparse
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="seed")
+    parser.add_argument("--config", help="Path to config (default: config.toml in repo root).")
+    parser.add_argument("--mode", help="Mode values include logo|thumb|backdrop|profile.")
+    parser.add_argument("--silent", "-s", action="store_true", help="silent mode")
+    return parser.parse_args()
+""",
+    )
+    _write_file(
+        repo_root / "config.example.toml",
+        """
+[server]
+jf_url = "https://demo"
+
+[logging]
+silent = true
+""",
+    )
+    _write_file(
+        repo_root / "docs/TECHNICAL_NOTES.md",
+        """
+## Runtime Flow (High Level)
+9) Always log scale decisions, API failures, and run summary before exit.
+
+## Logging, State, and Metrics
+- RunStats counts images_found/processed/success/skipped/warning/error and failed items.
+- Presence/absence of warning/error classes should remain user-visible.
+- Exit behavior: major classes are success, validation failure, and runtime failure.
+- upscaled_images and downscaled_images feed summary output.
+""",
+    )
+
+    cli_behavior = characterization_contract.CLI_BEHAVIOR_IDS[0]
+    cfg_behavior = characterization_contract.CFG_BEHAVIOR_IDS[0]
+    obs_behavior = characterization_contract.CLI_BEHAVIOR_IDS[1]
+
+    cli_owner_path, cli_owner_fn = _owner_test_for_behavior(cli_behavior)
+    cfg_owner_path, cfg_owner_fn = _owner_test_for_behavior(cfg_behavior)
+    obs_owner_path, obs_owner_fn = _owner_test_for_behavior(obs_behavior)
+
+    surface_index = {
+        "version": 1,
+        "cli_items": [
+            {
+                "id": "cli.root.command",
+                "command_path": "root",
+                "source_token": "command:root",
+                "default_text": "",
+                "parity_ids": [obs_behavior],
+                "owner_tests": [f"{obs_owner_path}::{obs_owner_fn}"],
+                "out_of_scope": False,
+                "out_of_scope_reason": "",
+                "code_refs": ["src/jfin/cli.py:1"],
+                "notes": "seed",
+            },
+            {
+                "id": "cli.root.option.-h",
+                "command_path": "root",
+                "source_token": "-h",
+                "default_text": "",
+                "parity_ids": [],
+                "owner_tests": [],
+                "out_of_scope": True,
+                "out_of_scope_reason": "help alias formatting",
+                "code_refs": ["src/jfin/cli.py:1"],
+                "notes": "seed",
+            },
+            {
+                "id": "cli.root.option.--help",
+                "command_path": "root",
+                "source_token": "--help",
+                "default_text": "",
+                "parity_ids": [],
+                "owner_tests": [],
+                "out_of_scope": True,
+                "out_of_scope_reason": "help alias formatting",
+                "code_refs": ["src/jfin/cli.py:1"],
+                "notes": "seed",
+            },
+            {
+                "id": "cli.root.option.--config",
+                "command_path": "root",
+                "source_token": "--config",
+                "default_text": "config.toml in repo root",
+                "parity_ids": [cfg_behavior],
+                "owner_tests": [f"{cfg_owner_path}::{cfg_owner_fn}"],
+                "out_of_scope": False,
+                "out_of_scope_reason": "",
+                "code_refs": ["src/jfin/cli.py:1"],
+                "notes": "seed",
+            },
+            {
+                "id": "cli.root.option.--mode",
+                "command_path": "root",
+                "source_token": "--mode",
+                "default_text": "",
+                "parity_ids": [cli_behavior],
+                "owner_tests": [f"{cli_owner_path}::{cli_owner_fn}"],
+                "out_of_scope": False,
+                "out_of_scope_reason": "",
+                "code_refs": ["src/jfin/cli.py:1"],
+                "notes": "seed",
+            },
+            {
+                "id": "cli.root.option.--silent",
+                "command_path": "root",
+                "source_token": "--silent",
+                "default_text": "",
+                "parity_ids": [obs_behavior],
+                "owner_tests": [f"{obs_owner_path}::{obs_owner_fn}"],
+                "out_of_scope": False,
+                "out_of_scope_reason": "",
+                "code_refs": ["src/jfin/cli.py:1"],
+                "notes": "seed",
+            },
+            {
+                "id": "cli.root.option.-s",
+                "command_path": "root",
+                "source_token": "-s",
+                "default_text": "",
+                "parity_ids": [obs_behavior],
+                "owner_tests": [f"{obs_owner_path}::{obs_owner_fn}"],
+                "out_of_scope": False,
+                "out_of_scope_reason": "",
+                "code_refs": ["src/jfin/cli.py:1"],
+                "notes": "seed",
+            },
+            {
+                "id": "cli.root.mode.backdrop",
+                "command_path": "root",
+                "source_token": "backdrop",
+                "default_text": "",
+                "parity_ids": [cli_behavior],
+                "owner_tests": [f"{cli_owner_path}::{cli_owner_fn}"],
+                "out_of_scope": False,
+                "out_of_scope_reason": "",
+                "code_refs": ["src/jfin/cli.py:1"],
+                "notes": "seed",
+            },
+            {
+                "id": "cli.root.mode.logo",
+                "command_path": "root",
+                "source_token": "logo",
+                "default_text": "",
+                "parity_ids": [cli_behavior],
+                "owner_tests": [f"{cli_owner_path}::{cli_owner_fn}"],
+                "out_of_scope": False,
+                "out_of_scope_reason": "",
+                "code_refs": ["src/jfin/cli.py:1"],
+                "notes": "seed",
+            },
+            {
+                "id": "cli.root.mode.profile",
+                "command_path": "root",
+                "source_token": "profile",
+                "default_text": "",
+                "parity_ids": [cli_behavior],
+                "owner_tests": [f"{cli_owner_path}::{cli_owner_fn}"],
+                "out_of_scope": False,
+                "out_of_scope_reason": "",
+                "code_refs": ["src/jfin/cli.py:1"],
+                "notes": "seed",
+            },
+            {
+                "id": "cli.root.mode.thumb",
+                "command_path": "root",
+                "source_token": "thumb",
+                "default_text": "",
+                "parity_ids": [cli_behavior],
+                "owner_tests": [f"{cli_owner_path}::{cli_owner_fn}"],
+                "out_of_scope": False,
+                "out_of_scope_reason": "",
+                "code_refs": ["src/jfin/cli.py:1"],
+                "notes": "seed",
+            },
+        ],
+        "config_items": [
+            {
+                "id": "config.server.jf_url",
+                "parity_ids": [cfg_behavior],
+                "owner_tests": [f"{cfg_owner_path}::{cfg_owner_fn}"],
+                "out_of_scope": False,
+                "out_of_scope_reason": "",
+                "code_refs": ["config.example.toml:2"],
+                "notes": "seed",
+            },
+            {
+                "id": "config.logging.silent",
+                "parity_ids": [cfg_behavior],
+                "owner_tests": [f"{cfg_owner_path}::{cfg_owner_fn}"],
+                "out_of_scope": False,
+                "out_of_scope_reason": "",
+                "code_refs": ["config.example.toml:5"],
+                "notes": "seed",
+            },
+        ],
+        "observability_items": [
+            {
+                "id": "obs.summary.counters",
+                "parity_ids": [obs_behavior],
+                "owner_tests": [f"{obs_owner_path}::{obs_owner_fn}"],
+                "out_of_scope": False,
+                "out_of_scope_reason": "",
+                "code_refs": ["docs/TECHNICAL_NOTES.md:6"],
+                "notes": "seed",
+            },
+            {
+                "id": "obs.summary.failure_list",
+                "parity_ids": [obs_behavior],
+                "owner_tests": [f"{obs_owner_path}::{obs_owner_fn}"],
+                "out_of_scope": False,
+                "out_of_scope_reason": "",
+                "code_refs": ["docs/TECHNICAL_NOTES.md:6"],
+                "notes": "seed",
+            },
+            {
+                "id": "obs.summary.warning_error_presence",
+                "parity_ids": [obs_behavior],
+                "owner_tests": [f"{obs_owner_path}::{obs_owner_fn}"],
+                "out_of_scope": False,
+                "out_of_scope_reason": "",
+                "code_refs": ["docs/TECHNICAL_NOTES.md:7"],
+                "notes": "seed",
+            },
+            {
+                "id": "obs.summary.scale_decision_reporting",
+                "parity_ids": [obs_behavior],
+                "owner_tests": [f"{obs_owner_path}::{obs_owner_fn}"],
+                "out_of_scope": False,
+                "out_of_scope_reason": "",
+                "code_refs": ["docs/TECHNICAL_NOTES.md:3"],
+                "notes": "seed",
+            },
+            {
+                "id": "obs.exit_codes.major_classes",
+                "parity_ids": [obs_behavior],
+                "owner_tests": [f"{obs_owner_path}::{obs_owner_fn}"],
+                "out_of_scope": False,
+                "out_of_scope_reason": "",
+                "code_refs": ["docs/TECHNICAL_NOTES.md:8"],
+                "notes": "seed",
+            },
+        ],
+    }
+    _write_file(
+        repo_root / "project/surface-coverage-index.json",
+        json.dumps(surface_index, indent=2) + "\n",
+    )
+
+
 def _write_valid_artifacts(
     tmp_path: Path,
     characterization_contract,
@@ -244,6 +509,7 @@ def _write_valid_artifacts(
     parity_text = _render_table(parity_contract.REQUIRED_PARITY_COLUMNS, parity_rows)
     parity_path = repo_root / "project/parity-matrix.md"
     _write_file(parity_path, parity_text)
+    _write_surface_artifacts(repo_root, characterization_contract)
     return repo_root, cli_baseline_path, parity_path
 
 

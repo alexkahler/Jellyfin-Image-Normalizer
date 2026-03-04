@@ -78,7 +78,7 @@ LOC/complexity note (non-tests/docs)
 ---
 
 Verdict: **Almost fully compliant; all previously flagged technical gaps are now closed.**  
-If you require strict file-list parity from the old audit’s `S4-REQ-015`, it remains a **scoped variance** (extra helper file + unchanged `tests/test_characterization_checks_links.py`).
+If you require strict file-list parity from the old audit's `S4-REQ-015`, it remains a **scoped variance** (extra helper file + unchanged `tests/test_characterization_checks_links.py`).
 
 **Cross-check vs prior partial findings**
 1. `S4-REQ-007` (tolerance-note enforcement): **Pass now**  
