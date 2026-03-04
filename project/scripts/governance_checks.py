@@ -7,6 +7,10 @@ import re
 from pathlib import Path
 from typing import Iterable
 
+from architecture_checks import (
+    check_architecture_artifacts,
+    render_architecture_baseline,
+)
 from characterization_checks import check_characterization_artifacts
 from governance_contract import (
     CheckResult,
@@ -22,6 +26,7 @@ SUPPORTED_CHECKS = (
     "ci-sync",
     "loc",
     "python-version",
+    "architecture",
     "parity",
     "characterization",
 )
@@ -194,8 +199,21 @@ def _print_check_result(check_name: str, result: CheckResult) -> None:
         print(f"  ERROR: {error}")
 
 
-def run_selected_checks(check_name: str, repo_root: Path) -> int:
+def run_selected_checks(
+    check_name: str,
+    repo_root: Path,
+    *,
+    print_baseline: bool = False,
+) -> int:
     """Run one or all governance checks and return a process exit code."""
+    if print_baseline:
+        if check_name != "architecture":
+            print("[FAIL] architecture-baseline")
+            print("  ERROR: --print-baseline requires '--check architecture'.")
+            return 1
+        print(render_architecture_baseline(repo_root), end="")
+        return 0
+
     contract_path = repo_root / "project" / "verification-contract.yml"
     ci_path = repo_root / ".github" / "workflows" / "ci.yml"
     readme_path = repo_root / "README.md"
@@ -218,6 +236,7 @@ def run_selected_checks(check_name: str, repo_root: Path) -> int:
             ci_path,
             readme_path,
         ),
+        "architecture": lambda: check_architecture_artifacts(repo_root),
         "parity": lambda: check_parity_artifacts(repo_root),
         "characterization": lambda: check_characterization_artifacts(repo_root),
     }
@@ -250,6 +269,14 @@ def build_parser() -> argparse.ArgumentParser:
         default="all",
         help="Select one check or run all checks.",
     )
+    parser.add_argument(
+        "--print-baseline",
+        action="store_true",
+        help=(
+            "Print generated architecture baseline JSON and exit. "
+            "Requires --check architecture."
+        ),
+    )
     return parser
 
 
@@ -258,4 +285,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     repo_root = Path(__file__).resolve().parents[2]
-    return run_selected_checks(args.check, repo_root)
+    return run_selected_checks(
+        args.check,
+        repo_root,
+        print_baseline=args.print_baseline,
+    )

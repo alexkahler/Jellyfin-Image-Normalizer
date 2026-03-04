@@ -287,12 +287,13 @@ def test_python_version_consistency_failure(governance_module, tmp_path: Path):
     assert any("expected 3.13, found 3.12" in error for error in result.errors)
 
 
-def test_supported_checks_include_characterization(governance_module):
-    """Governance CLI should expose the WI-004 characterization check selector."""
+def test_supported_checks_include_architecture_and_characterization(governance_module):
+    """Governance CLI should expose architecture and characterization selectors."""
     parser = governance_module.build_parser()
     check_action = next(
         action
         for action in parser._actions
         if action.dest == "check"  # noqa: SLF001
     )
+    assert "architecture" in check_action.choices
     assert "characterization" in check_action.choices

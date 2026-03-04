@@ -159,7 +159,11 @@ padding_remove_sensitivity = 0
 ## Development and Testing Notes
 - Dependencies (`requirements.txt`): Pillow, requests, pytest (for local testing).
 - Run tests with `PYTHONPATH=src python -m pytest` (PowerShell: `$env:PYTHONPATH="src"; python -m pytest`). Tests rely on mocks/stubs; no live Jellyfin calls are performed.
-- Run governance checks with `python project/scripts/verify_governance.py --check all` to validate CI/contract sync, LOC policy, and Python version consistency. Current Track 1 baseline includes known pre-existing LOC failures in `src/jfin/*`; WI-003 requires no additional failures beyond that baseline.
+- Run governance checks with `python project/scripts/verify_governance.py --check all` to validate CI/contract sync, LOC policy, and Python version consistency. Current Track 1 baseline includes known pre-existing LOC failures in `src/jfin/*`; slice work should not introduce additional failures beyond that baseline.
+- Run architecture checks with `python project/scripts/verify_governance.py --check architecture` to validate:
+  - ratcheted non-entry exit usage (`sys.exit`, `SystemExit`, `from sys import exit`, and `builtins.exit|quit`) against `project/architecture-baseline.json`
+  - conditional import boundaries for `src/jfin/domain/` and `src/jfin/app/services/`
+- Regenerate the architecture baseline snapshot with `python project/scripts/verify_governance.py --check architecture --print-baseline`.
 - Run parity-only checks with `python project/scripts/verify_governance.py --check parity` to validate `project/parity-matrix.md` and `project/route-fence.md`.
 - Run characterization linkage checks with `python project/scripts/verify_governance.py --check characterization` to validate baseline schema, parity linkage, owner test references, imaging manifest linkage, and artifact budgets for `CLI-*`, `CFG-*`, and `IMG-*` IDs.
 - Characterization suites live in `tests/characterization/cli_contract/`, `tests/characterization/config_contract/`, and `tests/characterization/imaging_contract/`, with baseline contracts in `tests/characterization/baselines/`.
