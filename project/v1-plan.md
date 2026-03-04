@@ -385,6 +385,7 @@ Each parity row must include:
 3. CLI/config characterization harness.
 4. Imaging golden harness.
 5. Architecture guard tests (import boundaries + no non-entry exits).
+6. Dry-run/write-gate + restore-safety contracts
 
 Each slice must define:
 
@@ -530,3 +531,6 @@ Create `/plans/WI_TEMPLATE.md` fields:
 3. Python baseline change is deferred to Track 2.
 4. Interface-breaking CLI/config changes are deferred to Track 2.
 5. Unrelated worktree deletions in `project/v1-checklist.md` and `project/v1-project-plan.md` are treated as out-of-scope.
+
+## 27) Addendum
+Slice 6 (WI-005) is adopted from WORK_ITEMS as a Track 1 prerequisite before strangler route flips.

@@ -1,0 +1,156 @@
+{
+  "version": 1,
+  "cases": {
+    "API-DRYRUN-001": {
+      "expected_observations": {
+        "result": {
+          "return_value": true,
+          "raises": null
+        },
+        "calls": {
+          "requests_post": 0
+        }
+      },
+      "expected_messages": [
+        "DRY RUN - Would upload normalized image"
+      ],
+      "notes": "Dry-run blocks item image POST uploads at the adapter layer."
+    },
+    "API-DRYRUN-002": {
+      "expected_observations": {
+        "result": {
+          "return_value": true,
+          "raises": null
+        },
+        "calls": {
+          "requests_delete": 0,
+          "requests_post": 0
+        }
+      },
+      "expected_messages": [
+        "DRY RUN - Would delete existing image",
+        "DRY RUN - Would upload normalized image"
+      ],
+      "notes": "Dry-run blocks profile DELETE+POST writes on /UserImage."
+    },
+    "API-DELETE-001": {
+      "expected_observations": {
+        "result": {
+          "return_value": false,
+          "raises": null
+        },
+        "calls": {
+          "requests_delete": 3
+        }
+      },
+      "notes": "Non-dry-run delete retries on non-ok responses for the configured retry_count."
+    },
+    "PIPE-DRYRUN-001": {
+      "expected_observations": {
+        "result": {
+          "return_value": true,
+          "raises": null
+        },
+        "calls": {
+          "app_upload_calls": 0,
+          "adapter_post_calls": 0
+        },
+        "stats": {
+          "app_successes": 1,
+          "adapter_successes": 1
+        }
+      },
+      "notes": "App dry-run bypasses upload, and adapter dry-run still blocks writes when app dry-run is disabled."
+    },
+    "PIPE-BACKDROP-001": {
+      "expected_observations": {
+        "result": {
+          "return_value": false,
+          "raises": null
+        },
+        "calls": {
+          "delete_calls": 2,
+          "upload_calls": 2
+        },
+        "stats": {
+          "successes": 1,
+          "errors": 1
+        },
+        "filesystem": {
+          "staging_retained": true
+        },
+        "ordering": [
+          "delete_before_upload"
+        ]
+      },
+      "notes": "Backdrop transaction deletes originals before upload and retains staging artifacts when uploads partially fail."
+    },
+    "RST-BULK-001": {
+      "expected_observations": {
+        "result": {
+          "return_value": null,
+          "raises": null
+        },
+        "calls": {
+          "item_upload_calls": 2,
+          "profile_upload_calls": 0
+        },
+        "stats": {
+          "successes": 2,
+          "errors": 0
+        }
+      },
+      "notes": "Bulk restore preserves contiguous backdrop index semantics."
+    },
+    "RST-SINGLE-001": {
+      "expected_observations": {
+        "result": {
+          "return_value": true,
+          "raises": null
+        },
+        "calls": {
+          "item_upload_calls": 2,
+          "profile_upload_calls": 0
+        },
+        "stats": {
+          "successes": 2,
+          "errors": 0
+        }
+      },
+      "notes": "Single-item restore preserves contiguous backdrop index semantics."
+    },
+    "RST-REFUSE-001": {
+      "expected_observations": {
+        "result": {
+          "return_value": null,
+          "raises": "SystemExit",
+          "exit_code": 1
+        },
+        "stats": {
+          "errors": 1
+        }
+      },
+      "expected_messages": [
+        "Backup directory does not exist"
+      ],
+      "notes": "Bulk restore refuses execution when backup root is missing (legacy Track 1 refusal semantics)."
+    },
+    "RST-PATH-001": {
+      "expected_observations": {
+        "result": {
+          "return_value": true,
+          "raises": null
+        },
+        "calls": {
+          "profile_upload_calls": 1,
+          "item_upload_calls": 1
+        },
+        "stats": {
+          "successes": 2,
+          "errors": 0
+        }
+      },
+      "notes": "Restore routes profile images to profile API and item images to item API."
+    }
+  }
+}

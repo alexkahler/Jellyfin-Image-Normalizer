@@ -38,12 +38,10 @@ def characterization_modules():
 
 
 def _escape_cell(value: str) -> str:
-    """Escape markdown pipe delimiters inside table cells."""
     return value.replace("|", "\\|")
 
 
 def _render_table(columns: list[str], rows: list[dict[str, str]]) -> str:
-    """Serialize one markdown table with deterministic row/column ordering."""
     lines = [
         "| " + " | ".join(_escape_cell(column) for column in columns) + " |",
         "| " + " | ".join(["---"] * len(columns)) + " |",
@@ -58,13 +56,11 @@ def _render_table(columns: list[str], rows: list[dict[str, str]]) -> str:
 
 
 def _write_file(path: Path, content: str) -> None:
-    """Write UTF-8 text content to disk, creating parent directories."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
 
 
 def _owner_test_for_behavior(behavior_id: str) -> tuple[str, str]:
-    """Map a behavior ID to deterministic owner test path/function names."""
     function_name = f"test_{behavior_id.lower().replace('-', '_')}"
     if behavior_id.startswith("CLI-"):
         return (
@@ -76,6 +72,21 @@ def _owner_test_for_behavior(behavior_id: str) -> tuple[str, str]:
             "tests/characterization/imaging_contract/test_imaging_contract_characterization.py",
             function_name,
         )
+    if behavior_id.startswith(("API-", "PIPE-", "RST-")):
+        if behavior_id.startswith("API-"):
+            return (
+                "tests/characterization/safety_contract/test_safety_contract_api.py",
+                function_name,
+            )
+        if behavior_id.startswith("PIPE-"):
+            return (
+                "tests/characterization/safety_contract/test_safety_contract_pipeline.py",
+                function_name,
+            )
+        return (
+            "tests/characterization/safety_contract/test_safety_contract_restore.py",
+            function_name,
+        )
     return (
         "tests/characterization/config_contract/test_config_contract_characterization.py",
         function_name,
@@ -83,10 +94,10 @@ def _owner_test_for_behavior(behavior_id: str) -> tuple[str, str]:
 
 
 def _write_owner_test_files(required_ids: list[str], repo_root: Path) -> None:
-    """Write deterministic owner test files containing required test functions."""
     cli_functions: list[str] = []
     cfg_functions: list[str] = []
     img_functions: list[str] = []
+    safety_functions: list[str] = []
     for behavior_id in required_ids:
         _path, function_name = _owner_test_for_behavior(behavior_id)
         function_line = f"def {function_name}():\n    assert True\n"
@@ -94,6 +105,8 @@ def _write_owner_test_files(required_ids: list[str], repo_root: Path) -> None:
             cli_functions.append(function_line)
         elif behavior_id.startswith("IMG-"):
             img_functions.append(function_line)
+        elif behavior_id.startswith(("API-", "PIPE-", "RST-")):
+            safety_functions.append(function_line)
         else:
             cfg_functions.append(function_line)
 
@@ -112,10 +125,31 @@ def _write_owner_test_files(required_ids: list[str], repo_root: Path) -> None:
         / "tests/characterization/imaging_contract/test_imaging_contract_characterization.py",
         "\n".join(img_functions) + "\n",
     )
+    safety_api_functions = [line for line in safety_functions if "test_api_" in line]
+    safety_pipeline_functions = [
+        line for line in safety_functions if "test_pipe_" in line
+    ]
+    safety_restore_functions = [
+        line for line in safety_functions if "test_rst_" in line
+    ]
+    _write_file(
+        repo_root
+        / "tests/characterization/safety_contract/test_safety_contract_api.py",
+        "\n".join(safety_api_functions) + "\n",
+    )
+    _write_file(
+        repo_root
+        / "tests/characterization/safety_contract/test_safety_contract_pipeline.py",
+        "\n".join(safety_pipeline_functions) + "\n",
+    )
+    _write_file(
+        repo_root
+        / "tests/characterization/safety_contract/test_safety_contract_restore.py",
+        "\n".join(safety_restore_functions) + "\n",
+    )
 
 
 def _build_valid_parity_rows(required_ids: list[str]) -> list[dict[str, str]]:
-    """Build valid parity matrix rows for required characterization behavior IDs."""
     rows: list[dict[str, str]] = []
     for behavior_id in required_ids:
         baseline_file = (
@@ -124,7 +158,11 @@ def _build_valid_parity_rows(required_ids: list[str]) -> list[dict[str, str]]:
             else (
                 "tests/characterization/baselines/imaging_contract_baseline.json"
                 if behavior_id.startswith("IMG-")
-                else "tests/characterization/baselines/config_contract_baseline.json"
+                else (
+                    "tests/characterization/baselines/safety_contract_baseline.json"
+                    if behavior_id.startswith(("API-", "PIPE-", "RST-"))
+                    else "tests/characterization/baselines/config_contract_baseline.json"
+                )
             )
         )
         owner_path, owner_function = _owner_test_for_behavior(behavior_id)
@@ -148,7 +186,6 @@ def _write_valid_artifacts(
     characterization_contract,
     parity_contract,
 ) -> tuple[Path, Path, Path]:
-    """Write baseline files, owner test files, and parity matrix for passing checks."""
     repo_root = tmp_path
     cli_payload = build_valid_baseline_payload(
         characterization_contract.CLI_BEHAVIOR_IDS
@@ -159,6 +196,10 @@ def _write_valid_artifacts(
     imaging_payload = build_valid_baseline_payload(
         characterization_contract.IMG_BEHAVIOR_IDS,
         imaging=True,
+    )
+    safety_payload = build_valid_baseline_payload(
+        characterization_contract.SAFETY_BEHAVIOR_IDS,
+        safety=True,
     )
     imaging_manifest = build_valid_imaging_manifest(
         characterization_contract.IMG_BEHAVIOR_IDS
@@ -177,10 +218,14 @@ def _write_valid_artifacts(
     imaging_baseline_path = (
         repo_root / "tests/characterization/baselines/imaging_contract_baseline.json"
     )
+    safety_baseline_path = (
+        repo_root / "tests/characterization/baselines/safety_contract_baseline.json"
+    )
     imaging_manifest_path = repo_root / "tests/golden/imaging/manifest.json"
     _write_file(cli_baseline_path, json.dumps(cli_payload, indent=2) + "\n")
     _write_file(cfg_baseline_path, json.dumps(cfg_payload, indent=2) + "\n")
     _write_file(imaging_baseline_path, json.dumps(imaging_payload, indent=2) + "\n")
+    _write_file(safety_baseline_path, json.dumps(safety_payload, indent=2) + "\n")
     _write_file(imaging_manifest_path, json.dumps(imaging_manifest, indent=2) + "\n")
 
     for behavior_id in characterization_contract.IMG_BEHAVIOR_IDS:
@@ -203,7 +248,6 @@ def _write_valid_artifacts(
 
 
 def test_characterization_check_valid_pass(characterization_modules, tmp_path: Path):
-    """Characterization checks should pass with valid artifacts and links."""
     characterization_contract, characterization_checks, parity_contract = (
         characterization_modules
     )
@@ -222,7 +266,6 @@ def test_characterization_fails_when_baseline_file_missing(
     characterization_modules,
     tmp_path: Path,
 ):
-    """Missing baseline files should fail characterization governance checks."""
     characterization_contract, characterization_checks, parity_contract = (
         characterization_modules
     )
@@ -241,7 +284,6 @@ def test_characterization_fails_when_required_behavior_id_missing(
     characterization_modules,
     tmp_path: Path,
 ):
-    """Missing required IDs in baseline cases should fail characterization checks."""
     characterization_contract, characterization_checks, parity_contract = (
         characterization_modules
     )

@@ -1,4 +1,4 @@
-"""Characterization artifact checks for WI-004 and WI-003 governance enforcement."""
+"""Characterization artifact checks for WI-004, WI-003, and WI-005 governance enforcement."""
 
 from __future__ import annotations
 
@@ -294,7 +294,7 @@ def _check_artifact_budget(
 
 
 def check_characterization_artifacts(repo_root: Path) -> CheckResult:
-    """Run WI-004 and WI-003 characterization linkage checks from repository root."""
+    """Run WI-004/WI-003/WI-005 characterization linkage checks from repository root."""
     result = CheckResult()
     baseline_cases_by_path = _load_and_validate_baselines(repo_root, result)
     imaging_manifest = _load_and_validate_imaging_manifest(repo_root, result)

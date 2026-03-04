@@ -166,10 +166,12 @@ padding_remove_sensitivity = 0
 - Regenerate the architecture baseline snapshot with `python project/scripts/verify_governance.py --check architecture --print-baseline`.
 - Run parity-only checks with `python project/scripts/verify_governance.py --check parity` to validate `project/parity-matrix.md` and `project/route-fence.md`.
 - Run characterization linkage checks with `python project/scripts/verify_governance.py --check characterization` to validate baseline schema, parity linkage, owner test references, imaging manifest linkage, and artifact budgets for `CLI-*`, `CFG-*`, and `IMG-*` IDs.
-- Characterization suites live in `tests/characterization/cli_contract/`, `tests/characterization/config_contract/`, and `tests/characterization/imaging_contract/`, with baseline contracts in `tests/characterization/baselines/`.
+- Characterization suites live in `tests/characterization/cli_contract/`, `tests/characterization/config_contract/`, `tests/characterization/imaging_contract/`, and `tests/characterization/safety_contract/`, with baseline contracts in `tests/characterization/baselines/`.
+- Safety contract baseline is `tests/characterization/baselines/safety_contract_baseline.json` and covers dry-run/write-gate + restore-safety invariants (`API-*`, `PIPE-*`, `RST-*` safety IDs).
 - Imaging golden artifacts are stored in `tests/golden/imaging/`:
   - expected outputs: `tests/golden/imaging/expected/`
   - real-ish fixtures: `tests/golden/imaging/fixtures/realish/`
   - provenance policy: `tests/golden/imaging/fixtures/PROVENANCE.md`
+- Track 1 migration note: Slice 6 restore safety assertions currently live under `tests/characterization/safety_contract/`; later migration may consolidate/alias them into `tests/characterization/restore_contract/` without changing behavior IDs.
 - Config tests cover TOML parsing/validation; runtime JSON configs are no longer supported.
 - When adding a new image mode, update `src/jfin/constants.py` (`MODE_CONFIG`, `IMAGE_TYPE_TO_MODE`, `MODE_TO_IMAGE_TYPE`, `FILENAME_CONFIG`), extend config parsing, and add a normalization branch in `imaging.build_normalized_image` plus pipeline wiring.

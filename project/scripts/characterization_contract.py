@@ -31,14 +31,27 @@ IMG_BEHAVIOR_IDS = [
     "IMG-CROP-001",
     "IMG-ENCODE-001",
 ]
+SAFETY_BEHAVIOR_IDS = [
+    "API-DRYRUN-001",
+    "API-DRYRUN-002",
+    "API-DELETE-001",
+    "PIPE-DRYRUN-001",
+    "PIPE-BACKDROP-001",
+    "RST-BULK-001",
+    "RST-SINGLE-001",
+    "RST-REFUSE-001",
+    "RST-PATH-001",
+]
 REQUIRED_CHARACTERIZATION_BEHAVIOR_IDS = [
     *CLI_BEHAVIOR_IDS,
     *CFG_BEHAVIOR_IDS,
     *IMG_BEHAVIOR_IDS,
+    *SAFETY_BEHAVIOR_IDS,
 ]
 IMAGING_BASELINE_PATH = (
     "tests/characterization/baselines/imaging_contract_baseline.json"
 )
+SAFETY_BASELINE_PATH = "tests/characterization/baselines/safety_contract_baseline.json"
 IMAGING_GOLDEN_MANIFEST_PATH = "tests/golden/imaging/manifest.json"
 IMAGING_EXPECTED_ROOT = "tests/golden/imaging/expected"
 IMAGING_FIXTURE_ROOT = "tests/golden/imaging/fixtures/realish"
@@ -51,6 +64,7 @@ REQUIRED_BASELINE_FILES = {
     "tests/characterization/baselines/cli_contract_baseline.json": CLI_BEHAVIOR_IDS,
     "tests/characterization/baselines/config_contract_baseline.json": CFG_BEHAVIOR_IDS,
     IMAGING_BASELINE_PATH: IMG_BEHAVIOR_IDS,
+    SAFETY_BASELINE_PATH: SAFETY_BEHAVIOR_IDS,
 }
 OPTIONAL_CASE_KEYS = {
     "expected_stats",
@@ -250,6 +264,116 @@ def _validate_imaging_case_schema(
         )
 
 
+def _is_scalar_like(value: Any) -> bool:
+    """Return True when value is JSON-scalar-like for baseline observations."""
+    return value is None or isinstance(value, (str, int, float, bool))
+
+
+def _validate_scalar_mapping(
+    *,
+    baseline_path: Path,
+    behavior_id: str,
+    field_name: str,
+    payload: Any,
+) -> None:
+    """Validate that a payload is an object with scalar-like leaf values."""
+    if not isinstance(payload, dict):
+        raise CharacterizationError(
+            f"{baseline_path}#{behavior_id} {field_name} must be an object."
+        )
+    for key, value in payload.items():
+        if not isinstance(key, str) or not key.strip():
+            raise CharacterizationError(
+                f"{baseline_path}#{behavior_id} {field_name} contains invalid key."
+            )
+        if not _is_scalar_like(value):
+            raise CharacterizationError(
+                f"{baseline_path}#{behavior_id} {field_name}.{key} must be a scalar "
+                "value."
+            )
+
+
+def _validate_safety_case_schema(
+    *,
+    baseline_path: Path,
+    behavior_id: str,
+    case_payload: Any,
+) -> None:
+    """Validate one safety baseline case payload against WI-005 schema rules."""
+    if not isinstance(case_payload, dict):
+        raise CharacterizationError(
+            f"{baseline_path}#{behavior_id} must be an object, found {type(case_payload)}."
+        )
+
+    allowed_keys = {"expected_observations", "expected_messages", "notes"}
+    unknown_keys = sorted(set(case_payload) - allowed_keys)
+    if unknown_keys:
+        raise CharacterizationError(
+            f"{baseline_path}#{behavior_id} has unknown keys: {unknown_keys}."
+        )
+
+    expected_observations = case_payload.get("expected_observations")
+    if not isinstance(expected_observations, dict):
+        raise CharacterizationError(
+            f"{baseline_path}#{behavior_id} missing required object: expected_observations."
+        )
+
+    result_payload = expected_observations.get("result")
+    if not isinstance(result_payload, dict):
+        raise CharacterizationError(
+            f"{baseline_path}#{behavior_id} expected_observations.result must be an object."
+        )
+    required_result_keys = {"return_value", "raises"}
+    missing_result_keys = sorted(required_result_keys - set(result_payload))
+    if missing_result_keys:
+        raise CharacterizationError(
+            f"{baseline_path}#{behavior_id} expected_observations.result missing keys: "
+            f"{missing_result_keys}."
+        )
+    for key in required_result_keys:
+        if not _is_scalar_like(result_payload[key]):
+            raise CharacterizationError(
+                f"{baseline_path}#{behavior_id} expected_observations.result.{key} "
+                "must be a scalar value."
+            )
+
+    for optional_object in ("calls", "stats", "filesystem"):
+        payload = expected_observations.get(optional_object)
+        if payload is None:
+            continue
+        _validate_scalar_mapping(
+            baseline_path=baseline_path,
+            behavior_id=behavior_id,
+            field_name=f"expected_observations.{optional_object}",
+            payload=payload,
+        )
+
+    ordering = expected_observations.get("ordering")
+    if ordering is not None:
+        if not isinstance(ordering, list) or not all(
+            isinstance(token, str) and token.strip() for token in ordering
+        ):
+            raise CharacterizationError(
+                f"{baseline_path}#{behavior_id} expected_observations.ordering must "
+                "be list[str]."
+            )
+
+    expected_messages = case_payload.get("expected_messages")
+    if expected_messages is not None:
+        if not isinstance(expected_messages, list) or not all(
+            isinstance(item, str) for item in expected_messages
+        ):
+            raise CharacterizationError(
+                f"{baseline_path}#{behavior_id} expected_messages must be list[str]."
+            )
+
+    notes = case_payload.get("notes")
+    if not isinstance(notes, str) or not notes.strip():
+        raise CharacterizationError(
+            f"{baseline_path}#{behavior_id} notes must be a non-empty string."
+        )
+
+
 def validate_baseline_case_schema(
     *,
     baseline_relpath: str,
@@ -260,6 +384,13 @@ def validate_baseline_case_schema(
     """Validate one baseline case payload using schema by baseline path."""
     if baseline_relpath == IMAGING_BASELINE_PATH:
         _validate_imaging_case_schema(
+            baseline_path=baseline_path,
+            behavior_id=behavior_id,
+            case_payload=case_payload,
+        )
+        return
+    if baseline_relpath == SAFETY_BASELINE_PATH:
+        _validate_safety_case_schema(
             baseline_path=baseline_path,
             behavior_id=behavior_id,
             case_payload=case_payload,

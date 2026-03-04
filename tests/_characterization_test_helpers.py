@@ -30,15 +30,33 @@ def _default_imaging_case_payload() -> dict[str, object]:
     }
 
 
+def _default_safety_case_payload() -> dict[str, object]:
+    """Build a valid minimal WI-005 safety baseline case payload."""
+    return {
+        "expected_observations": {
+            "result": {"return_value": True, "raises": None},
+            "calls": {"seed_calls": 0},
+        },
+        "expected_messages": [],
+        "notes": "seed",
+    }
+
+
 def build_valid_baseline_payload(
     required_ids: list[str],
     *,
     imaging: bool = False,
+    safety: bool = False,
 ) -> dict[str, Any]:
     """Build a valid baseline JSON payload for required behavior IDs."""
-    case_payload = (
-        _default_imaging_case_payload() if imaging else _default_case_payload()
-    )
+    if imaging and safety:
+        raise ValueError("imaging and safety payload flags are mutually exclusive.")
+    if imaging:
+        case_payload = _default_imaging_case_payload()
+    elif safety:
+        case_payload = _default_safety_case_payload()
+    else:
+        case_payload = _default_case_payload()
     return {
         "version": 1,
         "cases": {behavior_id: dict(case_payload) for behavior_id in required_ids},

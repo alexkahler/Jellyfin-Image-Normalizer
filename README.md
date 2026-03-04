@@ -461,13 +461,21 @@ Run characterization suites:
 PYTHONPATH=src python -m pytest -q tests/characterization/cli_contract/test_cli_contract_characterization.py
 PYTHONPATH=src python -m pytest -q tests/characterization/config_contract/test_config_contract_characterization.py
 PYTHONPATH=src python -m pytest -q tests/characterization/imaging_contract/test_imaging_contract_characterization.py
+PYTHONPATH=src python -m pytest -q tests/characterization/safety_contract
 ```
 
 Verification command policy is tracked in `project/verification-contract.yml`.
 Parity artifacts are tracked in `project/parity-matrix.md` and `project/route-fence.md`.
 Characterization baselines are tracked in `tests/characterization/baselines/`.
+Safety baseline coverage is tracked in
+`tests/characterization/baselines/safety_contract_baseline.json`.
 Architecture ratchet baseline is tracked in `project/architecture-baseline.json`.
 Imaging golden artifacts are tracked in `tests/golden/imaging/`.
+
+Track 1 note: Slice 6 introduces restore safety contracts under
+`tests/characterization/safety_contract/`; later migration may
+consolidate/alias these into `tests/characterization/restore_contract/`
+without changing behavior IDs.
 
 More details about the processing pipeline, classes, config TOML, and CLI entrypoints are documented in:
 
