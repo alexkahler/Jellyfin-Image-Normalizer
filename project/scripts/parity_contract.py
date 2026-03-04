@@ -43,6 +43,7 @@ REQUIRED_BEHAVIOR_IDS = [
     "API-QUERY-001",
     "API-WRITE-001",
     "API-DRYRUN-001",
+    "API-DRYRUN-002",
     "API-DELETE-001",
     "API-GETIMG-001",
     "API-RETRY-001",
@@ -64,6 +65,8 @@ REQUIRED_BEHAVIOR_IDS = [
     "BKP-PATH-001",
     "RST-BULK-001",
     "RST-SINGLE-001",
+    "RST-REFUSE-001",
+    "RST-PATH-001",
 ]
 REQUIRED_ROUTE_ROWS = [
     ("run", "logo"),
