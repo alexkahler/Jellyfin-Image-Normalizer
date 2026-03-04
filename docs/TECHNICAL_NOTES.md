@@ -165,7 +165,7 @@ padding_remove_sensitivity = 0
   - conditional import boundaries for `src/jfin/domain/` and `src/jfin/app/services/`
 - Regenerate the architecture baseline snapshot with `python project/scripts/verify_governance.py --check architecture --print-baseline`.
 - Run parity-only checks with `python project/scripts/verify_governance.py --check parity` to validate `project/parity-matrix.md` and `project/route-fence.md`.
-- Run characterization linkage checks with `python project/scripts/verify_governance.py --check characterization` to validate baseline schema, parity linkage, owner test references, imaging manifest linkage, and artifact budgets for `CLI-*`, `CFG-*`, and `IMG-*` IDs.
+- Run characterization linkage checks with `python project/scripts/verify_governance.py --check characterization` to validate baseline schema, parity linkage, owner test references, imaging manifest linkage, artifact budgets for `CLI-*`, `CFG-*`, and `IMG-*` IDs, and Surface Coverage Gate completeness via `project/surface-coverage-index.json` (including remaining unmapped CLI/config/observability report counters).
 - Characterization suites live in `tests/characterization/cli_contract/`, `tests/characterization/config_contract/`, `tests/characterization/imaging_contract/`, and `tests/characterization/safety_contract/`, with baseline contracts in `tests/characterization/baselines/`.
 - Safety contract baseline is `tests/characterization/baselines/safety_contract_baseline.json` and covers dry-run/write-gate + restore-safety invariants (`API-*`, `PIPE-*`, `RST-*` safety IDs).
 - Imaging golden artifacts are stored in `tests/golden/imaging/`:

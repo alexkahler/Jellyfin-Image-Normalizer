@@ -1,0 +1,1370 @@
+{
+  "version": 1,
+  "cli_items": [
+    {
+      "id": "cli.root.command",
+      "command_path": "root",
+      "source_token": "command:root",
+      "default_text": "",
+      "parity_ids": [
+        "OBS-EXITCODE-001"
+      ],
+      "owner_tests": [
+        "tests/test_jfin.py::test_main_exit_code_classes"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "src/jfin/cli.py:491"
+      ],
+      "notes": "Root command behavior is covered by exit-code class parity."
+    },
+    {
+      "id": "cli.root.mode.backdrop",
+      "command_path": "root",
+      "source_token": "backdrop",
+      "default_text": "",
+      "parity_ids": [
+        "PIPE-BACKDROP-001"
+      ],
+      "owner_tests": [
+        "tests/characterization/safety_contract/test_safety_contract_pipeline.py::test_pipe_backdrop_001_characterization"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "src/jfin/cli.py:102"
+      ],
+      "notes": "Track 1 mode behavior remains mapped."
+    },
+    {
+      "id": "cli.root.mode.logo",
+      "command_path": "root",
+      "source_token": "logo",
+      "default_text": "",
+      "parity_ids": [
+        "IMG-LOGO-001"
+      ],
+      "owner_tests": [
+        "tests/characterization/imaging_contract/test_imaging_contract_characterization.py::test_img_logo_001_characterization"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "src/jfin/cli.py:102"
+      ],
+      "notes": "Track 1 mode behavior remains mapped."
+    },
+    {
+      "id": "cli.root.mode.profile",
+      "command_path": "root",
+      "source_token": "profile",
+      "default_text": "",
+      "parity_ids": [
+        "RST-PATH-001"
+      ],
+      "owner_tests": [
+        "tests/characterization/safety_contract/test_safety_contract_restore.py::test_rst_path_001_characterization"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "src/jfin/cli.py:102"
+      ],
+      "notes": "Track 1 mode behavior remains mapped."
+    },
+    {
+      "id": "cli.root.mode.thumb",
+      "command_path": "root",
+      "source_token": "thumb",
+      "default_text": "",
+      "parity_ids": [
+        "IMG-CROP-001"
+      ],
+      "owner_tests": [
+        "tests/characterization/imaging_contract/test_imaging_contract_characterization.py::test_img_crop_001_characterization"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "src/jfin/cli.py:102"
+      ],
+      "notes": "Track 1 mode behavior remains mapped."
+    },
+    {
+      "id": "cli.root.option.--backdrop-jpeg-quality",
+      "command_path": "root",
+      "source_token": "--backdrop-jpeg-quality",
+      "default_text": "",
+      "parity_ids": [
+        "CLI-OVERRIDE-001"
+      ],
+      "owner_tests": [
+        "tests/characterization/cli_contract/test_cli_contract_characterization.py::test_cli_warns_for_incompatible_overrides"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "src/jfin/cli.py:140"
+      ],
+      "notes": "Unused-mode quality override warnings remain stable."
+    },
+    {
+      "id": "cli.root.option.--backdrop-target-size",
+      "command_path": "root",
+      "source_token": "--backdrop-target-size",
+      "default_text": "",
+      "parity_ids": [
+        "CFG-OVERRIDE-001"
+      ],
+      "owner_tests": [
+        "tests/characterization/config_contract/test_config_contract_characterization.py::test_config_apply_cli_overrides_applies_target_size"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "src/jfin/cli.py:121"
+      ],
+      "notes": "CLI target-size override behavior is preserved."
+    },
+    {
+      "id": "cli.root.option.--backup",
+      "command_path": "root",
+      "source_token": "--backup",
+      "default_text": "",
+      "parity_ids": [
+        "BKP-MODE-001"
+      ],
+      "owner_tests": [
+        "tests/test_backup.py::test_should_backup_for_plan_modes"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "src/jfin/cli.py:160"
+      ],
+      "notes": "Backup mode enablement semantics are covered."
+    },
+    {
+      "id": "cli.root.option.--config",
+      "command_path": "root",
+      "source_token": "--config",
+      "default_text": "config.toml in repo root",
+      "parity_ids": [
+        "CFG-TOML-001",
+        "CFG-TOML-002"
+      ],
+      "owner_tests": [
+        "tests/characterization/config_contract/test_config_contract_characterization.py::test_config_rejects_non_toml_paths",
+        "tests/characterization/config_contract/test_config_contract_characterization.py::test_config_parses_toml_and_builds_mode_settings"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "src/jfin/cli.py:77"
+      ],
+      "notes": "Config path contract and TOML parsing are preserved."
+    },
+    {
+      "id": "cli.root.option.--dry-run",
+      "command_path": "root",
+      "source_token": "--dry-run",
+      "default_text": "",
+      "parity_ids": [
+        "API-DRYRUN-001",
+        "PIPE-DRYRUN-001"
+      ],
+      "owner_tests": [
+        "tests/characterization/safety_contract/test_safety_contract_api.py::test_api_dryrun_001_characterization",
+        "tests/characterization/safety_contract/test_safety_contract_pipeline.py::test_pipe_dryrun_001_characterization"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "src/jfin/cli.py:154"
+      ],
+      "notes": "Dry-run dual gate remains preserved."
+    },
+    {
+      "id": "cli.root.option.--force-upload-noscale",
+      "command_path": "root",
+      "source_token": "--force-upload-noscale",
+      "default_text": "",
+      "parity_ids": [
+        "IMG-NOSCALE-001"
+      ],
+      "owner_tests": [
+        "tests/characterization/imaging_contract/test_imaging_contract_characterization.py::test_img_noscale_001_characterization"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "src/jfin/cli.py:239"
+      ],
+      "notes": "NO_SCALE upload forcing behavior is preserved."
+    },
+    {
+      "id": "cli.root.option.--generate-config",
+      "command_path": "root",
+      "source_token": "--generate-config",
+      "default_text": "",
+      "parity_ids": [
+        "CLI-GENCFG-001",
+        "OBS-EXITCODE-001"
+      ],
+      "owner_tests": [
+        "tests/characterization/cli_contract/test_cli_contract_characterization.py::test_cli_generate_config_blocks_operational_flags",
+        "tests/test_jfin.py::test_main_exit_code_classes"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "src/jfin/cli.py:85"
+      ],
+      "notes": "Generate-config exclusivity and exit semantics are covered."
+    },
+    {
+      "id": "cli.root.option.--help",
+      "command_path": "root",
+      "source_token": "--help",
+      "default_text": "",
+      "parity_ids": [],
+      "owner_tests": [],
+      "out_of_scope": true,
+      "out_of_scope_reason": "Help alias presentation tokens are out-of-scope for Track 1 behavior parity.",
+      "code_refs": [
+        "src/jfin/cli.py:64"
+      ],
+      "notes": "Explicitly scoped out."
+    },
+    {
+      "id": "cli.root.option.--item-types",
+      "command_path": "root",
+      "source_token": "--item-types",
+      "default_text": "",
+      "parity_ids": [
+        "CFG-DISC-001"
+      ],
+      "owner_tests": [
+        "tests/characterization/config_contract/test_config_contract_characterization.py::test_config_build_discovery_settings_maps_modes_and_filters"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "src/jfin/cli.py:228"
+      ],
+      "notes": "Discovery/API timing override behavior remains mapped."
+    },
+    {
+      "id": "cli.root.option.--jf-api-key",
+      "command_path": "root",
+      "source_token": "--jf-api-key",
+      "default_text": "",
+      "parity_ids": [
+        "CFG-CORE-001"
+      ],
+      "owner_tests": [
+        "tests/characterization/config_contract/test_config_contract_characterization.py::test_config_requires_core_fields"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "src/jfin/cli.py:218"
+      ],
+      "notes": "Core credential overrides are covered by config core-field contract."
+    },
+    {
+      "id": "cli.root.option.--jf-delay-ms",
+      "command_path": "root",
+      "source_token": "--jf-delay-ms",
+      "default_text": "",
+      "parity_ids": [
+        "API-RETRY-001"
+      ],
+      "owner_tests": [
+        "tests/test_client.py::test_get_retries_on_failure"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "src/jfin/cli.py:233"
+      ],
+      "notes": "Discovery/API timing override behavior remains mapped."
+    },
+    {
+      "id": "cli.root.option.--jf-url",
+      "command_path": "root",
+      "source_token": "--jf-url",
+      "default_text": "",
+      "parity_ids": [
+        "CFG-CORE-001"
+      ],
+      "owner_tests": [
+        "tests/characterization/config_contract/test_config_contract_characterization.py::test_config_requires_core_fields"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "src/jfin/cli.py:213"
+      ],
+      "notes": "Core credential overrides are covered by config core-field contract."
+    },
+    {
+      "id": "cli.root.option.--libraries",
+      "command_path": "root",
+      "source_token": "--libraries",
+      "default_text": "",
+      "parity_ids": [
+        "CFG-DISC-001"
+      ],
+      "owner_tests": [
+        "tests/characterization/config_contract/test_config_contract_characterization.py::test_config_build_discovery_settings_maps_modes_and_filters"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "src/jfin/cli.py:223"
+      ],
+      "notes": "Discovery/API timing override behavior remains mapped."
+    },
+    {
+      "id": "cli.root.option.--logo-padding",
+      "command_path": "root",
+      "source_token": "--logo-padding",
+      "default_text": "",
+      "parity_ids": [
+        "CLI-OVERRIDE-001",
+        "IMG-LOGO-001"
+      ],
+      "owner_tests": [
+        "tests/characterization/cli_contract/test_cli_contract_characterization.py::test_cli_warns_for_incompatible_overrides",
+        "tests/characterization/imaging_contract/test_imaging_contract_characterization.py::test_img_logo_001_characterization"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "src/jfin/cli.py:203"
+      ],
+      "notes": "Logo padding semantics and override warnings are preserved."
+    },
+    {
+      "id": "cli.root.option.--logo-target-size",
+      "command_path": "root",
+      "source_token": "--logo-target-size",
+      "default_text": "",
+      "parity_ids": [
+        "CFG-OVERRIDE-001"
+      ],
+      "owner_tests": [
+        "tests/characterization/config_contract/test_config_contract_characterization.py::test_config_apply_cli_overrides_applies_target_size"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "src/jfin/cli.py:109"
+      ],
+      "notes": "CLI target-size override behavior is preserved."
+    },
+    {
+      "id": "cli.root.option.--mode",
+      "command_path": "root",
+      "source_token": "--mode",
+      "default_text": "",
+      "parity_ids": [
+        "CLI-SINGLE-001",
+        "CFG-OPS-001"
+      ],
+      "owner_tests": [
+        "tests/characterization/cli_contract/test_cli_contract_characterization.py::test_cli_single_requires_explicit_mode",
+        "tests/characterization/config_contract/test_config_contract_characterization.py::test_config_parse_operations_dedupes_and_orders"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "src/jfin/cli.py:97"
+      ],
+      "notes": "Mode parsing and single-mode requirements remain preserved."
+    },
+    {
+      "id": "cli.root.option.--no-downscale",
+      "command_path": "root",
+      "source_token": "--no-downscale",
+      "default_text": "",
+      "parity_ids": [
+        "CFG-SCALEFLAGS-001"
+      ],
+      "owner_tests": [
+        "tests/test_imaging.py::test_make_scale_plan_blocks_all_scaling_when_both_directions_disallowed"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "src/jfin/cli.py:197"
+      ],
+      "notes": "Scaling-flag behavior is validated at decision layer."
+    },
+    {
+      "id": "cli.root.option.--no-upscale",
+      "command_path": "root",
+      "source_token": "--no-upscale",
+      "default_text": "",
+      "parity_ids": [
+        "CFG-SCALEFLAGS-001"
+      ],
+      "owner_tests": [
+        "tests/test_imaging.py::test_make_scale_plan_blocks_all_scaling_when_both_directions_disallowed"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "src/jfin/cli.py:191"
+      ],
+      "notes": "Scaling-flag behavior is validated at decision layer."
+    },
+    {
+      "id": "cli.root.option.--profile-target-size",
+      "command_path": "root",
+      "source_token": "--profile-target-size",
+      "default_text": "",
+      "parity_ids": [
+        "CFG-OVERRIDE-001"
+      ],
+      "owner_tests": [
+        "tests/characterization/config_contract/test_config_contract_characterization.py::test_config_apply_cli_overrides_applies_target_size"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "src/jfin/cli.py:127"
+      ],
+      "notes": "CLI target-size override behavior is preserved."
+    },
+    {
+      "id": "cli.root.option.--profile-webp-quality",
+      "command_path": "root",
+      "source_token": "--profile-webp-quality",
+      "default_text": "",
+      "parity_ids": [
+        "CLI-OVERRIDE-001"
+      ],
+      "owner_tests": [
+        "tests/characterization/cli_contract/test_cli_contract_characterization.py::test_cli_warns_for_incompatible_overrides"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "src/jfin/cli.py:147"
+      ],
+      "notes": "Unused-mode quality override warnings remain stable."
+    },
+    {
+      "id": "cli.root.option.--restore",
+      "command_path": "root",
+      "source_token": "--restore",
+      "default_text": "",
+      "parity_ids": [
+        "RST-SINGLE-001"
+      ],
+      "owner_tests": [
+        "tests/characterization/safety_contract/test_safety_contract_restore.py::test_rst_single_001_characterization"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "src/jfin/cli.py:174"
+      ],
+      "notes": "Restore single-path behavior remains preserved."
+    },
+    {
+      "id": "cli.root.option.--restore-all",
+      "command_path": "root",
+      "source_token": "--restore-all",
+      "default_text": "",
+      "parity_ids": [
+        "CLI-RESTORE-001",
+        "RST-BULK-001"
+      ],
+      "owner_tests": [
+        "tests/characterization/cli_contract/test_cli_contract_characterization.py::test_cli_restore_all_blocks_operational_flags",
+        "tests/characterization/safety_contract/test_safety_contract_restore.py::test_rst_bulk_001_characterization"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "src/jfin/cli.py:182"
+      ],
+      "notes": "Restore-all exclusivity and bulk restore behavior are preserved."
+    },
+    {
+      "id": "cli.root.option.--silent",
+      "command_path": "root",
+      "source_token": "--silent",
+      "default_text": "",
+      "parity_ids": [
+        "OBS-SUMLOG-001"
+      ],
+      "owner_tests": [
+        "tests/test_logging_utils.py::test_setup_logging_respects_silent_and_verbose_flags"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "src/jfin/cli.py:247"
+      ],
+      "notes": "CLI logging-toggle observability remains preserved."
+    },
+    {
+      "id": "cli.root.option.--single",
+      "command_path": "root",
+      "source_token": "--single",
+      "default_text": "",
+      "parity_ids": [
+        "CLI-SINGLE-001",
+        "PIPE-SINGLE-001"
+      ],
+      "owner_tests": [
+        "tests/characterization/cli_contract/test_cli_contract_characterization.py::test_cli_single_requires_explicit_mode",
+        "tests/test_pipeline.py::test_process_single_item_uses_direct_item_id"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "src/jfin/cli.py:166"
+      ],
+      "notes": "Single-target behavior contract is preserved."
+    },
+    {
+      "id": "cli.root.option.--test-jf",
+      "command_path": "root",
+      "source_token": "--test-jf",
+      "default_text": "",
+      "parity_ids": [
+        "CLI-TESTJF-001",
+        "OBS-EXITCODE-001"
+      ],
+      "owner_tests": [
+        "tests/characterization/cli_contract/test_cli_contract_characterization.py::test_cli_test_jf_blocks_operational_flags",
+        "tests/test_jfin.py::test_main_exit_code_classes"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "src/jfin/cli.py:91"
+      ],
+      "notes": "Test-jf exclusivity and exit classes are covered."
+    },
+    {
+      "id": "cli.root.option.--thumb-jpeg-quality",
+      "command_path": "root",
+      "source_token": "--thumb-jpeg-quality",
+      "default_text": "",
+      "parity_ids": [
+        "CLI-OVERRIDE-001"
+      ],
+      "owner_tests": [
+        "tests/characterization/cli_contract/test_cli_contract_characterization.py::test_cli_warns_for_incompatible_overrides"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "src/jfin/cli.py:133"
+      ],
+      "notes": "Unused-mode quality override warnings remain stable."
+    },
+    {
+      "id": "cli.root.option.--thumb-target-size",
+      "command_path": "root",
+      "source_token": "--thumb-target-size",
+      "default_text": "",
+      "parity_ids": [
+        "CFG-OVERRIDE-001"
+      ],
+      "owner_tests": [
+        "tests/characterization/config_contract/test_config_contract_characterization.py::test_config_apply_cli_overrides_applies_target_size"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "src/jfin/cli.py:115"
+      ],
+      "notes": "CLI target-size override behavior is preserved."
+    },
+    {
+      "id": "cli.root.option.--verbose",
+      "command_path": "root",
+      "source_token": "--verbose",
+      "default_text": "",
+      "parity_ids": [
+        "OBS-SUMLOG-001"
+      ],
+      "owner_tests": [
+        "tests/test_logging_utils.py::test_setup_logging_respects_silent_and_verbose_flags"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "src/jfin/cli.py:254"
+      ],
+      "notes": "CLI logging-toggle observability remains preserved."
+    },
+    {
+      "id": "cli.root.option.-h",
+      "command_path": "root",
+      "source_token": "-h",
+      "default_text": "",
+      "parity_ids": [],
+      "owner_tests": [],
+      "out_of_scope": true,
+      "out_of_scope_reason": "Help alias presentation tokens are out-of-scope for Track 1 behavior parity.",
+      "code_refs": [
+        "src/jfin/cli.py:64"
+      ],
+      "notes": "Explicitly scoped out."
+    },
+    {
+      "id": "cli.root.option.-s",
+      "command_path": "root",
+      "source_token": "-s",
+      "default_text": "",
+      "parity_ids": [
+        "OBS-SUMLOG-001"
+      ],
+      "owner_tests": [
+        "tests/test_logging_utils.py::test_setup_logging_respects_silent_and_verbose_flags"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "src/jfin/cli.py:248"
+      ],
+      "notes": "CLI logging-toggle observability remains preserved."
+    },
+    {
+      "id": "cli.root.option.-v",
+      "command_path": "root",
+      "source_token": "-v",
+      "default_text": "",
+      "parity_ids": [
+        "OBS-SUMLOG-001"
+      ],
+      "owner_tests": [
+        "tests/test_logging_utils.py::test_setup_logging_respects_silent_and_verbose_flags"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "src/jfin/cli.py:255"
+      ],
+      "notes": "CLI logging-toggle observability remains preserved."
+    }
+  ],
+  "config_items": [
+    {
+      "id": "config.api.api_retry_backoff_ms",
+      "parity_ids": [
+        "API-RETRY-001"
+      ],
+      "owner_tests": [
+        "tests/test_client.py::test_get_retries_on_failure"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "config.example.toml:16"
+      ],
+      "notes": "API config behavior mapped to retries/type/dry-run contracts."
+    },
+    {
+      "id": "config.api.api_retry_count",
+      "parity_ids": [
+        "API-RETRY-001"
+      ],
+      "owner_tests": [
+        "tests/test_client.py::test_get_retries_on_failure"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "config.example.toml:16"
+      ],
+      "notes": "API config behavior mapped to retries/type/dry-run contracts."
+    },
+    {
+      "id": "config.api.dry_run",
+      "parity_ids": [
+        "API-DRYRUN-001"
+      ],
+      "owner_tests": [
+        "tests/characterization/safety_contract/test_safety_contract_api.py::test_api_dryrun_001_characterization"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "config.example.toml:16"
+      ],
+      "notes": "API config behavior mapped to retries/type/dry-run contracts."
+    },
+    {
+      "id": "config.api.fail_fast",
+      "parity_ids": [
+        "CFG-TYPE-001"
+      ],
+      "owner_tests": [
+        "tests/characterization/config_contract/test_config_contract_characterization.py::test_config_rejects_invalid_types"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "config.example.toml:16"
+      ],
+      "notes": "API config behavior mapped to retries/type/dry-run contracts."
+    },
+    {
+      "id": "config.api.jf_delay_ms",
+      "parity_ids": [
+        "API-RETRY-001"
+      ],
+      "owner_tests": [
+        "tests/test_client.py::test_get_retries_on_failure"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "config.example.toml:16"
+      ],
+      "notes": "API config behavior mapped to retries/type/dry-run contracts."
+    },
+    {
+      "id": "config.api.timeout",
+      "parity_ids": [
+        "CFG-TYPE-001"
+      ],
+      "owner_tests": [
+        "tests/characterization/config_contract/test_config_contract_characterization.py::test_config_rejects_invalid_types"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "config.example.toml:16"
+      ],
+      "notes": "API config behavior mapped to retries/type/dry-run contracts."
+    },
+    {
+      "id": "config.api.verify_tls",
+      "parity_ids": [
+        "CFG-TYPE-001"
+      ],
+      "owner_tests": [
+        "tests/characterization/config_contract/test_config_contract_characterization.py::test_config_rejects_invalid_types"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "config.example.toml:16"
+      ],
+      "notes": "API config behavior mapped to retries/type/dry-run contracts."
+    },
+    {
+      "id": "config.backdrop.height",
+      "parity_ids": [
+        "CFG-TOML-002"
+      ],
+      "owner_tests": [
+        "tests/characterization/config_contract/test_config_contract_characterization.py::test_config_parses_toml_and_builds_mode_settings"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "config.example.toml:76"
+      ],
+      "notes": "Mode size settings remain preserved in runtime mapping."
+    },
+    {
+      "id": "config.backdrop.jpeg_quality",
+      "parity_ids": [
+        "IMG-ENCODE-001"
+      ],
+      "owner_tests": [
+        "tests/characterization/imaging_contract/test_imaging_contract_characterization.py::test_img_encode_001_characterization"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "config.example.toml:111"
+      ],
+      "notes": "Encoder quality behavior remains mapped."
+    },
+    {
+      "id": "config.backdrop.no_downscale",
+      "parity_ids": [
+        "CFG-SCALEFLAGS-001"
+      ],
+      "owner_tests": [
+        "tests/test_imaging.py::test_make_scale_plan_blocks_all_scaling_when_both_directions_disallowed"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "config.example.toml:82"
+      ],
+      "notes": "Scaling flags are validated at decision behavior layer."
+    },
+    {
+      "id": "config.backdrop.no_upscale",
+      "parity_ids": [
+        "CFG-SCALEFLAGS-001"
+      ],
+      "owner_tests": [
+        "tests/test_imaging.py::test_make_scale_plan_blocks_all_scaling_when_both_directions_disallowed"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "config.example.toml:82"
+      ],
+      "notes": "Scaling flags are validated at decision behavior layer."
+    },
+    {
+      "id": "config.backdrop.width",
+      "parity_ids": [
+        "CFG-TOML-002"
+      ],
+      "owner_tests": [
+        "tests/characterization/config_contract/test_config_contract_characterization.py::test_config_parses_toml_and_builds_mode_settings"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "config.example.toml:76"
+      ],
+      "notes": "Mode size settings remain preserved in runtime mapping."
+    },
+    {
+      "id": "config.backup.backup",
+      "parity_ids": [
+        "BKP-MODE-001"
+      ],
+      "owner_tests": [
+        "tests/test_backup.py::test_should_backup_for_plan_modes"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "config.example.toml:34"
+      ],
+      "notes": "Backup configuration behavior remains mapped."
+    },
+    {
+      "id": "config.backup.backup_dir",
+      "parity_ids": [
+        "BKP-PATH-001"
+      ],
+      "owner_tests": [
+        "tests/test_backup.py::test_backup_path_for_image"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "config.example.toml:40"
+      ],
+      "notes": "Backup configuration behavior remains mapped."
+    },
+    {
+      "id": "config.backup.backup_mode",
+      "parity_ids": [
+        "BKP-MODE-001"
+      ],
+      "owner_tests": [
+        "tests/test_backup.py::test_should_backup_for_plan_modes"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "config.example.toml:37"
+      ],
+      "notes": "Backup configuration behavior remains mapped."
+    },
+    {
+      "id": "config.backup.force_upload_noscale",
+      "parity_ids": [
+        "IMG-NOSCALE-001"
+      ],
+      "owner_tests": [
+        "tests/characterization/imaging_contract/test_imaging_contract_characterization.py::test_img_noscale_001_characterization"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "config.example.toml:43"
+      ],
+      "notes": "Backup configuration behavior remains mapped."
+    },
+    {
+      "id": "config.libraries.names",
+      "parity_ids": [
+        "CFG-DISC-001"
+      ],
+      "owner_tests": [
+        "tests/characterization/config_contract/test_config_contract_characterization.py::test_config_build_discovery_settings_maps_modes_and_filters"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "config.example.toml:47"
+      ],
+      "notes": "Discovery operation settings remain preserved."
+    },
+    {
+      "id": "config.logging.cli_level",
+      "parity_ids": [
+        "OBS-SUMLOG-001"
+      ],
+      "owner_tests": [
+        "tests/test_logging_utils.py::test_setup_logging_respects_silent_and_verbose_flags"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "config.example.toml:58"
+      ],
+      "notes": "Logging config behavior mapped to summary/logging observability parity."
+    },
+    {
+      "id": "config.logging.file_enabled",
+      "parity_ids": [
+        "OBS-SUMLOG-001"
+      ],
+      "owner_tests": [
+        "tests/test_logging_utils.py::test_setup_logging_respects_silent_and_verbose_flags"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "config.example.toml:58"
+      ],
+      "notes": "Logging config behavior mapped to summary/logging observability parity."
+    },
+    {
+      "id": "config.logging.file_level",
+      "parity_ids": [
+        "OBS-SUMLOG-001"
+      ],
+      "owner_tests": [
+        "tests/test_logging_utils.py::test_setup_logging_respects_silent_and_verbose_flags"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "config.example.toml:58"
+      ],
+      "notes": "Logging config behavior mapped to summary/logging observability parity."
+    },
+    {
+      "id": "config.logging.file_path",
+      "parity_ids": [
+        "OBS-SUMLOG-001"
+      ],
+      "owner_tests": [
+        "tests/test_logging_utils.py::test_setup_logging_respects_silent_and_verbose_flags"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "config.example.toml:58"
+      ],
+      "notes": "Logging config behavior mapped to summary/logging observability parity."
+    },
+    {
+      "id": "config.logging.silent",
+      "parity_ids": [
+        "OBS-SUMLOG-001"
+      ],
+      "owner_tests": [
+        "tests/test_logging_utils.py::test_setup_logging_respects_silent_and_verbose_flags"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "config.example.toml:58"
+      ],
+      "notes": "Logging config behavior mapped to summary/logging observability parity."
+    },
+    {
+      "id": "config.logo.height",
+      "parity_ids": [
+        "CFG-TOML-002"
+      ],
+      "owner_tests": [
+        "tests/characterization/config_contract/test_config_contract_characterization.py::test_config_parses_toml_and_builds_mode_settings"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "config.example.toml:76"
+      ],
+      "notes": "Mode size settings remain preserved in runtime mapping."
+    },
+    {
+      "id": "config.logo.no_downscale",
+      "parity_ids": [
+        "CFG-SCALEFLAGS-001"
+      ],
+      "owner_tests": [
+        "tests/test_imaging.py::test_make_scale_plan_blocks_all_scaling_when_both_directions_disallowed"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "config.example.toml:82"
+      ],
+      "notes": "Scaling flags are validated at decision behavior layer."
+    },
+    {
+      "id": "config.logo.no_upscale",
+      "parity_ids": [
+        "CFG-SCALEFLAGS-001"
+      ],
+      "owner_tests": [
+        "tests/test_imaging.py::test_make_scale_plan_blocks_all_scaling_when_both_directions_disallowed"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "config.example.toml:82"
+      ],
+      "notes": "Scaling flags are validated at decision behavior layer."
+    },
+    {
+      "id": "config.logo.padding",
+      "parity_ids": [
+        "IMG-LOGO-001"
+      ],
+      "owner_tests": [
+        "tests/characterization/imaging_contract/test_imaging_contract_characterization.py::test_img_logo_001_characterization"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "config.example.toml:88"
+      ],
+      "notes": "Logo padding policy behavior remains preserved."
+    },
+    {
+      "id": "config.logo.padding_remove_sensitivity",
+      "parity_ids": [
+        "IMG-LOGO-001"
+      ],
+      "owner_tests": [
+        "tests/characterization/imaging_contract/test_imaging_contract_characterization.py::test_img_logo_001_characterization"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "config.example.toml:94"
+      ],
+      "notes": "Logo padding sensitivity behavior remains preserved."
+    },
+    {
+      "id": "config.logo.width",
+      "parity_ids": [
+        "CFG-TOML-002"
+      ],
+      "owner_tests": [
+        "tests/characterization/config_contract/test_config_contract_characterization.py::test_config_parses_toml_and_builds_mode_settings"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "config.example.toml:76"
+      ],
+      "notes": "Mode size settings remain preserved in runtime mapping."
+    },
+    {
+      "id": "config.modes.item_types",
+      "parity_ids": [
+        "CFG-DISC-001"
+      ],
+      "owner_tests": [
+        "tests/characterization/config_contract/test_config_contract_characterization.py::test_config_build_discovery_settings_maps_modes_and_filters"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "config.example.toml:47"
+      ],
+      "notes": "Discovery operation settings remain preserved."
+    },
+    {
+      "id": "config.modes.operations",
+      "parity_ids": [
+        "CFG-OPS-001"
+      ],
+      "owner_tests": [
+        "tests/characterization/config_contract/test_config_contract_characterization.py::test_config_parse_operations_dedupes_and_orders"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "config.example.toml:47"
+      ],
+      "notes": "Discovery operation settings remain preserved."
+    },
+    {
+      "id": "config.profile.height",
+      "parity_ids": [
+        "CFG-TOML-002"
+      ],
+      "owner_tests": [
+        "tests/characterization/config_contract/test_config_contract_characterization.py::test_config_parses_toml_and_builds_mode_settings"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "config.example.toml:76"
+      ],
+      "notes": "Mode size settings remain preserved in runtime mapping."
+    },
+    {
+      "id": "config.profile.no_downscale",
+      "parity_ids": [
+        "CFG-SCALEFLAGS-001"
+      ],
+      "owner_tests": [
+        "tests/test_imaging.py::test_make_scale_plan_blocks_all_scaling_when_both_directions_disallowed"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "config.example.toml:82"
+      ],
+      "notes": "Scaling flags are validated at decision behavior layer."
+    },
+    {
+      "id": "config.profile.no_upscale",
+      "parity_ids": [
+        "CFG-SCALEFLAGS-001"
+      ],
+      "owner_tests": [
+        "tests/test_imaging.py::test_make_scale_plan_blocks_all_scaling_when_both_directions_disallowed"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "config.example.toml:82"
+      ],
+      "notes": "Scaling flags are validated at decision behavior layer."
+    },
+    {
+      "id": "config.profile.webp_quality",
+      "parity_ids": [
+        "IMG-ENCODE-001"
+      ],
+      "owner_tests": [
+        "tests/characterization/imaging_contract/test_imaging_contract_characterization.py::test_img_encode_001_characterization"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "config.example.toml:111"
+      ],
+      "notes": "Encoder quality behavior remains mapped."
+    },
+    {
+      "id": "config.profile.width",
+      "parity_ids": [
+        "CFG-TOML-002"
+      ],
+      "owner_tests": [
+        "tests/characterization/config_contract/test_config_contract_characterization.py::test_config_parses_toml_and_builds_mode_settings"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "config.example.toml:76"
+      ],
+      "notes": "Mode size settings remain preserved in runtime mapping."
+    },
+    {
+      "id": "config.server.jf_api_key",
+      "parity_ids": [
+        "CFG-CORE-001"
+      ],
+      "owner_tests": [
+        "tests/characterization/config_contract/test_config_contract_characterization.py::test_config_requires_core_fields"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "config.example.toml:7"
+      ],
+      "notes": "Core credentials remain required."
+    },
+    {
+      "id": "config.server.jf_url",
+      "parity_ids": [
+        "CFG-CORE-001"
+      ],
+      "owner_tests": [
+        "tests/characterization/config_contract/test_config_contract_characterization.py::test_config_requires_core_fields"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "config.example.toml:7"
+      ],
+      "notes": "Core credentials remain required."
+    },
+    {
+      "id": "config.thumb.height",
+      "parity_ids": [
+        "CFG-TOML-002"
+      ],
+      "owner_tests": [
+        "tests/characterization/config_contract/test_config_contract_characterization.py::test_config_parses_toml_and_builds_mode_settings"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "config.example.toml:76"
+      ],
+      "notes": "Mode size settings remain preserved in runtime mapping."
+    },
+    {
+      "id": "config.thumb.jpeg_quality",
+      "parity_ids": [
+        "IMG-ENCODE-001"
+      ],
+      "owner_tests": [
+        "tests/characterization/imaging_contract/test_imaging_contract_characterization.py::test_img_encode_001_characterization"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "config.example.toml:111"
+      ],
+      "notes": "Encoder quality behavior remains mapped."
+    },
+    {
+      "id": "config.thumb.no_downscale",
+      "parity_ids": [
+        "CFG-SCALEFLAGS-001"
+      ],
+      "owner_tests": [
+        "tests/test_imaging.py::test_make_scale_plan_blocks_all_scaling_when_both_directions_disallowed"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "config.example.toml:82"
+      ],
+      "notes": "Scaling flags are validated at decision behavior layer."
+    },
+    {
+      "id": "config.thumb.no_upscale",
+      "parity_ids": [
+        "CFG-SCALEFLAGS-001"
+      ],
+      "owner_tests": [
+        "tests/test_imaging.py::test_make_scale_plan_blocks_all_scaling_when_both_directions_disallowed"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "config.example.toml:82"
+      ],
+      "notes": "Scaling flags are validated at decision behavior layer."
+    },
+    {
+      "id": "config.thumb.width",
+      "parity_ids": [
+        "CFG-TOML-002"
+      ],
+      "owner_tests": [
+        "tests/characterization/config_contract/test_config_contract_characterization.py::test_config_parses_toml_and_builds_mode_settings"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "config.example.toml:76"
+      ],
+      "notes": "Mode size settings remain preserved in runtime mapping."
+    }
+  ],
+  "observability_items": [
+    {
+      "id": "obs.exit_codes.major_classes",
+      "parity_ids": [
+        "OBS-EXITCODE-001"
+      ],
+      "owner_tests": [
+        "tests/test_jfin.py::test_main_exit_code_classes"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "src/jfin/cli.py:753"
+      ],
+      "notes": "Major exit-code classes remain preserved."
+    },
+    {
+      "id": "obs.summary.counters",
+      "parity_ids": [
+        "OBS-SUMLOG-001"
+      ],
+      "owner_tests": [
+        "tests/test_logging_utils.py::test_log_run_summary_reports_counters_and_failures"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "src/jfin/logging_utils.py:161"
+      ],
+      "notes": "Summary counter output remains preserved."
+    },
+    {
+      "id": "obs.summary.failure_list",
+      "parity_ids": [
+        "OBS-SUMLOG-001"
+      ],
+      "owner_tests": [
+        "tests/test_logging_utils.py::test_log_run_summary_reports_counters_and_failures"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "src/jfin/logging_utils.py:169"
+      ],
+      "notes": "Failure list output shape remains preserved."
+    },
+    {
+      "id": "obs.summary.scale_decision_reporting",
+      "parity_ids": [
+        "OBS-SUMLOG-001"
+      ],
+      "owner_tests": [
+        "tests/test_imaging.py::test_make_scale_plan_blocks_all_scaling_when_both_directions_disallowed"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "src/jfin/imaging.py:104"
+      ],
+      "notes": "Scale decision reporting inputs remain preserved."
+    },
+    {
+      "id": "obs.summary.warning_error_presence",
+      "parity_ids": [
+        "OBS-SUMLOG-001"
+      ],
+      "owner_tests": [
+        "tests/test_logging_utils.py::test_log_run_summary_reports_counters_and_failures"
+      ],
+      "out_of_scope": false,
+      "out_of_scope_reason": "",
+      "code_refs": [
+        "src/jfin/logging_utils.py:162"
+      ],
+      "notes": "Warning/error counter visibility remains preserved."
+    }
+  ]
+}

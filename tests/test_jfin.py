@@ -248,3 +248,47 @@ def test_backup_disallowed_with_restore(tmp_path, monkeypatch):
     with pytest.raises(SystemExit) as excinfo:
         main()
     assert excinfo.value.code == 1
+
+
+def test_main_exit_code_classes(tmp_path, monkeypatch):
+    success_config = tmp_path / "generated-config.toml"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["jfin", "--generate-config", "--config", str(success_config)],
+    )
+    with pytest.raises(SystemExit) as success_exc:
+        main()
+    assert success_exc.value.code == 0
+    assert success_config.exists()
+
+    runtime_config = tmp_path / "runtime.toml"
+    runtime_config.write_text(
+        """
+        jf_url = "https://demo.example.com"
+        jf_api_key = "token"
+
+        [logging]
+        file_enabled = false
+        silent = true
+        """,
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["jfin", "--config", str(runtime_config), "--restore-all", "--restore"],
+    )
+    with pytest.raises(SystemExit) as validation_exc:
+        main()
+    assert validation_exc.value.code == 1
+
+    def _raise_runtime_error(_path):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr("jfin.cli.load_config_from_path", _raise_runtime_error)
+    monkeypatch.setattr(sys, "argv", ["jfin", "--config", str(runtime_config)])
+    with pytest.raises(SystemExit) as runtime_exc:
+        main()
+    assert runtime_exc.value.code == 1

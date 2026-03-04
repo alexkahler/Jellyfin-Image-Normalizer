@@ -31,6 +31,22 @@ def test_make_scale_plan_upscale(rgb_image_bytes):
     assert (plan.new_width, plan.new_height) == (200, 100)
 
 
+def test_make_scale_plan_blocks_all_scaling_when_both_directions_disallowed(
+    rgb_image_bytes,
+):
+    img = Image.open(io.BytesIO(rgb_image_bytes(size=(100, 50))))
+    plan = make_scale_plan(
+        img,
+        target_w=200,
+        target_h=100,
+        fit_mode="fit",
+        allow_upscale=False,
+        allow_downscale=False,
+    )
+    assert plan.decision == "NO_SCALE"
+    assert (plan.new_width, plan.new_height) == (100, 50)
+
+
 def test_handle_no_scale_dry_run_skips_upload():
     called = []
 
