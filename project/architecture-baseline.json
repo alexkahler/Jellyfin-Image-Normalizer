@@ -1,0 +1,33 @@
+{
+  "entry_exit_modules": [
+    "src/jfin/cli.py"
+  ],
+  "non_entry_exit_allowlist": {
+    "src/jfin/backup.py": {
+      "builtins_exit_calls": 0,
+      "sys_exit_calls": 0,
+      "sys_import_exit_calls": 0,
+      "system_exit_raises": 1
+    },
+    "src/jfin/config.py": {
+      "builtins_exit_calls": 0,
+      "sys_exit_calls": 10,
+      "sys_import_exit_calls": 0,
+      "system_exit_raises": 0
+    },
+    "src/jfin/discovery.py": {
+      "builtins_exit_calls": 0,
+      "sys_exit_calls": 0,
+      "sys_import_exit_calls": 0,
+      "system_exit_raises": 2
+    },
+    "src/jfin/pipeline.py": {
+      "builtins_exit_calls": 0,
+      "sys_exit_calls": 0,
+      "sys_import_exit_calls": 0,
+      "system_exit_raises": 5
+    }
+  },
+  "v1_root": "src/jfin",
+  "version": 1
+}
