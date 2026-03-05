@@ -31,6 +31,7 @@ SUPPORTED_CHECKS = (
     "characterization",
 )
 EXPECTED_VENV_BOOTSTRAP = "python -m venv .venv"
+EXPECTED_GOVERNANCE_INSTALL_PREFIX = "./.venv/bin/python -m pip install"
 
 
 def _extract_ci_job_block(ci_text: str, job_name: str) -> str | None:
@@ -90,6 +91,18 @@ def check_ci_contract_sync(
             "CI governance job must execute "
             "'./.venv/bin/python project/scripts/verify_governance.py --check all'."
         )
+    governance_block = required_job_blocks.get("governance")
+    if governance_block is not None:
+        if EXPECTED_GOVERNANCE_INSTALL_PREFIX not in governance_block:
+            result.add_error(
+                "CI workflow job 'governance' must install dependencies in .venv "
+                "before running governance checks."
+            )
+        if "pytest" not in governance_block:
+            result.add_error(
+                "CI workflow job 'governance' install step must include pytest "
+                "availability."
+            )
 
     return result
 
@@ -255,6 +268,44 @@ def _print_check_result(check_name: str, result: CheckResult) -> None:
             print("  INFO: Characterization collectability/linkage OK")
         else:
             print("  INFO: Characterization collectability/linkage NOT OK")
+    runtime_gate_report = getattr(result, "runtime_gate_report", None)
+    if runtime_gate_report is not None:
+        print(
+            "  INFO: Characterization runtime gate targets configured: "
+            f"{len(runtime_gate_report.configured_targets)}"
+        )
+        print(
+            "  INFO: Characterization runtime gate targets checked: "
+            f"{runtime_gate_report.checked_targets}"
+        )
+        print(
+            "  INFO: Characterization runtime gate targets passed: "
+            f"{runtime_gate_report.passed_targets}"
+        )
+        print(
+            "  INFO: Characterization runtime gate targets failed: "
+            f"{runtime_gate_report.failed_targets}"
+        )
+        print(
+            "  INFO: Characterization runtime gate elapsed seconds: "
+            f"{runtime_gate_report.elapsed_seconds:.3f}"
+        )
+        print(
+            "  INFO: Characterization runtime gate budget seconds: "
+            f"{runtime_gate_report.budget_seconds}"
+        )
+        print(
+            "  INFO: Characterization runtime gate mapped parity ids: "
+            f"{len(runtime_gate_report.mapped_parity_ids)}"
+        )
+        for info_line in runtime_gate_report.infos:
+            print(f"  INFO: {info_line}")
+        if runtime_gate_report.failed_targets == 0 and not any(
+            warning.startswith("runtime_gate.") for warning in result.warnings
+        ):
+            print("  INFO: Characterization runtime gate OK (warn)")
+        else:
+            print("  INFO: Characterization runtime gate NOT OK (warn)")
     for warning in result.warnings:
         print(f"  WARN: {warning}")
     for error in result.errors:

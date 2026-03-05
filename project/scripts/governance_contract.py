@@ -15,6 +15,8 @@ EXPECTED_VERIFICATION_COMMANDS = [
     "./.venv/bin/python -m pip_audit",
 ]
 EXPECTED_REQUIRED_CI_JOBS = ["test", "security", "quality", "governance"]
+EXPECTED_RUNTIME_GATE_TARGETS = ["tests/characterization/safety_contract"]
+EXPECTED_RUNTIME_GATE_BUDGET_SECONDS = 180
 
 
 class GovernanceError(Exception):
@@ -32,6 +34,14 @@ class LocPolicy:
 
 
 @dataclass(frozen=True)
+class RuntimeGatePolicy:
+    """Runtime characterization gate policy from verification contract."""
+
+    targets: list[str]
+    budget_seconds: int
+
+
+@dataclass(frozen=True)
 class VerificationContract:
     """Parsed verification-contract values used by governance checks."""
 
@@ -40,6 +50,7 @@ class VerificationContract:
     verification_commands: list[str]
     required_ci_jobs: list[str]
     loc_policy: LocPolicy
+    runtime_gate: RuntimeGatePolicy
 
 
 @dataclass
@@ -151,6 +162,14 @@ def parse_verification_contract(contract_path: Path) -> VerificationContract:
         _extract_indented_block(text, "required_ci_jobs"),
         "required_ci_jobs",
     )
+    runtime_gate_targets = _parse_list_block(
+        _extract_indented_block(text, "characterization_runtime_gate_targets"),
+        "characterization_runtime_gate_targets",
+    )
+    runtime_gate_budget_seconds = _parse_positive_int(
+        _extract_scalar(text, "characterization_runtime_gate_budget_seconds"),
+        "characterization_runtime_gate_budget_seconds",
+    )
 
     loc_policy_map = _parse_map_block(
         _extract_indented_block(text, "loc_policy"),
@@ -172,6 +191,10 @@ def parse_verification_contract(contract_path: Path) -> VerificationContract:
         ),
         tests_mode=loc_policy_map["tests_mode"],
     )
+    runtime_gate = RuntimeGatePolicy(
+        targets=runtime_gate_targets,
+        budget_seconds=runtime_gate_budget_seconds,
+    )
 
     return VerificationContract(
         version=version,
@@ -179,6 +202,7 @@ def parse_verification_contract(contract_path: Path) -> VerificationContract:
         verification_commands=verification_commands,
         required_ci_jobs=required_ci_jobs,
         loc_policy=loc_policy,
+        runtime_gate=runtime_gate,
     )
 
 
@@ -209,5 +233,15 @@ def check_contract_schema(contract: VerificationContract) -> CheckResult:
         result.add_error("loc_policy.tests_max_lines must be 300.")
     if contract.loc_policy.tests_mode != "warn":
         result.add_error("loc_policy.tests_mode must be 'warn'.")
+    if contract.runtime_gate.targets != EXPECTED_RUNTIME_GATE_TARGETS:
+        result.add_error(
+            "characterization_runtime_gate_targets must be exactly "
+            f"{EXPECTED_RUNTIME_GATE_TARGETS}, found {contract.runtime_gate.targets}."
+        )
+    if contract.runtime_gate.budget_seconds != EXPECTED_RUNTIME_GATE_BUDGET_SECONDS:
+        result.add_error(
+            "characterization_runtime_gate_budget_seconds must be "
+            f"{EXPECTED_RUNTIME_GATE_BUDGET_SECONDS}."
+        )
 
     return result
