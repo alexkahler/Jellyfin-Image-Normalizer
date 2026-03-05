@@ -14,6 +14,7 @@ from tests.characterization._harness import (
     assert_expected_stats_subset,
     build_minimal_runtime_config_text,
     load_baseline_cases,
+    merge_observed_messages,
 )
 
 
@@ -79,3 +80,21 @@ def test_harness_expected_messages_fails_for_missing_token() -> None:
     """Harness should raise on missing message tokens for baseline checks."""
     with pytest.raises(AssertionError):
         assert_expected_messages(["required-token"], ["irrelevant output"])
+
+
+def test_harness_merge_observed_messages_strips_ansi_and_deduplicates() -> None:
+    """Message merge should normalize ANSI wrappers without rewriting semantics."""
+    merged = merge_observed_messages(
+        ["\x1b[1;31mcritical message\x1b[0m", "critical message"],
+        ["secondary message"],
+    )
+    assert merged == ["critical message", "secondary message"]
+
+
+def test_harness_expected_messages_negative_control_precision() -> None:
+    """Near-match text should fail to avoid permissive token regressions."""
+    with pytest.raises(AssertionError):
+        assert_expected_messages(
+            ["DRY RUN - Would upload normalized image"],
+            ["DRY RUN - Would upload image"],
+        )

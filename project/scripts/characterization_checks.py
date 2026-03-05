@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+import os
+import re
+import subprocess
+import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -25,9 +30,213 @@ from characterization_contract import (
     parse_owner_test_reference,
     validate_baseline_case_schema,
 )
-from governance_contract import CheckResult
+from governance_contract import (
+    CheckResult,
+    GovernanceError,
+    parse_verification_contract,
+)
 from parity_contract import REQUIRED_PARITY_COLUMNS, load_markdown_table
 from surface_coverage_checks import check_surface_coverage_artifacts
+
+REQUIRED_COLLECTABILITY_PYTEST_COMMAND = "PYTHONPATH=src ./.venv/bin/python -m pytest"
+COLLECT_ONLY_NODEID_PATTERN = re.compile(r"^tests[\\/].+::.+$")
+
+
+@dataclass(frozen=True)
+class CollectabilityReport:
+    """Collectability counters surfaced by governance output."""
+
+    total_owner_nodeids: int
+    resolved_owner_nodeids: int
+    unresolved_owner_nodeids: int
+
+
+def _add_collectability_error(
+    result: CheckResult,
+    category: str,
+    behavior_id: str,
+    detail: str,
+) -> None:
+    """Record one deterministic collectability error with stable taxonomy."""
+    result.add_error(f"collectability.{category}: {behavior_id}: {detail}")
+
+
+def _has_collectability_contract_context(repo_root: Path, result: CheckResult) -> bool:
+    """Ensure collectability checks run under the verification-contract pytest context."""
+    contract_path = repo_root / "project" / "verification-contract.yml"
+    try:
+        contract = parse_verification_contract(contract_path)
+    except GovernanceError as exc:
+        result.add_error(f"collectability.contract_context_missing: {exc}")
+        return False
+    if REQUIRED_COLLECTABILITY_PYTEST_COMMAND not in contract.verification_commands:
+        result.add_error(
+            "collectability.contract_context_missing: verification_commands missing "
+            f"required command '{REQUIRED_COLLECTABILITY_PYTEST_COMMAND}'."
+        )
+        return False
+    return True
+
+
+def _looks_like_collect_only_nodeid(line: str) -> bool:
+    """Return True when one collect-only output line is a pytest nodeid."""
+    stripped = line.strip()
+    if not stripped:
+        return False
+    if stripped.startswith("=") or stripped.startswith("-"):
+        return False
+    if "collected" in stripped:
+        return False
+    if " " in stripped:
+        return False
+    return bool(COLLECT_ONLY_NODEID_PATTERN.match(stripped))
+
+
+def _collect_characterization_nodeids(repo_root: Path, result: CheckResult) -> set[str]:
+    """Collect characterization nodeids via pinned repo-root pytest context."""
+    command = [
+        sys.executable,
+        "-m",
+        "pytest",
+        "--collect-only",
+        "-q",
+        "tests/characterization",
+    ]
+    env = os.environ.copy()
+    env["PYTHONPATH"] = "src"
+    completed = subprocess.run(
+        command,
+        cwd=repo_root,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        stderr_line = next(
+            (line for line in completed.stderr.splitlines() if line.strip()),
+            "",
+        )
+        stdout_line = next(
+            (line for line in completed.stdout.splitlines() if line.strip()),
+            "",
+        )
+        detail = stderr_line or stdout_line or "<no output>"
+        result.add_error(
+            "collectability.collect_only_failed: "
+            "pytest --collect-only failed for tests/characterization "
+            f"(exit_code={completed.returncode}, detail={detail!r})."
+        )
+        return set()
+    nodeids: set[str] = set()
+    for line in completed.stdout.splitlines():
+        if _looks_like_collect_only_nodeid(line):
+            nodeids.add(line.strip().replace("\\", "/"))
+    return nodeids
+
+
+def _check_owner_collectability(
+    repo_root: Path,
+    parity_rows: dict[str, dict[str, str]],
+    result: CheckResult,
+) -> CollectabilityReport:
+    """Validate parity-owned owner_test nodeids are collectable under pytest."""
+    total_owner_nodeids = len(REQUIRED_CHARACTERIZATION_BEHAVIOR_IDS)
+    resolved_owner_nodeids = 0
+
+    owner_nodeids: dict[str, str] = {}
+    for behavior_id in REQUIRED_CHARACTERIZATION_BEHAVIOR_IDS:
+        row = parity_rows.get(behavior_id)
+        if row is None:
+            continue
+        owner_test = row.get("owner_test", "").strip()
+        if not owner_test:
+            _add_collectability_error(
+                result,
+                "owner_ref_invalid",
+                behavior_id,
+                "owner_test must be non-empty.",
+            )
+            continue
+        try:
+            owner_path_part, owner_function = parse_owner_test_reference(owner_test)
+        except CharacterizationError as exc:
+            _add_collectability_error(
+                result,
+                "owner_ref_invalid",
+                behavior_id,
+                str(exc),
+            )
+            continue
+
+        normalized_owner_path = owner_path_part.replace("\\", "/")
+        if not normalized_owner_path.startswith("tests/characterization/"):
+            _add_collectability_error(
+                result,
+                "contract_gap",
+                behavior_id,
+                "owner_test must be under tests/characterization/ for verification-contract inclusion.",
+            )
+            continue
+
+        owner_test_path = repo_root / normalized_owner_path
+        if not owner_test_path.exists():
+            _add_collectability_error(
+                result,
+                "owner_file_missing",
+                behavior_id,
+                f"owner_test file not found: {normalized_owner_path}",
+            )
+            continue
+        if not owner_test_exists(owner_test_path, owner_function):
+            _add_collectability_error(
+                result,
+                "owner_symbol_missing",
+                behavior_id,
+                f"owner_test function '{owner_function}' not found in {normalized_owner_path}.",
+            )
+            continue
+        owner_nodeids[behavior_id] = f"{normalized_owner_path}::{owner_function}"
+
+    if not _has_collectability_contract_context(repo_root, result):
+        unresolved_owner_nodeids = total_owner_nodeids - resolved_owner_nodeids
+        return CollectabilityReport(
+            total_owner_nodeids=total_owner_nodeids,
+            resolved_owner_nodeids=resolved_owner_nodeids,
+            unresolved_owner_nodeids=unresolved_owner_nodeids,
+        )
+
+    collected_nodeids = _collect_characterization_nodeids(repo_root, result)
+    if not collected_nodeids:
+        unresolved_owner_nodeids = total_owner_nodeids - resolved_owner_nodeids
+        return CollectabilityReport(
+            total_owner_nodeids=total_owner_nodeids,
+            resolved_owner_nodeids=resolved_owner_nodeids,
+            unresolved_owner_nodeids=unresolved_owner_nodeids,
+        )
+
+    for behavior_id in sorted(owner_nodeids):
+        owner_nodeid = owner_nodeids[behavior_id]
+        if owner_nodeid not in collected_nodeids:
+            _add_collectability_error(
+                result,
+                "collect_only_unresolved",
+                behavior_id,
+                (
+                    "owner_test nodeid is not collectable via "
+                    "'PYTHONPATH=src ./.venv/bin/python -m pytest --collect-only -q <nodeid>'. "
+                    f"(nodeid={owner_nodeid})"
+                ),
+            )
+            continue
+        resolved_owner_nodeids += 1
+
+    unresolved_owner_nodeids = total_owner_nodeids - resolved_owner_nodeids
+    return CollectabilityReport(
+        total_owner_nodeids=total_owner_nodeids,
+        resolved_owner_nodeids=resolved_owner_nodeids,
+        unresolved_owner_nodeids=unresolved_owner_nodeids,
+    )
 
 
 def _load_and_validate_baselines(
@@ -318,6 +527,9 @@ def check_characterization_artifacts(repo_root: Path) -> CheckResult:
                 imaging_manifest=imaging_manifest,
                 result=result,
             )
+
+    collectability_report = _check_owner_collectability(repo_root, parity_rows, result)
+    setattr(result, "collectability_report", collectability_report)
 
     _check_artifact_budget(
         repo_root=repo_root,

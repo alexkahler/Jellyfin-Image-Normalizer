@@ -454,9 +454,9 @@ Run characterization linkage validation:
 ./.venv/bin/python project/scripts/verify_governance.py --check characterization
 ```
 
-`--check characterization` now also enforces the Surface Coverage Gate using
-`project/surface-coverage-index.json` and reports remaining unmapped CLI/config/
-observability items plus parity/test linkage gaps.
+`--check characterization` now enforces:
+- Surface Coverage Gate via `project/surface-coverage-index.json` (unmapped CLI/config/observability and parity/test linkage counters).
+- Parity-owner collectability gate for characterization `owner_test` nodeids via `pytest --collect-only`, including explicit `collectability/linkage OK` status output.
 
 Run architecture guard validation (WI-001 Slice 5):
 

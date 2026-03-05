@@ -4,10 +4,16 @@ from __future__ import annotations
 
 import io
 import json
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
+import pytest
 from PIL import Image
+from tests.characterization._harness import (
+    capture_logger_messages,
+    merge_observed_messages,
+)
 
 
 def load_baseline_cases(path: Path) -> dict[str, dict[str, Any]]:
@@ -33,6 +39,24 @@ def assert_expected_messages(
     haystack = "\n".join(observed_messages)
     for token in expected_tokens:
         assert token in haystack, f"Missing expected message token: {token!r}"
+
+
+@contextmanager
+def capture_safety_messages() -> Iterator[list[str]]:
+    """Capture safety-test logger messages with strict lifecycle isolation."""
+    with capture_logger_messages("jfin") as captured:
+        yield captured
+
+
+def observed_messages(
+    caplog: pytest.LogCaptureFixture,
+    logger_messages: list[str],
+) -> list[str]:
+    """Merge caplog + direct logger captures with deterministic normalization."""
+    return merge_observed_messages(
+        [record.getMessage() for record in caplog.records],
+        logger_messages,
+    )
 
 
 def assert_observation_subset(

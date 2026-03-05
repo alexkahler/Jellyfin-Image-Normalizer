@@ -60,6 +60,37 @@ def _write_file(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
+def _write_verification_contract(repo_root: Path) -> None:
+    """Write the canonical verification-contract payload for test repos."""
+    _write_file(
+        repo_root / "project/verification-contract.yml",
+        "\n".join(
+            [
+                "version: 1",
+                'python_version: "3.13"',
+                "verification_commands:",
+                "  - PYTHONPATH=src ./.venv/bin/python -m pytest",
+                "  - ./.venv/bin/python -m ruff check .",
+                "  - ./.venv/bin/python -m ruff format --check .",
+                "  - ./.venv/bin/python -m mypy src",
+                "  - ./.venv/bin/python -m bandit -r src",
+                "  - ./.venv/bin/python -m pip_audit",
+                "required_ci_jobs:",
+                "  - test",
+                "  - security",
+                "  - quality",
+                "  - governance",
+                "loc_policy:",
+                "  src_max_lines: 300",
+                "  src_mode: block",
+                "  tests_max_lines: 300",
+                "  tests_mode: warn",
+            ]
+        )
+        + "\n",
+    )
+
+
 def _owner_test_for_behavior(behavior_id: str) -> tuple[str, str]:
     function_name = f"test_{behavior_id.lower().replace('-', '_')}"
     if behavior_id.startswith("CLI-"):
@@ -509,6 +540,7 @@ def _write_valid_artifacts(
     parity_text = _render_table(parity_contract.REQUIRED_PARITY_COLUMNS, parity_rows)
     parity_path = repo_root / "project/parity-matrix.md"
     _write_file(parity_path, parity_text)
+    _write_verification_contract(repo_root)
     _write_surface_artifacts(repo_root, characterization_contract)
     return repo_root, cli_baseline_path, parity_path
 
@@ -526,6 +558,9 @@ def test_characterization_check_valid_pass(characterization_modules, tmp_path: P
     result = characterization_checks.check_characterization_artifacts(repo_root)
     assert not result.errors
     assert not result.warnings
+    collectability_report = getattr(result, "collectability_report", None)
+    assert collectability_report is not None
+    assert collectability_report.unresolved_owner_nodeids == 0
 
 
 def test_characterization_fails_when_baseline_file_missing(
@@ -564,3 +599,65 @@ def test_characterization_fails_when_required_behavior_id_missing(
 
     result = characterization_checks.check_characterization_artifacts(repo_root)
     assert any("missing required behavior_id" in error for error in result.errors)
+
+
+def test_characterization_collectability_fails_for_non_collectable_nodeid(
+    characterization_modules,
+    tmp_path: Path,
+):
+    """Owner test symbols that exist but are not pytest-collectable must fail."""
+    characterization_contract, characterization_checks, parity_contract = (
+        characterization_modules
+    )
+    repo_root, _cli_baseline_path, parity_path = _write_valid_artifacts(
+        tmp_path,
+        characterization_contract,
+        parity_contract,
+    )
+    behavior_id = characterization_contract.CLI_BEHAVIOR_IDS[0]
+    owner_path, _owner_fn = _owner_test_for_behavior(behavior_id)
+    owner_file = repo_root / owner_path
+    owner_file.write_text(
+        owner_file.read_text(encoding="utf-8")
+        + "\n\ndef helper_not_a_pytest_case():\n    return True\n",
+        encoding="utf-8",
+    )
+    rows = _build_valid_parity_rows(
+        characterization_contract.REQUIRED_CHARACTERIZATION_BEHAVIOR_IDS
+    )
+    target_row = next(row for row in rows if row["behavior_id"] == behavior_id)
+    target_row["owner_test"] = f"{owner_path}::helper_not_a_pytest_case"
+    _write_file(
+        parity_path,
+        _render_table(parity_contract.REQUIRED_PARITY_COLUMNS, rows),
+    )
+
+    result = characterization_checks.check_characterization_artifacts(repo_root)
+    assert any(
+        "collectability.collect_only_unresolved" in error and behavior_id in error
+        for error in result.errors
+    )
+
+
+def test_characterization_collectability_fails_when_contract_context_missing(
+    characterization_modules,
+    tmp_path: Path,
+):
+    """Collectability must fail deterministically when contract context is invalid."""
+    characterization_contract, characterization_checks, parity_contract = (
+        characterization_modules
+    )
+    repo_root, _cli_baseline_path, _parity_path = _write_valid_artifacts(
+        tmp_path,
+        characterization_contract,
+        parity_contract,
+    )
+    _write_file(
+        repo_root / "project/verification-contract.yml",
+        "version: 1\n",
+    )
+
+    result = characterization_checks.check_characterization_artifacts(repo_root)
+    assert any(
+        "collectability.contract_context_missing" in error for error in result.errors
+    )
