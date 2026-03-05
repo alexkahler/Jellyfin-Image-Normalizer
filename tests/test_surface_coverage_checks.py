@@ -253,7 +253,9 @@ def test_surface_coverage_fails_on_invalid_owner_symbol(surface_module, tmp_path
     )
 
     report = surface_module.check_surface_coverage_artifacts(tmp_path)
-    assert any("owner_test symbol 'missing_symbol'" in error for error in report.result.errors)
+    assert any(
+        "owner_test symbol 'missing_symbol'" in error for error in report.result.errors
+    )
     assert report.parity_test_linkage_gaps == 1
 
 

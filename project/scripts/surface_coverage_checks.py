@@ -168,7 +168,9 @@ def _extract_subcommands(help_text: str) -> list[str]:
     return sorted(set(commands))
 
 
-def _collect_help_in_process(repo_root: Path, command_path: tuple[str, ...]) -> str | None:
+def _collect_help_in_process(
+    repo_root: Path, command_path: tuple[str, ...]
+) -> str | None:
     """Try collecting CLI help output in-process first for deterministic behavior."""
     src_root = repo_root / "src"
     if not src_root.exists():
@@ -200,8 +202,9 @@ def _collect_help_in_process(repo_root: Path, command_path: tuple[str, ...]) -> 
             return None
 
         sys.argv = ["jfin", *command_path, "--help"]
-        with contextlib.redirect_stdout(output_buffer), contextlib.redirect_stderr(
-            error_buffer
+        with (
+            contextlib.redirect_stdout(output_buffer),
+            contextlib.redirect_stderr(error_buffer),
         ):
             try:
                 cli_module.parse_args()
@@ -234,7 +237,9 @@ def _collect_help_in_process(repo_root: Path, command_path: tuple[str, ...]) -> 
             sys.path.remove(str(src_root))
 
 
-def _collect_help_subprocess(repo_root: Path, command_path: tuple[str, ...]) -> str | None:
+def _collect_help_subprocess(
+    repo_root: Path, command_path: tuple[str, ...]
+) -> str | None:
     """Fallback: collect CLI help output via subprocess with deterministic env."""
     env = os.environ.copy()
     src_root = repo_root / "src"
@@ -737,7 +742,9 @@ def check_surface_coverage_artifacts(repo_root: Path) -> SurfaceCoverageReport:
                         f"surface-coverage: {section_name} '{item_id}' references unknown parity_id '{parity_id}'."
                     )
             for owner_ref in entry["owner_tests"]:
-                is_valid, error_message = _validate_owner_reference(repo_root, owner_ref)
+                is_valid, error_message = _validate_owner_reference(
+                    repo_root, owner_ref
+                )
                 if not is_valid:
                     linkage_gap_count += 1
                     result.add_error(
