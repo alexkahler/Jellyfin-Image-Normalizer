@@ -30,6 +30,18 @@ SUPPORTED_CHECKS = (
     "parity",
     "characterization",
 )
+EXPECTED_VENV_BOOTSTRAP = "python -m venv .venv"
+
+
+def _extract_ci_job_block(ci_text: str, job_name: str) -> str | None:
+    """Extract one top-level CI job block by name."""
+    pattern = re.compile(
+        rf"(?ms)^  {re.escape(job_name)}:\s*\n(.*?)(?=^  [A-Za-z0-9_-]+:\s*$|\Z)"
+    )
+    match = pattern.search(ci_text)
+    if not match:
+        return None
+    return match.group(1)
 
 
 def check_ci_contract_sync(
@@ -46,10 +58,15 @@ def check_ci_contract_sync(
     if "pull_request:" not in ci_text:
         result.add_error("CI workflow must include a pull_request trigger.")
 
+    required_job_blocks: dict[str, str] = {}
     for job_name in contract.required_ci_jobs:
         job_pattern = re.compile(rf"(?m)^  {re.escape(job_name)}:\s*$")
         if not job_pattern.search(ci_text):
             result.add_error(f"CI workflow is missing required job: {job_name}")
+            continue
+        block = _extract_ci_job_block(ci_text, job_name)
+        if block is not None:
+            required_job_blocks[job_name] = block
 
     for command in contract.verification_commands:
         if command not in ci_text:
@@ -57,11 +74,21 @@ def check_ci_contract_sync(
                 f"CI workflow is missing contract verification command: '{command}'"
             )
 
-    governance_command = "python project/scripts/verify_governance.py --check all"
+    for job_name, block in required_job_blocks.items():
+        if EXPECTED_VENV_BOOTSTRAP not in block:
+            result.add_error(
+                "CI workflow job "
+                f"'{job_name}' must bootstrap repo virtualenv with "
+                f"'{EXPECTED_VENV_BOOTSTRAP}'."
+            )
+
+    governance_command = (
+        "./.venv/bin/python project/scripts/verify_governance.py --check all"
+    )
     if governance_command not in ci_text:
         result.add_error(
             "CI governance job must execute "
-            "'python project/scripts/verify_governance.py --check all'."
+            "'./.venv/bin/python project/scripts/verify_governance.py --check all'."
         )
 
     return result
@@ -195,7 +222,9 @@ def _print_check_result(check_name: str, result: CheckResult) -> None:
     print(f"[{status}] {check_name}")
     surface_report = getattr(result, "surface_report", None)
     if surface_report is not None:
-        print(f"  INFO: Remaining unmapped CLI items: {surface_report.unmapped_cli_items}")
+        print(
+            f"  INFO: Remaining unmapped CLI items: {surface_report.unmapped_cli_items}"
+        )
         print(
             "  INFO: Remaining unmapped config keys: "
             f"{surface_report.unmapped_config_keys}"

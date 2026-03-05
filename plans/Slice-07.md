@@ -1,4 +1,4 @@
-﻿# Slice-07
+# Slice-07
 
 ## 1. Objective
 Implement a machine-checkable Surface Coverage Gate that enforces complete Track 1 coverage mapping for CLI help-visible surface, `config.example.toml` keys, and Track 1 observability contract items, with deterministic unmapped reporting under governance.
@@ -9,8 +9,8 @@ Out-of-scope: route-fence flips, Track 2 CLI/config redesign, additional mapping
 
 ## 3. Public interfaces affected
 - `project/surface-coverage-index.json`
-- `python project/scripts/verify_governance.py --check characterization`
-- `python project/scripts/verify_governance.py --check all`
+- `./.venv/bin/python project/scripts/verify_governance.py --check characterization`
+- `./.venv/bin/python project/scripts/verify_governance.py --check all`
 - `project/parity-matrix.md`
 
 ## 4. Acceptance criteria
@@ -26,14 +26,14 @@ Out-of-scope: route-fence flips, Track 2 CLI/config redesign, additional mapping
 - New parity rows and tests exist for `OBS-SUMLOG-001`, `CFG-SCALEFLAGS-001`, and `OBS-EXITCODE-001`.
 
 ## 5. Verification commands (<10 min)
-- `PYTHONPATH=src py -3.13 -m pytest -q tests/test_surface_coverage_checks.py`
-- `PYTHONPATH=src py -3.13 -m pytest -q tests/test_characterization_checks.py tests/test_characterization_checks_links.py tests/test_characterization_checks_imaging.py tests/test_characterization_checks_safety.py`
-- `PYTHONPATH=src py -3.13 -m pytest -q tests/test_parity_checks.py tests/test_governance_checks.py`
-- `PYTHONPATH=src py -3.13 -m pytest -q tests/test_logging_utils.py`
-- `PYTHONPATH=src py -3.13 -m pytest -q tests/test_imaging.py -k "no_scale or no_upscale or no_downscale"`
-- `PYTHONPATH=src py -3.13 -m pytest -q tests/test_jfin.py -k "exit_code or generate_config or restore_all or test_jf"`
-- `python project/scripts/verify_governance.py --check characterization`
-- `python project/scripts/verify_governance.py --check all`
+- `PYTHONPATH=src ./.venv/bin/python -m pytest -q tests/test_surface_coverage_checks.py`
+- `PYTHONPATH=src ./.venv/bin/python -m pytest -q tests/test_characterization_checks.py tests/test_characterization_checks_links.py tests/test_characterization_checks_imaging.py tests/test_characterization_checks_safety.py`
+- `PYTHONPATH=src ./.venv/bin/python -m pytest -q tests/test_parity_checks.py tests/test_governance_checks.py`
+- `PYTHONPATH=src ./.venv/bin/python -m pytest -q tests/test_logging_utils.py`
+- `PYTHONPATH=src ./.venv/bin/python -m pytest -q tests/test_imaging.py -k "no_scale or no_upscale or no_downscale"`
+- `PYTHONPATH=src ./.venv/bin/python -m pytest -q tests/test_jfin.py -k "exit_code or generate_config or restore_all or test_jf"`
+- `./.venv/bin/python project/scripts/verify_governance.py --check characterization`
+- `./.venv/bin/python project/scripts/verify_governance.py --check all`
 
 ## 6. Rollback step
 Revert Slice 7 commits in reverse dependency order with `git revert`: docs/report updates, parity row/test updates, characterization integration changes, then surface coverage checker/index artifacts.

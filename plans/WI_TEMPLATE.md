@@ -9,6 +9,7 @@
 ## 4. Acceptance criteria
 
 ## 5. Verification commands (<10 min)
+Use repo `.venv` interpreter forms for Python commands (POSIX: `./.venv/bin/python`; PowerShell: `.\.venv\Scripts\python.exe`).
 
 ## 6. Rollback step
 

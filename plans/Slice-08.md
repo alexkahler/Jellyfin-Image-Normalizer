@@ -10,9 +10,9 @@ Out-of-scope: route flips (`v0 -> v1`), v1 use-case implementations, CLI redesig
 ## 3. Public interfaces affected
 - `project/route-fence.md` (canonical table with machine markers)
 - `project/route-fence.json`
-- `python project/scripts/generate_route_fence_json.py --write`
-- `python project/scripts/generate_route_fence_json.py --check`
-- `python project/scripts/verify_governance.py --check parity`
+- `./.venv/bin/python project/scripts/generate_route_fence_json.py --write`
+- `./.venv/bin/python project/scripts/generate_route_fence_json.py --check`
+- `./.venv/bin/python project/scripts/verify_governance.py --check parity`
 
 ## 4. Acceptance criteria
 - Runtime dispatch is gated for: `config_init|n/a`, `test_connection|n/a`, `restore|logo|thumb|backdrop|profile`, and `run|logo|thumb|backdrop|profile`.
@@ -22,13 +22,13 @@ Out-of-scope: route flips (`v0 -> v1`), v1 use-case implementations, CLI redesig
 - No route row is flipped to `v1` in Slice 8.
 
 ## 5. Verification commands (<10 min)
-- `PYTHONPATH=src py -3.13 -m pytest -q tests/test_route_fence_json_sync.py tests/test_route_fence_runtime.py`
-- `PYTHONPATH=src py -3.13 -m pytest -q tests/test_parity_checks.py tests/test_governance_checks.py -k "parity or route_fence"`
-- `PYTHONPATH=src py -3.13 -m pytest -q tests/test_jfin.py -k "generate_config or test_jf or restore_all or exit_code or route_fence"`
-- `python project/scripts/generate_route_fence_json.py --check`
-- `python project/scripts/verify_governance.py --check parity`
-- `python project/scripts/verify_governance.py --check characterization`
-- `python project/scripts/verify_governance.py --check all`
+- `PYTHONPATH=src ./.venv/bin/python -m pytest -q tests/test_route_fence_json_sync.py tests/test_route_fence_runtime.py`
+- `PYTHONPATH=src ./.venv/bin/python -m pytest -q tests/test_parity_checks.py tests/test_governance_checks.py -k "parity or route_fence"`
+- `PYTHONPATH=src ./.venv/bin/python -m pytest -q tests/test_jfin.py -k "generate_config or test_jf or restore_all or exit_code or route_fence"`
+- `./.venv/bin/python project/scripts/generate_route_fence_json.py --check`
+- `./.venv/bin/python project/scripts/verify_governance.py --check parity`
+- `./.venv/bin/python project/scripts/verify_governance.py --check characterization`
+- `./.venv/bin/python project/scripts/verify_governance.py --check all`
 
 ## 6. Rollback step
 Revert Slice 8 commits in reverse order: docs/slice artifacts, CLI/runtime route-fence support, parity sync checks, generator script, and `project/route-fence.json`.

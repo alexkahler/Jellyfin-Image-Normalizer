@@ -7,12 +7,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 EXPECTED_VERIFICATION_COMMANDS = [
-    "PYTHONPATH=src python -m pytest",
-    "python -m ruff check .",
-    "python -m ruff format --check .",
-    "python -m mypy src",
-    "python -m bandit -r src",
-    "python -m pip_audit",
+    "PYTHONPATH=src ./.venv/bin/python -m pytest",
+    "./.venv/bin/python -m ruff check .",
+    "./.venv/bin/python -m ruff format --check .",
+    "./.venv/bin/python -m mypy src",
+    "./.venv/bin/python -m bandit -r src",
+    "./.venv/bin/python -m pip_audit",
 ]
 EXPECTED_REQUIRED_CI_JOBS = ["test", "security", "quality", "governance"]
 

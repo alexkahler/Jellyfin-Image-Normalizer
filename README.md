@@ -418,13 +418,13 @@ For internal architecture and layout, see: [Technical Notes](docs/TECHNICAL_NOTE
 Run tests:
 
 ```bash
-PYTHONPATH=src python -m pytest
+PYTHONPATH=src ./.venv/bin/python -m pytest
 ```
 
 Run governance checks:
 
 ```bash
-python project/scripts/verify_governance.py --check all
+./.venv/bin/python project/scripts/verify_governance.py --check all
 ```
 
 Track 1 note: `--check all` currently reports known pre-existing LOC failures in
@@ -434,14 +434,14 @@ beyond that known baseline.
 Run parity-only validation:
 
 ```bash
-python project/scripts/verify_governance.py --check parity
+./.venv/bin/python project/scripts/verify_governance.py --check parity
 ```
 
 Generate or verify the runtime route-fence JSON artifact (Slice 8):
 
 ```bash
-python project/scripts/generate_route_fence_json.py --write
-python project/scripts/generate_route_fence_json.py --check
+./.venv/bin/python project/scripts/generate_route_fence_json.py --write
+./.venv/bin/python project/scripts/generate_route_fence_json.py --check
 ```
 
 `--check parity` validates the canonical marked table in
@@ -451,7 +451,7 @@ python project/scripts/generate_route_fence_json.py --check
 Run characterization linkage validation:
 
 ```bash
-python project/scripts/verify_governance.py --check characterization
+./.venv/bin/python project/scripts/verify_governance.py --check characterization
 ```
 
 `--check characterization` now also enforces the Surface Coverage Gate using
@@ -461,22 +461,22 @@ observability items plus parity/test linkage gaps.
 Run architecture guard validation (WI-001 Slice 5):
 
 ```bash
-python project/scripts/verify_governance.py --check architecture
+./.venv/bin/python project/scripts/verify_governance.py --check architecture
 ```
 
 Regenerate architecture exit baseline snapshot:
 
 ```bash
-python project/scripts/verify_governance.py --check architecture --print-baseline
+./.venv/bin/python project/scripts/verify_governance.py --check architecture --print-baseline
 ```
 
 Run characterization suites:
 
 ```bash
-PYTHONPATH=src python -m pytest -q tests/characterization/cli_contract/test_cli_contract_characterization.py
-PYTHONPATH=src python -m pytest -q tests/characterization/config_contract/test_config_contract_characterization.py
-PYTHONPATH=src python -m pytest -q tests/characterization/imaging_contract/test_imaging_contract_characterization.py
-PYTHONPATH=src python -m pytest -q tests/characterization/safety_contract
+PYTHONPATH=src ./.venv/bin/python -m pytest -q tests/characterization/cli_contract/test_cli_contract_characterization.py
+PYTHONPATH=src ./.venv/bin/python -m pytest -q tests/characterization/config_contract/test_config_contract_characterization.py
+PYTHONPATH=src ./.venv/bin/python -m pytest -q tests/characterization/imaging_contract/test_imaging_contract_characterization.py
+PYTHONPATH=src ./.venv/bin/python -m pytest -q tests/characterization/safety_contract
 ```
 
 Verification command policy is tracked in `project/verification-contract.yml`.

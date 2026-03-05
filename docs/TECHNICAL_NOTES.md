@@ -159,17 +159,17 @@ padding_remove_sensitivity = 0
 
 ## Development and Testing Notes
 - Dependencies (`requirements.txt`): Pillow, requests, pytest (for local testing).
-- Run tests with `PYTHONPATH=src python -m pytest` (PowerShell: `$env:PYTHONPATH="src"; python -m pytest`). Tests rely on mocks/stubs; no live Jellyfin calls are performed.
-- Run governance checks with `python project/scripts/verify_governance.py --check all` to validate CI/contract sync, LOC policy, and Python version consistency. Current Track 1 baseline includes known pre-existing LOC failures in `src/jfin/*`; slice work should not introduce additional failures beyond that baseline.
-- Run architecture checks with `python project/scripts/verify_governance.py --check architecture` to validate:
+- Run tests with `PYTHONPATH=src ./.venv/bin/python -m pytest` (PowerShell: `$env:PYTHONPATH="src"; .\.venv\Scripts\python.exe -m pytest`). Tests rely on mocks/stubs; no live Jellyfin calls are performed.
+- Run governance checks with `./.venv/bin/python project/scripts/verify_governance.py --check all` to validate CI/contract sync, LOC policy, and Python version consistency. Current Track 1 baseline includes known pre-existing LOC failures in `src/jfin/*`; slice work should not introduce additional failures beyond that baseline.
+- Run architecture checks with `./.venv/bin/python project/scripts/verify_governance.py --check architecture` to validate:
   - ratcheted non-entry exit usage (`sys.exit`, `SystemExit`, `from sys import exit`, and `builtins.exit|quit`) against `project/architecture-baseline.json`
   - conditional import boundaries for `src/jfin/domain/` and `src/jfin/app/services/`
-- Regenerate the architecture baseline snapshot with `python project/scripts/verify_governance.py --check architecture --print-baseline`.
-- Run parity-only checks with `python project/scripts/verify_governance.py --check parity` to validate `project/parity-matrix.md`, the canonical marked table in `project/route-fence.md`, and exact sync to `project/route-fence.json`.
+- Regenerate the architecture baseline snapshot with `./.venv/bin/python project/scripts/verify_governance.py --check architecture --print-baseline`.
+- Run parity-only checks with `./.venv/bin/python project/scripts/verify_governance.py --check parity` to validate `project/parity-matrix.md`, the canonical marked table in `project/route-fence.md`, and exact sync to `project/route-fence.json`.
 - Generate or verify route-fence JSON sync with:
-  - `python project/scripts/generate_route_fence_json.py --write`
-  - `python project/scripts/generate_route_fence_json.py --check`
-- Run characterization linkage checks with `python project/scripts/verify_governance.py --check characterization` to validate baseline schema, parity linkage, owner test references, imaging manifest linkage, artifact budgets for `CLI-*`, `CFG-*`, and `IMG-*` IDs, and Surface Coverage Gate completeness via `project/surface-coverage-index.json` (including remaining unmapped CLI/config/observability report counters).
+  - `./.venv/bin/python project/scripts/generate_route_fence_json.py --write`
+  - `./.venv/bin/python project/scripts/generate_route_fence_json.py --check`
+- Run characterization linkage checks with `./.venv/bin/python project/scripts/verify_governance.py --check characterization` to validate baseline schema, parity linkage, owner test references, imaging manifest linkage, artifact budgets for `CLI-*`, `CFG-*`, and `IMG-*` IDs, and Surface Coverage Gate completeness via `project/surface-coverage-index.json` (including remaining unmapped CLI/config/observability report counters).
 - Characterization suites live in `tests/characterization/cli_contract/`, `tests/characterization/config_contract/`, `tests/characterization/imaging_contract/`, and `tests/characterization/safety_contract/`, with baseline contracts in `tests/characterization/baselines/`.
 - Safety contract baseline is `tests/characterization/baselines/safety_contract_baseline.json` and covers dry-run/write-gate + restore-safety invariants (`API-*`, `PIPE-*`, `RST-*` safety IDs).
 - Imaging golden artifacts are stored in `tests/golden/imaging/`:

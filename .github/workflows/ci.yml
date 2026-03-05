@@ -20,14 +20,18 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Bootstrap virtual environment
+        run: |
+          python -m venv .venv
+
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt pytest
+          ./.venv/bin/python -m pip install --upgrade pip
+          ./.venv/bin/python -m pip install -r requirements.txt pytest
 
       - name: Run tests
         run: |
-          PYTHONPATH=src python -m pytest
+          PYTHONPATH=src ./.venv/bin/python -m pytest
 
   security:
     runs-on: ubuntu-latest
@@ -41,18 +45,22 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Bootstrap virtual environment
+        run: |
+          python -m venv .venv
+
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt bandit pip-audit
+          ./.venv/bin/python -m pip install --upgrade pip
+          ./.venv/bin/python -m pip install -r requirements.txt bandit pip-audit
 
       - name: Run bandit
         run: |
-          python -m bandit -r src
+          ./.venv/bin/python -m bandit -r src
 
       - name: Run pip-audit
         run: |
-          python -m pip_audit
+          ./.venv/bin/python -m pip_audit
 
   quality:
     runs-on: ubuntu-latest
@@ -66,22 +74,26 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Bootstrap virtual environment
+        run: |
+          python -m venv .venv
+
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt mypy ruff
+          ./.venv/bin/python -m pip install --upgrade pip
+          ./.venv/bin/python -m pip install -r requirements.txt mypy ruff
 
       - name: Run ruff format check
         run: |
-          python -m ruff format --check .
+          ./.venv/bin/python -m ruff format --check .
 
       - name: Run ruff lint
         run: |
-          python -m ruff check .
+          ./.venv/bin/python -m ruff check .
 
       - name: Run mypy
         run: |
-          python -m mypy src
+          ./.venv/bin/python -m mypy src
 
   governance:
     runs-on: ubuntu-latest
@@ -95,6 +107,10 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Bootstrap virtual environment
+        run: |
+          python -m venv .venv
+
       - name: Run governance checks
         run: |
-          python project/scripts/verify_governance.py --check all
+          ./.venv/bin/python project/scripts/verify_governance.py --check all

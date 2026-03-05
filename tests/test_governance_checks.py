@@ -45,12 +45,12 @@ def _contract_text(
 ) -> str:
     """Create a contract YAML string using default WI-001 values."""
     commands = verification_commands or [
-        "PYTHONPATH=src python -m pytest",
-        "python -m ruff check .",
-        "python -m ruff format --check .",
-        "python -m mypy src",
-        "python -m bandit -r src",
-        "python -m pip_audit",
+        "PYTHONPATH=src ./.venv/bin/python -m pytest",
+        "./.venv/bin/python -m ruff check .",
+        "./.venv/bin/python -m ruff format --check .",
+        "./.venv/bin/python -m mypy src",
+        "./.venv/bin/python -m bandit -r src",
+        "./.venv/bin/python -m pip_audit",
     ]
     jobs = required_ci_jobs or ["test", "security", "quality", "governance"]
     lines = [
@@ -78,6 +78,7 @@ def _ci_text(
     include_governance_job: bool = True,
     include_pull_request: bool = True,
     include_ruff_format_command: bool = True,
+    include_venv_bootstrap: bool = True,
 ) -> str:
     """Create a minimal CI workflow YAML string for governance tests."""
     lines = ["name: CI", "on:"]
@@ -89,38 +90,68 @@ def _ci_text(
             "  test:",
             "    runs-on: ubuntu-latest",
             "    steps:",
+            "      - name: Set up Python",
+            "        uses: actions/setup-python@v5",
+            "        with:",
+            f'          python-version: "{python_version}"',
+            "      - name: Bootstrap virtual environment",
+            "        run: |",
+            "          python -m venv .venv",
             "      - name: Run tests",
             "        run: |",
-            "          PYTHONPATH=src python -m pytest",
+            "          PYTHONPATH=src ./.venv/bin/python -m pytest",
             "  security:",
             "    runs-on: ubuntu-latest",
             "    steps:",
+            "      - name: Set up Python",
+            "        uses: actions/setup-python@v5",
+            "        with:",
+            f'          python-version: "{python_version}"',
+            "      - name: Bootstrap virtual environment",
+            "        run: |",
+            "          python -m venv .venv",
             "      - name: Security",
             "        run: |",
-            "          python -m bandit -r src",
-            "          python -m pip_audit",
+            "          ./.venv/bin/python -m bandit -r src",
+            "          ./.venv/bin/python -m pip_audit",
             "  quality:",
             "    runs-on: ubuntu-latest",
             "    steps:",
+            "      - name: Set up Python",
+            "        uses: actions/setup-python@v5",
+            "        with:",
+            f'          python-version: "{python_version}"',
+            "      - name: Bootstrap virtual environment",
+            "        run: |",
+            "          python -m venv .venv",
             "      - name: Quality",
             "        run: |",
-            "          python -m ruff check .",
+            "          ./.venv/bin/python -m ruff check .",
         ]
     )
     if include_ruff_format_command:
-        lines.append("          python -m ruff format --check .")
-    lines.append("          python -m mypy src")
+        lines.append("          ./.venv/bin/python -m ruff format --check .")
+    lines.append("          ./.venv/bin/python -m mypy src")
     if include_governance_job:
         lines.extend(
             [
                 "  governance:",
                 "    runs-on: ubuntu-latest",
                 "    steps:",
+                "      - name: Set up Python",
+                "        uses: actions/setup-python@v5",
+                "        with:",
+                f'          python-version: "{python_version}"',
+                "      - name: Bootstrap virtual environment",
+                "        run: |",
+                "          python -m venv .venv",
                 "      - name: Run governance checks",
                 "        run: |",
-                "          python project/scripts/verify_governance.py --check all",
+                "          ./.venv/bin/python project/scripts/verify_governance.py --check all",
             ]
         )
+    if not include_venv_bootstrap:
+        lines = [line for line in lines if line != "          python -m venv .venv"]
     return "\n".join(lines) + "\n"
 
 
@@ -149,7 +180,7 @@ def test_contract_schema_success(governance_module, tmp_path: Path):
             version: 1
             python_version: "3.13"
             verification_commands:
-              - PYTHONPATH=src python -m pytest
+              - PYTHONPATH=src ./.venv/bin/python -m pytest
             loc_policy:
               src_max_lines: 300
               src_mode: block
@@ -163,7 +194,7 @@ def test_contract_schema_success(governance_module, tmp_path: Path):
             version: 1
             python_version: "3.13"
             verification_commands:
-              - PYTHONPATH=src python -m pytest
+              - PYTHONPATH=src ./.venv/bin/python -m pytest
             required_ci_jobs:
               - test
               - security
@@ -205,7 +236,10 @@ def test_ci_sync_fails_when_contract_command_missing(
     contract = governance_module.parse_verification_contract(contract_path)
     result = governance_module.check_ci_contract_sync(contract, ci_path)
 
-    assert any("python -m ruff format --check ." in error for error in result.errors)
+    assert any(
+        "./.venv/bin/python -m ruff format --check ." in error
+        for error in result.errors
+    )
 
 
 def test_ci_sync_fails_when_governance_job_missing(
@@ -222,6 +256,25 @@ def test_ci_sync_fails_when_governance_job_missing(
     result = governance_module.check_ci_contract_sync(contract, ci_path)
 
     assert any("required job: governance" in error for error in result.errors)
+
+
+def test_ci_sync_fails_when_venv_bootstrap_missing(
+    governance_module,
+    tmp_path: Path,
+):
+    """CI sync should fail when required jobs do not create .venv."""
+    contract_path = tmp_path / "verification-contract.yml"
+    ci_path = tmp_path / "ci.yml"
+    _write_file(contract_path, _contract_text())
+    _write_file(ci_path, _ci_text(include_venv_bootstrap=False))
+
+    contract = governance_module.parse_verification_contract(contract_path)
+    result = governance_module.check_ci_contract_sync(contract, ci_path)
+
+    assert any(
+        "must bootstrap repo virtualenv with 'python -m venv .venv'" in error
+        for error in result.errors
+    )
 
 
 def test_loc_policy_blocks_src_overflow(governance_module, tmp_path: Path):

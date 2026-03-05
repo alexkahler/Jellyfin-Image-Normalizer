@@ -11,6 +11,7 @@ Change policy: any scope/contract change requires explicit addendum
 3. **Public behavior is preserved by default**; interface/platform redesign is deferred to Track 2.
 4. Planning mode only: this document is a blueprint; implementation happens slice-by-slice with verification and rollback.
 5. Baseline health snapshot captured in v1: `174 passed in 6.99s` (`PYTHONPATH=src python -m pytest -q`). *(Historical baseline; not a guarantee of current runtime as changes land.)*
+6. Current developer verification policy uses the repo virtual environment interpreter (for example: `PYTHONPATH=src ./.venv/bin/python -m pytest -q`).
 
 ---
 
