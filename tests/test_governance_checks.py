@@ -43,6 +43,8 @@ def _contract_text(
     src_mode: str = "block",
     tests_max_lines: int = 300,
     tests_mode: str = "warn",
+    runtime_gate_targets: list[str] | None = None,
+    runtime_gate_budget_seconds: int = 180,
 ) -> str:
     """Create a contract YAML string using default WI-001 values."""
     commands = verification_commands or [
@@ -54,6 +56,7 @@ def _contract_text(
         "./.venv/bin/python -m pip_audit",
     ]
     jobs = required_ci_jobs or ["test", "security", "quality", "governance"]
+    runtime_targets = runtime_gate_targets or ["tests/characterization/safety_contract"]
     lines = [
         "version: 1",
         f'python_version: "{python_version}"',
@@ -62,6 +65,11 @@ def _contract_text(
     lines.extend(f"  - {command}" for command in commands)
     lines.append("required_ci_jobs:")
     lines.extend(f"  - {job}" for job in jobs)
+    lines.append("characterization_runtime_gate_targets:")
+    lines.extend(f"  - {target}" for target in runtime_targets)
+    lines.append(
+        f"characterization_runtime_gate_budget_seconds: {runtime_gate_budget_seconds}"
+    )
     lines.extend(
         [
             "loc_policy:",
@@ -80,6 +88,7 @@ def _ci_text(
     include_pull_request: bool = True,
     include_ruff_format_command: bool = True,
     include_venv_bootstrap: bool = True,
+    include_governance_install: bool = True,
 ) -> str:
     """Create a minimal CI workflow YAML string for governance tests."""
     lines = ["name: CI", "on:"]
@@ -146,6 +155,19 @@ def _ci_text(
                 "      - name: Bootstrap virtual environment",
                 "        run: |",
                 "          python -m venv .venv",
+            ]
+        )
+        if include_governance_install:
+            lines.extend(
+                [
+                    "      - name: Install dependencies",
+                    "        run: |",
+                    "          ./.venv/bin/python -m pip install --upgrade pip",
+                    "          ./.venv/bin/python -m pip install -r requirements.txt pytest",
+                ]
+            )
+        lines.extend(
+            [
                 "      - name: Run governance checks",
                 "        run: |",
                 "          ./.venv/bin/python project/scripts/verify_governance.py --check all",
@@ -201,12 +223,36 @@ def test_contract_schema_success(governance_module, tmp_path: Path):
               - security
               - quality
               - governance
+            characterization_runtime_gate_targets:
+              - tests/characterization/safety_contract
+            characterization_runtime_gate_budget_seconds: 180
             loc_policy:
               src_max_lines: 300
               src_mode: block
               tests_max_lines: 300
             """,
             "loc_policy missing required key: tests_mode",
+        ),
+        (
+            """
+            version: 1
+            python_version: "3.13"
+            verification_commands:
+              - PYTHONPATH=src ./.venv/bin/python -m pytest
+            required_ci_jobs:
+              - test
+              - security
+              - quality
+              - governance
+            characterization_runtime_gate_targets:
+              - tests/characterization/safety_contract
+            loc_policy:
+              src_max_lines: 300
+              src_mode: block
+              tests_max_lines: 300
+              tests_mode: warn
+            """,
+            "required key: characterization_runtime_gate_budget_seconds",
         ),
     ],
 )

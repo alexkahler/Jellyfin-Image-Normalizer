@@ -6,6 +6,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -40,6 +41,7 @@ from surface_coverage_checks import check_surface_coverage_artifacts
 
 REQUIRED_COLLECTABILITY_PYTEST_COMMAND = "PYTHONPATH=src ./.venv/bin/python -m pytest"
 COLLECT_ONLY_NODEID_PATTERN = re.compile(r"^tests[\\/].+::.+$")
+RUNTIME_GATE_TIMEOUT_BUFFER_SECONDS = 15
 
 
 @dataclass(frozen=True)
@@ -49,6 +51,20 @@ class CollectabilityReport:
     total_owner_nodeids: int
     resolved_owner_nodeids: int
     unresolved_owner_nodeids: int
+
+
+@dataclass(frozen=True)
+class RuntimeGateReport:
+    """Runtime characterization gate counters surfaced by governance output."""
+
+    configured_targets: tuple[str, ...]
+    checked_targets: int
+    passed_targets: int
+    failed_targets: int
+    budget_seconds: int
+    elapsed_seconds: float
+    mapped_parity_ids: tuple[str, ...]
+    infos: tuple[str, ...]
 
 
 def _add_collectability_error(
@@ -92,36 +108,65 @@ def _looks_like_collect_only_nodeid(line: str) -> bool:
     return bool(COLLECT_ONLY_NODEID_PATTERN.match(stripped))
 
 
-def _collect_characterization_nodeids(repo_root: Path, result: CheckResult) -> set[str]:
-    """Collect characterization nodeids via pinned repo-root pytest context."""
-    command = [
-        sys.executable,
-        "-m",
-        "pytest",
-        "--collect-only",
-        "-q",
-        "tests/characterization",
-    ]
-    env = os.environ.copy()
-    env["PYTHONPATH"] = "src"
-    completed = subprocess.run(
-        command,
+def _normalize_nodeid(nodeid: str) -> str:
+    """Normalize nodeids to repo-relative POSIX-style strings."""
+    return nodeid.strip().replace("\\", "/")
+
+
+def _run_pytest_command(
+    *,
+    repo_root: Path,
+    args: list[str],
+    timeout_seconds: float | None = None,
+) -> subprocess.CompletedProcess[str]:
+    """Run pytest with deterministic repo-root context and captured output."""
+    env = {**os.environ, "PYTHONPATH": "src"}
+    return subprocess.run(
+        [sys.executable, "-m", "pytest", *args],
         cwd=repo_root,
         env=env,
         capture_output=True,
         text=True,
         check=False,
+        timeout=timeout_seconds,
+    )
+
+
+def _first_non_empty_output(*streams: str) -> str:
+    """Return first non-empty output line from ordered streams."""
+    for stream in streams:
+        for line in stream.splitlines():
+            if line.strip():
+                return line.strip()
+    return "<no output>"
+
+
+def _target_path_part(target: str) -> str:
+    """Return the filesystem path portion of a target or nodeid."""
+    return target.split("::", 1)[0]
+
+
+def _nodeid_matches_target(nodeid: str, target: str) -> bool:
+    """Return True when a normalized nodeid belongs to a normalized target."""
+    normalized_nodeid = _normalize_nodeid(nodeid)
+    normalized_target = _normalize_nodeid(target)
+    node_path = _target_path_part(normalized_nodeid).rstrip("/")
+    target_path = _target_path_part(normalized_target).rstrip("/")
+    if "::" in normalized_target:
+        return normalized_nodeid.startswith(normalized_target)
+    if target_path.endswith(".py"):
+        return node_path == target_path
+    return node_path.startswith(target_path + "/")
+
+
+def _collect_characterization_nodeids(repo_root: Path, result: CheckResult) -> set[str]:
+    """Collect characterization nodeids via pinned repo-root pytest context."""
+    completed = _run_pytest_command(
+        repo_root=repo_root,
+        args=["--collect-only", "-q", "tests/characterization"],
     )
     if completed.returncode != 0:
-        stderr_line = next(
-            (line for line in completed.stderr.splitlines() if line.strip()),
-            "",
-        )
-        stdout_line = next(
-            (line for line in completed.stdout.splitlines() if line.strip()),
-            "",
-        )
-        detail = stderr_line or stdout_line or "<no output>"
+        detail = _first_non_empty_output(completed.stderr, completed.stdout)
         result.add_error(
             "collectability.collect_only_failed: "
             "pytest --collect-only failed for tests/characterization "
@@ -131,7 +176,7 @@ def _collect_characterization_nodeids(repo_root: Path, result: CheckResult) -> s
     nodeids: set[str] = set()
     for line in completed.stdout.splitlines():
         if _looks_like_collect_only_nodeid(line):
-            nodeids.add(line.strip().replace("\\", "/"))
+            nodeids.add(_normalize_nodeid(line))
     return nodeids
 
 
@@ -236,6 +281,242 @@ def _check_owner_collectability(
         total_owner_nodeids=total_owner_nodeids,
         resolved_owner_nodeids=resolved_owner_nodeids,
         unresolved_owner_nodeids=unresolved_owner_nodeids,
+    )
+
+
+def _add_runtime_gate_warning(
+    result: CheckResult,
+    category: str,
+    detail: str,
+) -> None:
+    """Record one deterministic runtime-gate warning with stable taxonomy."""
+    result.add_warning(f"runtime_gate.{category}: {detail}")
+
+
+def _normalize_runtime_targets(targets: list[str]) -> list[str]:
+    """Normalize runtime target strings to repo-relative POSIX paths/nodeids."""
+    return [_normalize_nodeid(target) for target in targets]
+
+
+def _owner_nodeids_for_targets(
+    parity_rows: dict[str, dict[str, str]],
+    targets: list[str],
+) -> dict[str, str]:
+    """Return parity owner nodeids that belong to configured runtime targets."""
+    owner_nodeids: dict[str, str] = {}
+    for behavior_id, row in parity_rows.items():
+        owner_test = row.get("owner_test", "").strip()
+        if not owner_test:
+            continue
+        try:
+            owner_path, owner_function = parse_owner_test_reference(owner_test)
+        except CharacterizationError:
+            continue
+        owner_nodeid = _normalize_nodeid(f"{owner_path}::{owner_function}")
+        if any(_nodeid_matches_target(owner_nodeid, target) for target in targets):
+            owner_nodeids[behavior_id] = owner_nodeid
+    return owner_nodeids
+
+
+def _collect_runtime_target_nodeids(
+    repo_root: Path,
+    targets: list[str],
+    timeout_seconds: float,
+    result: CheckResult,
+    parity_ids: list[str],
+) -> set[str]:
+    """Collect nodeids for configured runtime targets."""
+    try:
+        completed = _run_pytest_command(
+            repo_root=repo_root,
+            args=["--collect-only", "-q", *targets],
+            timeout_seconds=timeout_seconds,
+        )
+    except subprocess.TimeoutExpired:
+        _add_runtime_gate_warning(
+            result,
+            "timeout",
+            (
+                "collect-only timed out for runtime targets "
+                f"{targets} with mapped_parity_ids={parity_ids}."
+            ),
+        )
+        return set()
+
+    if completed.returncode != 0:
+        detail = _first_non_empty_output(completed.stderr, completed.stdout)
+        _add_runtime_gate_warning(
+            result,
+            "execution_failed",
+            (
+                "collect-only failed for runtime targets "
+                f"{targets} (exit_code={completed.returncode}, detail={detail!r}, "
+                f"mapped_parity_ids={parity_ids})."
+            ),
+        )
+        return set()
+
+    nodeids: set[str] = set()
+    for line in completed.stdout.splitlines():
+        if _looks_like_collect_only_nodeid(line):
+            nodeids.add(_normalize_nodeid(line))
+    return nodeids
+
+
+def _check_runtime_characterization_gate(
+    repo_root: Path,
+    parity_rows: dict[str, dict[str, str]],
+    result: CheckResult,
+) -> RuntimeGateReport:
+    """Run Slice-10 runtime characterization gate for configured targets."""
+    contract_path = repo_root / "project" / "verification-contract.yml"
+    try:
+        contract = parse_verification_contract(contract_path)
+    except GovernanceError as exc:
+        _add_runtime_gate_warning(
+            result,
+            "target_invalid",
+            f"unable to parse runtime gate contract context: {exc}",
+        )
+        return RuntimeGateReport(
+            configured_targets=(),
+            checked_targets=0,
+            passed_targets=0,
+            failed_targets=0,
+            budget_seconds=0,
+            elapsed_seconds=0.0,
+            mapped_parity_ids=(),
+            infos=(),
+        )
+
+    configured_targets = _normalize_runtime_targets(contract.runtime_gate.targets)
+    budget_seconds = contract.runtime_gate.budget_seconds
+    warning_start = len(result.warnings)
+    valid_targets: list[str] = []
+    for target in configured_targets:
+        target_path_part = _target_path_part(target)
+        if not target_path_part.startswith("tests/characterization/"):
+            _add_runtime_gate_warning(
+                result,
+                "target_invalid",
+                f"target must be under tests/characterization/: {target!r}",
+            )
+            continue
+        if not (repo_root / target_path_part).exists():
+            _add_runtime_gate_warning(
+                result,
+                "target_invalid",
+                f"target path not found: {target_path_part!r}",
+            )
+            continue
+        valid_targets.append(target)
+
+    start_time = time.monotonic()
+    infos: list[str] = []
+
+    owner_nodeids = _owner_nodeids_for_targets(parity_rows, valid_targets)
+    candidate_parity_ids = sorted(owner_nodeids)
+    mapped_parity_ids: list[str] = []
+    timeout_seconds = float(budget_seconds + RUNTIME_GATE_TIMEOUT_BUFFER_SECONDS)
+
+    if valid_targets:
+        collected_nodeids = _collect_runtime_target_nodeids(
+            repo_root=repo_root,
+            targets=valid_targets,
+            timeout_seconds=timeout_seconds,
+            result=result,
+            parity_ids=candidate_parity_ids,
+        )
+        if collected_nodeids:
+            mapped_parity_ids = sorted(
+                behavior_id
+                for behavior_id, owner_nodeid in owner_nodeids.items()
+                if owner_nodeid in collected_nodeids
+            )
+            if not mapped_parity_ids:
+                infos.append(
+                    "runtime_gate.parity_mapping_empty: no parity owner nodeids intersect "
+                    f"collect-only nodeids for targets {valid_targets}."
+                )
+
+    elapsed_before_runtime = time.monotonic() - start_time
+    timeout_remaining = timeout_seconds - elapsed_before_runtime
+    if timeout_remaining <= 0:
+        _add_runtime_gate_warning(
+            result,
+            "timeout",
+            (
+                "runtime execution skipped because collect+run exceeded timeout budget "
+                f"for targets {valid_targets} with mapped_parity_ids={mapped_parity_ids}."
+            ),
+        )
+    elif valid_targets and not any(
+        warning.startswith("runtime_gate.timeout")
+        or warning.startswith("runtime_gate.execution_failed")
+        for warning in result.warnings[warning_start:]
+    ):
+        try:
+            completed = _run_pytest_command(
+                repo_root=repo_root,
+                args=["-q", "--maxfail=1", *valid_targets],
+                timeout_seconds=timeout_remaining,
+            )
+        except subprocess.TimeoutExpired:
+            _add_runtime_gate_warning(
+                result,
+                "timeout",
+                (
+                    "runtime execution timed out for targets "
+                    f"{valid_targets} with mapped_parity_ids={mapped_parity_ids}."
+                ),
+            )
+        else:
+            if completed.returncode != 0:
+                detail = _first_non_empty_output(completed.stderr, completed.stdout)
+                _add_runtime_gate_warning(
+                    result,
+                    "execution_failed",
+                    (
+                        "runtime execution failed for targets "
+                        f"{valid_targets} (exit_code={completed.returncode}, "
+                        f"detail={detail!r}, mapped_parity_ids={mapped_parity_ids})."
+                    ),
+                )
+
+    elapsed_seconds = time.monotonic() - start_time
+    runtime_warnings = result.warnings[warning_start:]
+    timed_out = any(
+        warning.startswith("runtime_gate.timeout") for warning in runtime_warnings
+    )
+    if not timed_out and elapsed_seconds > float(budget_seconds):
+        _add_runtime_gate_warning(
+            result,
+            "budget_exceeded",
+            (
+                "collect+run elapsed time exceeded runtime gate budget "
+                f"(elapsed_seconds={elapsed_seconds:.3f}, "
+                f"budget_seconds={budget_seconds}, targets={valid_targets}, "
+                f"mapped_parity_ids={mapped_parity_ids})."
+            ),
+        )
+
+    warning_count = len(result.warnings) - warning_start
+    checked_targets = len(valid_targets)
+    passed_targets = checked_targets if warning_count == 0 else 0
+    if checked_targets == 0:
+        failed_targets = len(configured_targets) if warning_count else 0
+    else:
+        failed_targets = checked_targets if warning_count else 0
+
+    return RuntimeGateReport(
+        configured_targets=tuple(configured_targets),
+        checked_targets=checked_targets,
+        passed_targets=passed_targets,
+        failed_targets=failed_targets,
+        budget_seconds=budget_seconds,
+        elapsed_seconds=elapsed_seconds,
+        mapped_parity_ids=tuple(mapped_parity_ids),
+        infos=tuple(infos),
     )
 
 
@@ -530,6 +811,12 @@ def check_characterization_artifacts(repo_root: Path) -> CheckResult:
 
     collectability_report = _check_owner_collectability(repo_root, parity_rows, result)
     setattr(result, "collectability_report", collectability_report)
+    runtime_gate_report = _check_runtime_characterization_gate(
+        repo_root,
+        parity_rows,
+        result,
+    )
+    setattr(result, "runtime_gate_report", runtime_gate_report)
 
     _check_artifact_budget(
         repo_root=repo_root,

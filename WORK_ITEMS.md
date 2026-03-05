@@ -12,6 +12,7 @@ Iteratively planned slices:
 - Slice 7 -> WI-001 Surface Coverage Gate (touches WI-002/WI-004 artifacts)
 - Slice 8 -> WI-002 Route-fence runtime enforcement (touches WI-001 governance artifacts)
 - Slice 9 -> WI-001 COV-01a Characterization collectability hardening (touches WI-004/WI-005 artifacts)
+- Slice 10 -> WI-001 COV-01b Characterization runtime gate (warn ratchet, safety_contract scope)
 
 After Slice 9, subsequent slices remain iterative. Governance-coverage slices
 (starting with COV-01b) take precedence before route-fence flip planning.

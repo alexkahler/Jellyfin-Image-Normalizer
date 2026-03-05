@@ -12,6 +12,9 @@ required_ci_jobs:
   - security
   - quality
   - governance
+characterization_runtime_gate_targets:
+  - tests/characterization/safety_contract
+characterization_runtime_gate_budget_seconds: 180
 loc_policy:
   src_max_lines: 300
   src_mode: block

@@ -111,6 +111,11 @@ jobs:
         run: |
           python -m venv .venv
 
+      - name: Install dependencies
+        run: |
+          ./.venv/bin/python -m pip install --upgrade pip
+          ./.venv/bin/python -m pip install -r requirements.txt pytest
+
       - name: Run governance checks
         run: |
           ./.venv/bin/python project/scripts/verify_governance.py --check all
