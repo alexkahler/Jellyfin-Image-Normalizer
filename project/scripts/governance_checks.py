@@ -237,6 +237,24 @@ def _print_check_result(check_name: str, result: CheckResult) -> None:
             "  INFO: Remaining parity/test linkage gaps: "
             f"{surface_report.parity_test_linkage_gaps}"
         )
+    collectability_report = getattr(result, "collectability_report", None)
+    if collectability_report is not None:
+        print(
+            "  INFO: Characterization collectability owner nodeids checked: "
+            f"{collectability_report.total_owner_nodeids}"
+        )
+        print(
+            "  INFO: Characterization collectability owner nodeids resolved: "
+            f"{collectability_report.resolved_owner_nodeids}"
+        )
+        print(
+            "  INFO: Characterization collectability owner nodeids unresolved: "
+            f"{collectability_report.unresolved_owner_nodeids}"
+        )
+        if collectability_report.unresolved_owner_nodeids == 0:
+            print("  INFO: Characterization collectability/linkage OK")
+        else:
+            print("  INFO: Characterization collectability/linkage NOT OK")
     for warning in result.warnings:
         print(f"  WARN: {warning}")
     for error in result.errors:

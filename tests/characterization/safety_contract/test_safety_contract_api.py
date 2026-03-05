@@ -13,7 +13,9 @@ from tests.characterization.safety_contract._harness import (
     FakeResponse,
     assert_expected_messages,
     assert_observation_subset,
+    capture_safety_messages,
     load_baseline_cases,
+    observed_messages,
 )
 
 
@@ -38,14 +40,15 @@ def test_api_dryrun_001_characterization(
     monkeypatch.setattr(requests, "post", fake_post)
 
     client = JellyfinClient(base_url="http://example", api_key="token", dry_run=True)
-    with caplog.at_level(logging.DEBUG):
-        result = client.set_item_image_bytes(
-            item_id="item1",
-            image_type="Logo",
-            data=b"abc",
-            content_type="image/png",
-            backdrop_index=None,
-        )
+    with capture_safety_messages() as captured_messages:
+        with caplog.at_level(logging.DEBUG):
+            result = client.set_item_image_bytes(
+                item_id="item1",
+                image_type="Logo",
+                data=b"abc",
+                content_type="image/png",
+                backdrop_index=None,
+            )
 
     observed = {
         "result": {"return_value": result, "raises": None},
@@ -54,7 +57,7 @@ def test_api_dryrun_001_characterization(
     assert_observation_subset(case["expected_observations"], observed)
     assert_expected_messages(
         case.get("expected_messages"),
-        [record.getMessage() for record in caplog.records],
+        observed_messages(caplog, captured_messages),
     )
 
 
@@ -79,12 +82,13 @@ def test_api_dryrun_002_characterization(
     monkeypatch.setattr(requests, "post", fake_post)
 
     client = JellyfinClient(base_url="http://example", api_key="token", dry_run=True)
-    with caplog.at_level(logging.DEBUG):
-        result = client.set_user_profile_image(
-            user_id="user1",
-            data=b"abc",
-            content_type="image/png",
-        )
+    with capture_safety_messages() as captured_messages:
+        with caplog.at_level(logging.DEBUG):
+            result = client.set_user_profile_image(
+                user_id="user1",
+                data=b"abc",
+                content_type="image/png",
+            )
 
     observed = {
         "result": {"return_value": result, "raises": None},
@@ -96,7 +100,7 @@ def test_api_dryrun_002_characterization(
     assert_observation_subset(case["expected_observations"], observed)
     assert_expected_messages(
         case.get("expected_messages"),
-        [record.getMessage() for record in caplog.records],
+        observed_messages(caplog, captured_messages),
     )
 
 

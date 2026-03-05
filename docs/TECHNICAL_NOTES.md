@@ -169,8 +169,10 @@ padding_remove_sensitivity = 0
 - Generate or verify route-fence JSON sync with:
   - `./.venv/bin/python project/scripts/generate_route_fence_json.py --write`
   - `./.venv/bin/python project/scripts/generate_route_fence_json.py --check`
-- Run characterization linkage checks with `./.venv/bin/python project/scripts/verify_governance.py --check characterization` to validate baseline schema, parity linkage, owner test references, imaging manifest linkage, artifact budgets for `CLI-*`, `CFG-*`, and `IMG-*` IDs, and Surface Coverage Gate completeness via `project/surface-coverage-index.json` (including remaining unmapped CLI/config/observability report counters).
+- Run characterization linkage checks with `./.venv/bin/python project/scripts/verify_governance.py --check characterization` to validate baseline schema, parity linkage, owner test references, collectability of parity-owned characterization nodeids via `pytest --collect-only`, imaging manifest linkage, artifact budgets for `CLI-*`, `CFG-*`, and `IMG-*` IDs, and Surface Coverage Gate completeness via `project/surface-coverage-index.json` (including remaining unmapped CLI/config/observability report counters and explicit collectability status output).
 - Characterization suites live in `tests/characterization/cli_contract/`, `tests/characterization/config_contract/`, `tests/characterization/imaging_contract/`, and `tests/characterization/safety_contract/`, with baseline contracts in `tests/characterization/baselines/`.
+- Characterization message normalization policy for baseline assertions is intentionally narrow: strip ANSI codes, trim outer whitespace, and de-duplicate identical captured lines; do not rewrite message semantics or relax token meaning.
+- If a targeted rebaseline is required for message-token drift, limit updates to the affected baseline case(s) and record a deterministic before/after token diff in the slice work report.
 - Safety contract baseline is `tests/characterization/baselines/safety_contract_baseline.json` and covers dry-run/write-gate + restore-safety invariants (`API-*`, `PIPE-*`, `RST-*` safety IDs).
 - Imaging golden artifacts are stored in `tests/golden/imaging/`:
   - expected outputs: `tests/golden/imaging/expected/`

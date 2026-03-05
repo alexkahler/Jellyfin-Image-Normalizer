@@ -11,10 +11,11 @@ Execution order (Track 1 slices):
 Iteratively planned slices:
 - Slice 7 -> WI-001 Surface Coverage Gate (touches WI-002/WI-004 artifacts)
 - Slice 8 -> WI-002 Route-fence runtime enforcement (touches WI-001 governance artifacts)
+- Slice 9 -> WI-001 COV-01a Characterization collectability hardening (touches WI-004/WI-005 artifacts)
 
-After Slice 8, subsequent slices are planned iteratively and are typically route-fence
-flip slices starting with the lowest-risk run+logo path.
-Route-fence flips must not be planned/executed until Slice 7 Surface Coverage Gate and
-Slice 8 runtime route-fence enforcement are both passing.
+After Slice 9, subsequent slices remain iterative. Governance-coverage slices
+(starting with COV-01b) take precedence before route-fence flip planning.
+Route-fence flips must not be planned/executed until Slice 7 Surface Coverage Gate,
+Slice 8 runtime route-fence enforcement, and Slice 9 collectability hardening are passing.
 
 The WI numbers represent thematic areas, not execution order.

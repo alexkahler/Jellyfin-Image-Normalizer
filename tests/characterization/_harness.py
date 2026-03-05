@@ -2,17 +2,72 @@
 
 from __future__ import annotations
 
+import re
 import json
 import logging
 import sys
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 import pytest
 
-
 PREFLIGHT_EXPECTED_VALUES = {"not_reached", "mocked_ok", "mocked_fail"}
+ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+class _ListHandler(logging.Handler):
+    """Capture log message strings into one in-memory list."""
+
+    def __init__(self, sink: list[str]) -> None:
+        super().__init__(level=logging.DEBUG)
+        self._sink = sink
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self._sink.append(record.getMessage())
+
+
+def _normalize_message(message: str) -> str:
+    """Normalize one captured message without removing meaning-bearing text."""
+    return ANSI_ESCAPE_RE.sub("", message).strip()
+
+
+def merge_observed_messages(*message_sources: list[str]) -> list[str]:
+    """Merge captured message lists deterministically with minimal normalization.
+
+    Normalization policy:
+    - remove ANSI color escape codes,
+    - trim leading/trailing whitespace,
+    - preserve exact semantic text (no token rewriting, regex matching, or reordering).
+    """
+    merged: list[str] = []
+    seen: set[str] = set()
+    for source in message_sources:
+        for raw in source:
+            normalized = _normalize_message(raw)
+            if not normalized or normalized in seen:
+                continue
+            merged.append(normalized)
+            seen.add(normalized)
+    return merged
+
+
+@contextmanager
+def capture_logger_messages(logger_name: str) -> Iterator[list[str]]:
+    """Capture messages for one logger with scoped install/uninstall lifecycle."""
+    logger = logging.getLogger(logger_name)
+    captured: list[str] = []
+    handler = _ListHandler(captured)
+    logger.addHandler(handler)
+    try:
+        yield captured
+    finally:
+        try:
+            logger.removeHandler(handler)
+        except ValueError:
+            # Allow safe cleanup when test code reconfigures handlers in-flight.
+            pass
 
 
 @dataclass(frozen=True)
@@ -196,10 +251,31 @@ def run_cli_case(
             lambda **_kwargs: True,
         )
 
+    captured_from_runtime_logger: list[str] = []
+    attached_handlers: list[tuple[logging.Logger, logging.Handler]] = []
+    original_setup_logging = cli.setup_logging
+
+    def wrapped_setup_logging(
+        cfg: dict[str, Any], args: Any
+    ) -> tuple[Any, dict[str, Any]]:
+        adapter, settings = original_setup_logging(cfg, args)
+        handler = _ListHandler(captured_from_runtime_logger)
+        adapter.logger.addHandler(handler)
+        attached_handlers.append((adapter.logger, handler))
+        return adapter, settings
+
+    monkeypatch.setattr(cli, "setup_logging", wrapped_setup_logging)
     monkeypatch.setattr(sys, "argv", ["jfin", *argv])
-    with caplog.at_level(logging.DEBUG):
-        with pytest.raises(SystemExit) as excinfo:
-            cli.main()
+    try:
+        with caplog.at_level(logging.DEBUG):
+            with pytest.raises(SystemExit) as excinfo:
+                cli.main()
+    finally:
+        for logger, handler in attached_handlers:
+            try:
+                logger.removeHandler(handler)
+            except ValueError:
+                pass
 
     raw_code = excinfo.value.code
     exit_code = raw_code if isinstance(raw_code, int) else 1
@@ -208,7 +284,10 @@ def run_cli_case(
         "warnings": state.stats.warnings,
         "successes": state.stats.successes,
     }
-    observed_messages = [record.getMessage() for record in caplog.records]
+    observed_messages = merge_observed_messages(
+        [record.getMessage() for record in caplog.records],
+        captured_from_runtime_logger,
+    )
 
     # Avoid leaking run state to subsequent calls if this helper is reused directly.
     state.reset_state()

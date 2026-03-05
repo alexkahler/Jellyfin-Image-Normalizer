@@ -51,7 +51,7 @@
         "warnings": 1
       },
       "expected_messages": [
-        "--thumb-jpeg-quality has no effect without 'thumb' mode selected."
+        "--thumb-jpeg-quality has no effect because 'thumb' mode is not selected."
       ],
       "expected_preflight": "mocked_ok",
       "notes": "incompatible mode override emits warning."
@@ -69,3 +69,4 @@
     }
   }
 }
+

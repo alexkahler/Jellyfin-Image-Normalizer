@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import sys
 import textwrap
+from types import SimpleNamespace
 from pathlib import Path
 
 import pytest
@@ -350,3 +351,24 @@ def test_supported_checks_include_architecture_and_characterization(governance_m
     )
     assert "architecture" in check_action.choices
     assert "characterization" in check_action.choices
+
+
+def test_print_check_result_includes_collectability_ok_signal(
+    governance_module,
+    capsys: pytest.CaptureFixture[str],
+):
+    """Characterization output should emit explicit collectability/linkage status."""
+    result = governance_module.CheckResult()
+    setattr(
+        result,
+        "collectability_report",
+        SimpleNamespace(
+            total_owner_nodeids=3,
+            resolved_owner_nodeids=3,
+            unresolved_owner_nodeids=0,
+        ),
+    )
+
+    governance_module._print_check_result("characterization", result)
+    output = capsys.readouterr().out
+    assert "Characterization collectability/linkage OK" in output

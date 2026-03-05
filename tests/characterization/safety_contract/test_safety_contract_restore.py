@@ -14,7 +14,9 @@ from jfin.client import JellyfinClient
 from tests.characterization.safety_contract._harness import (
     assert_expected_messages,
     assert_observation_subset,
+    capture_safety_messages,
     load_baseline_cases,
+    observed_messages,
     write_backup_files,
 )
 
@@ -108,14 +110,15 @@ def test_rst_refuse_001_characterization(
     state.reset_state()
     missing_root = tmp_path / "missing"
     jf_client = Mock(spec=JellyfinClient)
-    with caplog.at_level(logging.DEBUG):
-        with pytest.raises(SystemExit) as excinfo:
-            restore_from_backups(
-                backup_root=missing_root,
-                jf_client=jf_client,
-                operations=["logo"],
-                dry_run=False,
-            )
+    with capture_safety_messages() as captured_messages:
+        with caplog.at_level(logging.DEBUG):
+            with pytest.raises(SystemExit) as excinfo:
+                restore_from_backups(
+                    backup_root=missing_root,
+                    jf_client=jf_client,
+                    operations=["logo"],
+                    dry_run=False,
+                )
 
     observed = {
         "result": {
@@ -128,7 +131,7 @@ def test_rst_refuse_001_characterization(
     assert_observation_subset(case["expected_observations"], observed)
     assert_expected_messages(
         case.get("expected_messages"),
-        [record.getMessage() for record in caplog.records],
+        observed_messages(caplog, captured_messages),
     )
 
 
