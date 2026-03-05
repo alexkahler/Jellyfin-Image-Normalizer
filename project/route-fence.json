@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "rows": [
+    {
+      "command": "run",
+      "mode": "logo",
+      "route": "v0",
+      "owner_slice": "WI-00X",
+      "parity_status": "pending"
+    },
+    {
+      "command": "run",
+      "mode": "thumb",
+      "route": "v0",
+      "owner_slice": "WI-00X",
+      "parity_status": "pending"
+    },
+    {
+      "command": "run",
+      "mode": "backdrop",
+      "route": "v0",
+      "owner_slice": "WI-00X",
+      "parity_status": "pending"
+    },
+    {
+      "command": "run",
+      "mode": "profile",
+      "route": "v0",
+      "owner_slice": "WI-00X",
+      "parity_status": "pending"
+    },
+    {
+      "command": "restore",
+      "mode": "logo|thumb|backdrop|profile",
+      "route": "v0",
+      "owner_slice": "WI-00X",
+      "parity_status": "pending"
+    },
+    {
+      "command": "test_connection",
+      "mode": "n/a",
+      "route": "v0",
+      "owner_slice": "WI-00X",
+      "parity_status": "pending"
+    },
+    {
+      "command": "config_init",
+      "mode": "n/a",
+      "route": "v0",
+      "owner_slice": "WI-00X",
+      "parity_status": "pending"
+    },
+    {
+      "command": "config_validate",
+      "mode": "n/a",
+      "route": "v0",
+      "owner_slice": "WI-00X",
+      "parity_status": "pending"
+    }
+  ]
+}

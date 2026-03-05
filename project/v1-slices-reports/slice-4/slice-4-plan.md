@@ -6,7 +6,7 @@ This plan locks WI-003 to the imaging boundary while preserving existing Track 1
 As of **March 4, 2026**, `python project/scripts/verify_governance.py --check all` is run as a recorded gate signal, with known pre-existing `loc` failures in `src/jfin/*`. WI-003 must not introduce any new check failures.
 
 ## Decisions Locked
-1. Corpus is **hybrid**: synthetic backbone + tiny self-made “real-ish” fixtures.
+1. Corpus is **hybrid**: synthetic backbone + tiny self-made "real-ish" fixtures.
 2. WI-003 seam is **imaging-only**:
 - Allowed: `jfin.imaging` logic and `RunStats` mutation inside imaging helpers.
 - Forbidden: `jfin.pipeline` and `jfin.client` ownership/assertions.

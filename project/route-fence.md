@@ -2,6 +2,7 @@
 
 This table tracks command/mode strangler routing ownership and parity readiness.
 
+<!-- ROUTE_FENCE_TABLE_START -->
 | command | mode | route(v0\|v1) | owner slice | parity status |
 | --- | --- | --- | --- | --- |
 | run | logo | v0 | WI-00X | pending |
@@ -12,3 +13,4 @@ This table tracks command/mode strangler routing ownership and parity readiness.
 | test_connection | n/a | v0 | WI-00X | pending |
 | config_init | n/a | v0 | WI-00X | pending |
 | config_validate | n/a | v0 | WI-00X | pending |
+<!-- ROUTE_FENCE_TABLE_END -->

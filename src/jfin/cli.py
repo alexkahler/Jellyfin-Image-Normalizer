@@ -38,6 +38,7 @@ from .pipeline import (
     process_single_profile,
     process_single_item_api,
 )
+from .route_fence import RouteFenceError, resolve_route, route_fence_json_path
 
 CONFIG_ARG = "--config"  # nosec B105
 
@@ -488,6 +489,28 @@ def run_preflight_check(jf_client: JellyfinClient) -> None:
     raise SystemExit(1)
 
 
+def _enforce_route(command: str, mode: str) -> None:
+    """Fail closed if route-fence blocks the requested command/mode path."""
+    try:
+        route = resolve_route(command, mode)
+    except RouteFenceError as exc:
+        state.log.critical(str(exc))
+        state.stats.record_error("route-fence", str(exc))
+        raise SystemExit(1)
+
+    if route == "v0":
+        return
+
+    route_source = route_fence_json_path()
+    message = (
+        "route-fence dispatch blocked: command='%s' mode='%s' declares route='%s' "
+        "but v1 runtime path is not implemented in this build. Source: %s."
+    ) % (command, mode, route, route_source)
+    state.log.critical(message)
+    state.stats.record_error("route-fence", message)
+    raise SystemExit(1)
+
+
 def main() -> None:
     args = parse_args()
 
@@ -505,6 +528,7 @@ def main() -> None:
 
         if args.generate_config:
             validate_generate_config_args(sys.argv[1:])
+            _enforce_route("config_init", "n/a")
             generate_default_config(config_path)
             raise SystemExit(0)
 
@@ -566,6 +590,7 @@ def main() -> None:
         run_started = True
 
         if args.test_jf:
+            _enforce_route("test_connection", "n/a")
             jf_url = cfg.get("jf_url") or args.jf_url
             jf_api_key = cfg.get("jf_api_key") or args.jf_api_key
             if not jf_url or not jf_api_key:
@@ -582,6 +607,9 @@ def main() -> None:
             else:
                 state.stats.record_error("test-jf", "Connection test failed.")
             raise SystemExit(0 if ok else 1)
+
+        if restore_requested:
+            _enforce_route("restore", "logo|thumb|backdrop|profile")
 
         if args.single and not args.mode:
             state.log.critical(
@@ -620,6 +648,11 @@ def main() -> None:
                 raise SystemExit(1)
 
         warn_unrecommended_aspect_ratios(settings_by_mode)
+
+        if not restore_requested:
+            for route_mode in operations:
+                if route_mode in VALID_MODES:
+                    _enforce_route("run", route_mode)
 
         if args.single:
             ops_set = set(operations)

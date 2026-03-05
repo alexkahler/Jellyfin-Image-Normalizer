@@ -5,6 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+ROUTE_FENCE_MARKER_START = "<!-- ROUTE_FENCE_TABLE_START -->"
+ROUTE_FENCE_MARKER_END = "<!-- ROUTE_FENCE_TABLE_END -->"
+ROUTE_FENCE_JSON_RELATIVE_PATH = Path("project/route-fence.json")
+ROUTE_FENCE_MARKDOWN_RELATIVE_PATH = Path("project/route-fence.md")
+ROUTE_FENCE_JSON_VERSION = 1
+
 REQUIRED_PARITY_COLUMNS = [
     "behavior_id",
     "baseline_source",
@@ -93,6 +99,29 @@ class MarkdownTable:
 
     columns: list[str]
     rows: list[dict[str, str]]
+
+
+def extract_marked_block(
+    text: str,
+    *,
+    start_marker: str,
+    end_marker: str,
+    table_name: str,
+) -> str:
+    """Extract content between required marker tokens."""
+    start_index = text.find(start_marker)
+    end_index = text.find(end_marker)
+    if start_index < 0:
+        raise ParityContractError(
+            f"{table_name}: start marker not found: {start_marker!r}"
+        )
+    if end_index < 0:
+        raise ParityContractError(f"{table_name}: end marker not found: {end_marker!r}")
+    if end_index <= start_index:
+        raise ParityContractError(
+            f"{table_name}: marker order is invalid ({start_marker!r} before {end_marker!r})."
+        )
+    return text[start_index + len(start_marker) : end_index].strip()
 
 
 def _normalize_cell(cell: str) -> str:
@@ -193,3 +222,23 @@ def load_markdown_table(
     except FileNotFoundError as exc:
         raise ParityContractError(f"{table_name}: file not found: {path}") from exc
     return parse_markdown_table(text, expected_columns, table_name)
+
+
+def load_marked_route_fence_table(path: Path) -> MarkdownTable:
+    """Load the canonical route-fence table between machine markers."""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except FileNotFoundError as exc:
+        raise ParityContractError(f"route-fence: file not found: {path}") from exc
+
+    table_text = extract_marked_block(
+        text,
+        start_marker=ROUTE_FENCE_MARKER_START,
+        end_marker=ROUTE_FENCE_MARKER_END,
+        table_name="route-fence",
+    )
+    return parse_markdown_table(
+        table_text,
+        REQUIRED_ROUTE_FENCE_COLUMNS,
+        "route-fence",
+    )

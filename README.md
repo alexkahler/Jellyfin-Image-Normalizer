@@ -437,6 +437,17 @@ Run parity-only validation:
 python project/scripts/verify_governance.py --check parity
 ```
 
+Generate or verify the runtime route-fence JSON artifact (Slice 8):
+
+```bash
+python project/scripts/generate_route_fence_json.py --write
+python project/scripts/generate_route_fence_json.py --check
+```
+
+`--check parity` validates the canonical marked table in
+`project/route-fence.md` and enforces exact sync with
+`project/route-fence.json`.
+
 Run characterization linkage validation:
 
 ```bash
@@ -469,7 +480,10 @@ PYTHONPATH=src python -m pytest -q tests/characterization/safety_contract
 ```
 
 Verification command policy is tracked in `project/verification-contract.yml`.
-Parity artifacts are tracked in `project/parity-matrix.md` and `project/route-fence.md`.
+Parity artifacts are tracked in:
+- `project/parity-matrix.md`
+- `project/route-fence.md` (canonical marked table)
+- `project/route-fence.json` (runtime artifact generated from markdown)
 Characterization baselines are tracked in `tests/characterization/baselines/`.
 Safety baseline coverage is tracked in
 `tests/characterization/baselines/safety_contract_baseline.json`.

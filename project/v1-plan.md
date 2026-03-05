@@ -368,7 +368,7 @@ Each parity row must include:
 4. If verification exceeds 10 minutes, split the slice first.
 5. Every slice includes explicit rollback.
 6. Full-suite runs are gate checks, not default per-slice checks.
-7. No “while I'm here” edits.
+7. No "while I'm here" edits.
 
 ### Iterative planning rule for subsequent slices (preserved from v1)
 

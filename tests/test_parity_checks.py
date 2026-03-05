@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import json
 import sys
 from pathlib import Path
 
@@ -88,15 +89,34 @@ def _write_valid_artifacts(tmp_path: Path, parity_contract) -> tuple[Path, Path]
     route_rows = _build_valid_route_rows(parity_contract)
 
     parity_table = _render_table(parity_contract.REQUIRED_PARITY_COLUMNS, parity_rows)
-    route_table = _render_table(
-        parity_contract.REQUIRED_ROUTE_FENCE_COLUMNS,
-        route_rows,
+    route_table_body = _render_table(
+        parity_contract.REQUIRED_ROUTE_FENCE_COLUMNS, route_rows
     )
+    route_table = (
+        f"{parity_contract.ROUTE_FENCE_MARKER_START}\n"
+        f"{route_table_body}"
+        f"{parity_contract.ROUTE_FENCE_MARKER_END}\n"
+    )
+    route_json_payload = {
+        "version": parity_contract.ROUTE_FENCE_JSON_VERSION,
+        "rows": [
+            {
+                "command": row["command"],
+                "mode": row["mode"],
+                "route": row["route(v0|v1)"],
+                "owner_slice": row["owner slice"],
+                "parity_status": row["parity status"],
+            }
+            for row in route_rows
+        ],
+    }
 
     parity_path = tmp_path / "project" / "parity-matrix.md"
     route_path = tmp_path / "project" / "route-fence.md"
+    route_json_path = tmp_path / "project" / "route-fence.json"
     _write_file(parity_path, parity_table)
     _write_file(route_path, route_table)
+    _write_file(route_json_path, json.dumps(route_json_payload, indent=2) + "\n")
     return parity_path, route_path
 
 
@@ -199,9 +219,13 @@ def test_route_fence_fails_when_required_row_missing(parity_modules, tmp_path: P
 
     route_rows = _build_valid_route_rows(parity_contract)
     route_rows = route_rows[:-1]
-    route_table = _render_table(
-        parity_contract.REQUIRED_ROUTE_FENCE_COLUMNS,
-        route_rows,
+    route_table_body = _render_table(
+        parity_contract.REQUIRED_ROUTE_FENCE_COLUMNS, route_rows
+    )
+    route_table = (
+        f"{parity_contract.ROUTE_FENCE_MARKER_START}\n"
+        f"{route_table_body}"
+        f"{parity_contract.ROUTE_FENCE_MARKER_END}\n"
     )
     _write_file(route_path, route_table)
 
@@ -216,11 +240,53 @@ def test_route_fence_fails_on_invalid_route_value(parity_modules, tmp_path: Path
 
     route_rows = _build_valid_route_rows(parity_contract)
     route_rows[0]["route(v0|v1)"] = "legacy"
-    route_table = _render_table(
-        parity_contract.REQUIRED_ROUTE_FENCE_COLUMNS,
-        route_rows,
+    route_table_body = _render_table(
+        parity_contract.REQUIRED_ROUTE_FENCE_COLUMNS, route_rows
+    )
+    route_table = (
+        f"{parity_contract.ROUTE_FENCE_MARKER_START}\n"
+        f"{route_table_body}"
+        f"{parity_contract.ROUTE_FENCE_MARKER_END}\n"
     )
     _write_file(route_path, route_table)
 
     result = parity_checks.check_parity_artifacts(tmp_path)
     assert any("invalid route(v0|v1)" in error for error in result.errors)
+
+
+def test_route_fence_fails_when_markers_missing(parity_modules, tmp_path: Path):
+    """Route-fence markdown must include canonical machine markers."""
+    parity_contract, parity_checks = parity_modules
+    _parity_path, route_path = _write_valid_artifacts(tmp_path, parity_contract)
+
+    route_rows = _build_valid_route_rows(parity_contract)
+    route_table = _render_table(
+        parity_contract.REQUIRED_ROUTE_FENCE_COLUMNS, route_rows
+    )
+    _write_file(route_path, route_table)
+
+    result = parity_checks.check_parity_artifacts(tmp_path)
+    assert any("start marker not found" in error for error in result.errors)
+
+
+def test_route_fence_json_sync_fails_when_json_missing(parity_modules, tmp_path: Path):
+    """Parity checks fail when the JSON artifact is missing."""
+    parity_contract, parity_checks = parity_modules
+    _write_valid_artifacts(tmp_path, parity_contract)
+    (tmp_path / "project" / "route-fence.json").unlink()
+
+    result = parity_checks.check_parity_artifacts(tmp_path)
+    assert any("route-fence-json: file not found" in error for error in result.errors)
+
+
+def test_route_fence_json_sync_fails_on_mismatch(parity_modules, tmp_path: Path):
+    """Parity checks fail when markdown and JSON rows diverge."""
+    parity_contract, parity_checks = parity_modules
+    _write_valid_artifacts(tmp_path, parity_contract)
+    route_json_path = tmp_path / "project" / "route-fence.json"
+    payload = json.loads(route_json_path.read_text(encoding="utf-8"))
+    payload["rows"][0]["route"] = "v1"
+    _write_file(route_json_path, json.dumps(payload, indent=2) + "\n")
+
+    result = parity_checks.check_parity_artifacts(tmp_path)
+    assert any("route-fence-json: mismatch for" in error for error in result.errors)

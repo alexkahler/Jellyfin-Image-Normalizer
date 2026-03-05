@@ -43,7 +43,7 @@ Implemented Slice 5 end-to-end as requested, with governance-only changes and no
 
 **Findings**
 1. No remaining Slice 5 blockers after re-check and follow-up fixes.
-2. `F-001` was valid and is now fixed: `entry_exit_modules` is enforced as an exact fixed list (`["src/jfin/cli.py"]`), not “contains cli”.  
+2. `F-001` was valid and is now fixed: `entry_exit_modules` is enforced as an exact fixed list (`["src/jfin/cli.py"]`), not "contains cli".  
    [architecture_contract.py:146](C:/Users/akaehler/Proton Drive/alex.kahler/My files/Projects/Jellyfin Image Normalizer/project/scripts/architecture_contract.py:146)
 3. `F-002` is now covered with explicit schema-negative tests for:
 - extra/missing entry module

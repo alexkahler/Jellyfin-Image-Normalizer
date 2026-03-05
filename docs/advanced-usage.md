@@ -1,6 +1,6 @@
 # Advanced Usage & Tips
 
-This page collects small but useful patterns and best practices that don't fit in the basic README examples.
+This page collects small but useful patterns and best practices that doesn't fit in the basic README examples.
 
 ---
 

@@ -106,7 +106,7 @@
 
 ## Assumptions and Defaults
 1. Governance location is fixed to characterization checks (no new `--check surface` selector).
-2. CLI inventory is dynamic (root plus detected subcommands), never hard-coded to “root only.”
+2. CLI inventory is dynamic (root plus detected subcommands), never hard-coded to "root only."
 3. Exit codes are treated as observability contract behavior.
 4. Owner test refs accept `path` or `path::symbol`.
 5. Target is minimal change footprint with no new `src/` architecture work.

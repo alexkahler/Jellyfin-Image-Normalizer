@@ -75,16 +75,17 @@ padding_remove_sensitivity = 0
 2) Configure logging early, load the TOML config, merge CLI overrides, and validate config values.  
 3) Validate `--restore-all` exclusivity; normalize backup mode.  
 4) Determine operations: `test-jf` shortcut, `restore-all` runs all modes, otherwise `parse_operations` from CLI/config.  
-5) Build `JellyfinClient` from config (writes enabled when `dry_run=false`).  
-6) Pre-flight connectivity check: call `/System/Info` once via `test_connection`; abort early with a logged critical if unreachable, unauthorized/forbidden, returning 503, or reporting `IsShuttingDown=true`.  
-7) For each mode, validate required config and build `ModeRuntimeSettings` (width/height, scaling flags, qualities, padding).  
-8) Branches:
+5) Enforce runtime route-fence gating from `project/route-fence.json` for user entrypoints (`config_init`, `test_connection`, `restore`, and `run` per mode). Route lookup failures and unresolved/`v1` routes fail closed with validation-class exit behavior.  
+6) Build `JellyfinClient` from config (writes enabled when `dry_run=false`).  
+7) Pre-flight connectivity check: call `/System/Info` once via `test_connection`; abort early with a logged critical if unreachable, unauthorized/forbidden, returning 503, or reporting `IsShuttingDown=true`.  
+8) For each mode, validate required config and build `ModeRuntimeSettings` (width/height, scaling flags, qualities, padding).  
+9) Branches:
    - `--single` + item modes (`logo`/`thumb`/`backdrop` or a combination): call `process_single_item_api` once per selected mode (no discovery) for the provided item id.
    - `--single` + `profile` only: call `process_single_profile` (username lookup).
    - `--restore` + `--mode`: restore backups for those modes; with `--single`, restore only the targeted item/user using backup file lookup.
    - `--restore-all`: reuses the same restore path with all modes selected.
    - Normal processing: library modes (`logo`/`thumb`) via discovery + normalize; `profile` via user list.
-9) Always log scale decisions, API failures, and run summary before exit.
+10) Always log scale decisions, API failures, and run summary before exit.
 
 ## Discovery and Library Processing (`pipeline.process_libraries_via_api`)
 - Build `DiscoverySettings` from config and requested operations; image types are derived from modes (`Logo`, `Thumb`, `Backdrop`) and `item_types` map to `IncludeItemTypes` (`Movie`/`Series`).
@@ -164,7 +165,10 @@ padding_remove_sensitivity = 0
   - ratcheted non-entry exit usage (`sys.exit`, `SystemExit`, `from sys import exit`, and `builtins.exit|quit`) against `project/architecture-baseline.json`
   - conditional import boundaries for `src/jfin/domain/` and `src/jfin/app/services/`
 - Regenerate the architecture baseline snapshot with `python project/scripts/verify_governance.py --check architecture --print-baseline`.
-- Run parity-only checks with `python project/scripts/verify_governance.py --check parity` to validate `project/parity-matrix.md` and `project/route-fence.md`.
+- Run parity-only checks with `python project/scripts/verify_governance.py --check parity` to validate `project/parity-matrix.md`, the canonical marked table in `project/route-fence.md`, and exact sync to `project/route-fence.json`.
+- Generate or verify route-fence JSON sync with:
+  - `python project/scripts/generate_route_fence_json.py --write`
+  - `python project/scripts/generate_route_fence_json.py --check`
 - Run characterization linkage checks with `python project/scripts/verify_governance.py --check characterization` to validate baseline schema, parity linkage, owner test references, imaging manifest linkage, artifact budgets for `CLI-*`, `CFG-*`, and `IMG-*` IDs, and Surface Coverage Gate completeness via `project/surface-coverage-index.json` (including remaining unmapped CLI/config/observability report counters).
 - Characterization suites live in `tests/characterization/cli_contract/`, `tests/characterization/config_contract/`, `tests/characterization/imaging_contract/`, and `tests/characterization/safety_contract/`, with baseline contracts in `tests/characterization/baselines/`.
 - Safety contract baseline is `tests/characterization/baselines/safety_contract_baseline.json` and covers dry-run/write-gate + restore-safety invariants (`API-*`, `PIPE-*`, `RST-*` safety IDs).

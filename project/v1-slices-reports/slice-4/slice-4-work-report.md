@@ -99,5 +99,5 @@ If you require strict file-list parity from the old audit's `S4-REQ-015`, it rem
 - `python project/scripts/verify_governance.py --check all` → **same expected LOC-only failure profile** (6 `src` errors + 6 test warnings), no new governance failure classes.
 
 **Remaining nuance**
-- If judged against strict “entailed files exactly” audit interpretation: still partial due added [tests/_characterization_test_helpers.py](C:/Users/akaehler/Proton%20Drive/alex.kahler/My%20files/Projects/Jellyfin%20Image%20Normalizer/tests/_characterization_test_helpers.py) and unchanged `tests/test_characterization_checks_links.py`.
+- If judged against strict "entailed files exactly" audit interpretation: still partial due added [tests/_characterization_test_helpers.py](C:/Users/akaehler/Proton%20Drive/alex.kahler/My%20files/Projects/Jellyfin%20Image%20Normalizer/tests/_characterization_test_helpers.py) and unchanged `tests/test_characterization_checks_links.py`.
 - If judged by functional/governance acceptance criteria: **compliant now**.
