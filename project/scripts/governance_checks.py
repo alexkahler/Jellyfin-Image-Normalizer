@@ -34,6 +34,20 @@ SUPPORTED_CHECKS = (
 )
 EXPECTED_VENV_BOOTSTRAP = "python -m venv .venv"
 EXPECTED_GOVERNANCE_INSTALL_PREFIX = "./.venv/bin/python -m pip install"
+DOCS_TOPOLOGY_ERROR_PREFIX = "docs_topology.contract"
+CANONICAL_CHARACTERIZATION_SUITES = (
+    "tests/characterization/cli_contract/",
+    "tests/characterization/config_contract/",
+    "tests/characterization/imaging_contract/",
+    "tests/characterization/safety_contract/",
+)
+CANONICAL_CHARACTERIZATION_BASELINES = "tests/characterization/baselines/"
+V1_PLAN_CHARACTERIZATION_SUITES_HEADING = "### Characterization suites"
+TECHNICAL_NOTES_SUITES_ANCHOR = "Characterization suites live in"
+CHARACTERIZATION_PATH_TOKEN_PATTERN = re.compile(
+    r"tests[\\/]+characterization[\\/]+[A-Za-z0-9_-]+[\\/]?",
+    re.IGNORECASE,
+)
 
 
 def _extract_ci_job_block(ci_text: str, job_name: str) -> str | None:
@@ -231,6 +245,171 @@ def check_python_version_consistency(
     return result
 
 
+def _add_docs_topology_error(result: CheckResult, detail: str) -> None:
+    """Record one docs-topology error under the stable contract prefix."""
+    result.add_error(f"{DOCS_TOPOLOGY_ERROR_PREFIX}: {detail}")
+
+
+def _normalize_characterization_path(path_token: str) -> str:
+    """Normalize one docs path token for robust, order-insensitive comparison."""
+    normalized = path_token.strip()
+    normalized = normalized.strip("`'\"()[]{}<>,.;:")
+    normalized = normalized.replace("\\", "/")
+    normalized = re.sub(r"/+", "/", normalized)
+    normalized = normalized.rstrip("/") + "/"
+    return normalized.lower()
+
+
+def _extract_characterization_paths(block: str) -> set[str]:
+    """Extract characterization suite path tokens from a bounded doc text block."""
+    extracted_paths = {
+        _normalize_characterization_path(match)
+        for match in CHARACTERIZATION_PATH_TOKEN_PATTERN.findall(block)
+    }
+    return {
+        path for path in extracted_paths if path != CANONICAL_CHARACTERIZATION_BASELINES
+    }
+
+
+def _extract_markdown_section(text: str, heading: str) -> str | None:
+    """Extract one markdown section body until the next same-level heading."""
+    lines = text.splitlines()
+    start = None
+    heading_pattern = re.compile(rf"^\s*{re.escape(heading)}\s*$")
+    for index, line in enumerate(lines):
+        if heading_pattern.match(line):
+            start = index + 1
+            break
+    if start is None:
+        return None
+
+    section_lines: list[str] = []
+    for line in lines[start:]:
+        if re.match(r"^\s*###\s+", line):
+            break
+        section_lines.append(line)
+    return "\n".join(section_lines)
+
+
+def _extract_bounded_statement(text: str, anchor: str) -> str | None:
+    """Extract one markdown bullet statement plus wrapped continuation lines."""
+    lines = text.splitlines()
+    for index, line in enumerate(lines):
+        if anchor not in line:
+            continue
+        statement_lines = [line]
+        for follow_line in lines[index + 1 :]:
+            if re.match(r"^\s*-\s+", follow_line) or re.match(
+                r"^\s*##+\s+", follow_line
+            ):
+                break
+            statement_lines.append(follow_line)
+        return "\n".join(statement_lines)
+    return None
+
+
+def _validate_doc_suite_set(
+    *,
+    source_label: str,
+    observed_paths: set[str],
+    expected_paths: set[str],
+    result: CheckResult,
+) -> None:
+    """Validate one observed doc suite set against the canonical expected set."""
+    missing = sorted(expected_paths - observed_paths)
+    unexpected = sorted(observed_paths - expected_paths)
+    if not missing and not unexpected:
+        return
+
+    details: list[str] = []
+    if missing:
+        details.append(f"missing={missing}")
+    if unexpected:
+        details.append(f"unexpected={unexpected}")
+    _add_docs_topology_error(
+        result,
+        f"{source_label} characterization suite topology mismatch ({'; '.join(details)}).",
+    )
+
+
+def check_docs_topology_contract(repo_root: Path) -> CheckResult:
+    """Ensure blueprint/docs suite topology stays aligned with canonical paths."""
+    result = CheckResult()
+    expected_suites = {
+        _normalize_characterization_path(path)
+        for path in CANONICAL_CHARACTERIZATION_SUITES
+    }
+
+    v1_plan_path = repo_root / "project" / "v1-plan.md"
+    technical_notes_path = repo_root / "docs" / "TECHNICAL_NOTES.md"
+    try:
+        v1_plan_text = v1_plan_path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        _add_docs_topology_error(result, "project/v1-plan.md not found.")
+        v1_plan_text = ""
+    try:
+        technical_notes_text = technical_notes_path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        _add_docs_topology_error(result, "docs/TECHNICAL_NOTES.md not found.")
+        technical_notes_text = ""
+
+    if v1_plan_text:
+        v1_plan_section = _extract_markdown_section(
+            v1_plan_text, V1_PLAN_CHARACTERIZATION_SUITES_HEADING
+        )
+        if v1_plan_section is None:
+            _add_docs_topology_error(
+                result,
+                "project/v1-plan.md missing '### Characterization suites' section.",
+            )
+        else:
+            _validate_doc_suite_set(
+                source_label="project/v1-plan.md",
+                observed_paths=_extract_characterization_paths(v1_plan_section),
+                expected_paths=expected_suites,
+                result=result,
+            )
+
+    if technical_notes_text:
+        technical_statement = _extract_bounded_statement(
+            technical_notes_text, TECHNICAL_NOTES_SUITES_ANCHOR
+        )
+        if technical_statement is None:
+            _add_docs_topology_error(
+                result,
+                "docs/TECHNICAL_NOTES.md missing characterization suites statement.",
+            )
+        else:
+            _validate_doc_suite_set(
+                source_label="docs/TECHNICAL_NOTES.md",
+                observed_paths=_extract_characterization_paths(technical_statement),
+                expected_paths=expected_suites,
+                result=result,
+            )
+
+    required_dirs = [
+        *CANONICAL_CHARACTERIZATION_SUITES,
+        CANONICAL_CHARACTERIZATION_BASELINES,
+    ]
+    for relative_dir in required_dirs:
+        dir_path = repo_root / relative_dir
+        if dir_path.is_dir():
+            continue
+        _add_docs_topology_error(
+            result,
+            f"required directory missing: {relative_dir}",
+        )
+
+    return result
+
+
+def _check_characterization_with_docs_topology(repo_root: Path) -> CheckResult:
+    """Run characterization checks plus the docs-topology contract overlay."""
+    result = check_characterization_artifacts(repo_root)
+    result.merge(check_docs_topology_contract(repo_root))
+    return result
+
+
 def _print_check_result(check_name: str, result: CheckResult) -> None:
     """Print check output in a stable, CI-friendly format."""
     status = "PASS" if not result.errors else "FAIL"
@@ -406,7 +585,9 @@ def run_selected_checks(
         ),
         "architecture": lambda: check_architecture_artifacts(repo_root),
         "parity": lambda: check_parity_artifacts(repo_root),
-        "characterization": lambda: check_characterization_artifacts(repo_root),
+        "characterization": lambda: _check_characterization_with_docs_topology(
+            repo_root
+        ),
         "readiness": lambda: check_readiness_artifacts(repo_root),
     }
 

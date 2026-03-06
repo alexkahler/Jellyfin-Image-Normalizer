@@ -306,9 +306,8 @@ Preserved and updated to reflect Track 1 constraints:
 
 * `tests/characterization/cli_contract/`
 * `tests/characterization/config_contract/`
-* `tests/characterization/workflows/`
-* `tests/characterization/restore_contract/`
-* `tests/characterization/observability/`
+* `tests/characterization/imaging_contract/`
+* `tests/characterization/safety_contract/`
 
 ### Imaging golden suite
 

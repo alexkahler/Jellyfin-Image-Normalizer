@@ -13,6 +13,43 @@ from tests.test_governance_checks import _ci_text, _contract_text, _write_file
 pytest_plugins = ("tests.test_governance_checks",)
 
 
+def _write_docs_topology_artifacts(repo_root: Path) -> None:
+    """Write minimal canonical docs + directories for docs-topology checks."""
+    _write_file(
+        repo_root / "project/v1-plan.md",
+        """
+        ## 16) Behavior Preservation Plan
+
+        ### Characterization suites
+
+        * `tests/characterization/cli_contract/`
+        * `tests/characterization/config_contract/`
+        * `tests/characterization/imaging_contract/`
+        * `tests/characterization/safety_contract/`
+
+        ### Imaging golden suite
+
+        * seed
+        """,
+    )
+    _write_file(
+        repo_root / "docs/TECHNICAL_NOTES.md",
+        """
+        ## Development and Testing Notes
+        - Characterization suites live in `tests/characterization/cli_contract/`, `tests/characterization/config_contract/`, `tests/characterization/imaging_contract/`, and `tests/characterization/safety_contract/`, with baseline contracts in `tests/characterization/baselines/`.
+        - Characterization message normalization policy for baseline assertions is intentionally narrow.
+        """,
+    )
+    for relative in (
+        "tests/characterization/cli_contract",
+        "tests/characterization/config_contract",
+        "tests/characterization/imaging_contract",
+        "tests/characterization/safety_contract",
+        "tests/characterization/baselines",
+    ):
+        (repo_root / relative).mkdir(parents=True, exist_ok=True)
+
+
 def test_ci_sync_fails_when_governance_install_missing(
     governance_module,
     tmp_path: Path,
@@ -102,6 +139,7 @@ def test_run_selected_checks_characterization_returns_zero_for_runtime_warnings(
 ):
     """Warn-only runtime-gate outcomes should not force a nonzero exit code."""
     _write_file(tmp_path / "project/verification-contract.yml", _contract_text())
+    _write_docs_topology_artifacts(tmp_path)
     warning_result = governance_module.CheckResult()
     warning_result.add_warning("runtime_gate.execution_failed: synthetic warning")
     setattr(
