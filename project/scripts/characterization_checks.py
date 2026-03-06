@@ -63,6 +63,15 @@ class CollectabilityReport:
 
 
 @dataclass(frozen=True)
+class RuntimeGateDiagnostic:
+    """Structured runtime-gate warning diagnostic for claim-scoped readiness checks."""
+
+    category: str
+    targets: tuple[str, ...]
+    mapped_parity_ids: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class RuntimeGateReport:
     """Runtime characterization gate counters surfaced by governance output."""
 
@@ -74,6 +83,7 @@ class RuntimeGateReport:
     elapsed_seconds: float
     mapped_parity_ids: tuple[str, ...]
     infos: tuple[str, ...]
+    diagnostics: tuple[RuntimeGateDiagnostic, ...]
 
 
 @dataclass(frozen=True)
@@ -309,9 +319,21 @@ def _add_runtime_gate_warning(
     result: CheckResult,
     category: str,
     detail: str,
+    *,
+    diagnostics: list[RuntimeGateDiagnostic] | None = None,
+    targets: list[str] | tuple[str, ...] = (),
+    mapped_parity_ids: list[str] | tuple[str, ...] = (),
 ) -> None:
     """Record one deterministic runtime-gate warning with stable taxonomy."""
     result.add_warning(f"runtime_gate.{category}: {detail}")
+    if diagnostics is not None:
+        diagnostics.append(
+            RuntimeGateDiagnostic(
+                category=category,
+                targets=tuple(_normalize_nodeid(target) for target in targets),
+                mapped_parity_ids=tuple(sorted(set(mapped_parity_ids))),
+            )
+        )
 
 
 def _add_workflow_contract_finding(
@@ -375,6 +397,7 @@ def _collect_runtime_target_nodeids(
     timeout_seconds: float,
     result: CheckResult,
     parity_ids: list[str],
+    diagnostics: list[RuntimeGateDiagnostic],
 ) -> set[str]:
     """Collect nodeids for configured runtime targets."""
     try:
@@ -391,6 +414,9 @@ def _collect_runtime_target_nodeids(
                 "collect-only timed out for runtime targets "
                 f"{targets} with mapped_parity_ids={parity_ids}."
             ),
+            diagnostics=diagnostics,
+            targets=targets,
+            mapped_parity_ids=parity_ids,
         )
         return set()
 
@@ -404,6 +430,9 @@ def _collect_runtime_target_nodeids(
                 f"{targets} (exit_code={completed.returncode}, detail={detail!r}, "
                 f"mapped_parity_ids={parity_ids})."
             ),
+            diagnostics=diagnostics,
+            targets=targets,
+            mapped_parity_ids=parity_ids,
         )
         return set()
 
@@ -420,6 +449,7 @@ def _check_runtime_characterization_gate(
     result: CheckResult,
 ) -> RuntimeGateReport:
     """Run Slice-10 runtime characterization gate for configured targets."""
+    diagnostics: list[RuntimeGateDiagnostic] = []
     contract_path = repo_root / "project" / "verification-contract.yml"
     try:
         contract = parse_verification_contract(contract_path)
@@ -428,6 +458,7 @@ def _check_runtime_characterization_gate(
             result,
             "target_invalid",
             f"unable to parse runtime gate contract context: {exc}",
+            diagnostics=diagnostics,
         )
         return RuntimeGateReport(
             configured_targets=(),
@@ -438,6 +469,7 @@ def _check_runtime_characterization_gate(
             elapsed_seconds=0.0,
             mapped_parity_ids=(),
             infos=(),
+            diagnostics=(),
         )
 
     configured_targets = _normalize_runtime_targets(contract.runtime_gate.targets)
@@ -451,6 +483,8 @@ def _check_runtime_characterization_gate(
                 result,
                 "target_invalid",
                 f"target must be under tests/characterization/: {target!r}",
+                diagnostics=diagnostics,
+                targets=[target],
             )
             continue
         if not (repo_root / target_path_part).exists():
@@ -458,6 +492,8 @@ def _check_runtime_characterization_gate(
                 result,
                 "target_invalid",
                 f"target path not found: {target_path_part!r}",
+                diagnostics=diagnostics,
+                targets=[target],
             )
             continue
         valid_targets.append(target)
@@ -477,6 +513,7 @@ def _check_runtime_characterization_gate(
             timeout_seconds=timeout_seconds,
             result=result,
             parity_ids=candidate_parity_ids,
+            diagnostics=diagnostics,
         )
         if collected_nodeids:
             mapped_parity_ids = sorted(
@@ -500,6 +537,9 @@ def _check_runtime_characterization_gate(
                 "runtime execution skipped because collect+run exceeded timeout budget "
                 f"for targets {valid_targets} with mapped_parity_ids={mapped_parity_ids}."
             ),
+            diagnostics=diagnostics,
+            targets=valid_targets,
+            mapped_parity_ids=mapped_parity_ids,
         )
     elif valid_targets and not any(
         warning.startswith("runtime_gate.timeout")
@@ -520,6 +560,9 @@ def _check_runtime_characterization_gate(
                     "runtime execution timed out for targets "
                     f"{valid_targets} with mapped_parity_ids={mapped_parity_ids}."
                 ),
+                diagnostics=diagnostics,
+                targets=valid_targets,
+                mapped_parity_ids=mapped_parity_ids,
             )
         else:
             if completed.returncode != 0:
@@ -532,6 +575,9 @@ def _check_runtime_characterization_gate(
                         f"{valid_targets} (exit_code={completed.returncode}, "
                         f"detail={detail!r}, mapped_parity_ids={mapped_parity_ids})."
                     ),
+                    diagnostics=diagnostics,
+                    targets=valid_targets,
+                    mapped_parity_ids=mapped_parity_ids,
                 )
 
     elapsed_seconds = time.monotonic() - start_time
@@ -549,6 +595,9 @@ def _check_runtime_characterization_gate(
                 f"budget_seconds={budget_seconds}, targets={valid_targets}, "
                 f"mapped_parity_ids={mapped_parity_ids})."
             ),
+            diagnostics=diagnostics,
+            targets=valid_targets,
+            mapped_parity_ids=mapped_parity_ids,
         )
 
     warning_count = len(result.warnings) - warning_start
@@ -568,6 +617,7 @@ def _check_runtime_characterization_gate(
         elapsed_seconds=elapsed_seconds,
         mapped_parity_ids=tuple(mapped_parity_ids),
         infos=tuple(infos),
+        diagnostics=tuple(diagnostics),
     )
 
 
