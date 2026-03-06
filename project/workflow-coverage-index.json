@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "cells": {
+    "run|backdrop": {
+      "command": "run",
+      "mode": "backdrop",
+      "required_parity_ids": [
+        "PIPE-BACKDROP-001"
+      ],
+      "required_owner_tests": [
+        "tests/characterization/safety_contract/test_safety_contract_pipeline.py::test_pipe_backdrop_001_characterization"
+      ],
+      "evidence_layout": {
+        "field_container": "expected_observations.calls",
+        "ordering_container": "expected_observations.ordering"
+      },
+      "required_evidence_fields": [
+        "sequence.fetch_indices_dense_ordered",
+        "sequence.normalize_source_index_mapping",
+        "sequence.post_delete_404_verified",
+        "sequence.upload_indices_dense_ordered",
+        "sequence.delete_index_zero_repeated",
+        "sequence.staging_retained_partial_failure"
+      ],
+      "required_ordering_tokens": [
+        "delete_before_upload"
+      ],
+      "severity": {
+        "contract": "block",
+        "sequence": "warn"
+      },
+      "future_split_debt": {
+        "id": "DEBT-BACKDROP-ID-SPLIT-001",
+        "status": "open",
+        "readiness_blocking": true,
+        "enforcement_phase": "COV-03",
+        "closure": {
+          "type": "parity_id_count_min",
+          "cell": "run|backdrop",
+          "min_required": 2
+        }
+      }
+    }
+  }
+}

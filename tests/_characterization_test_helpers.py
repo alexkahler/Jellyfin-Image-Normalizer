@@ -35,7 +35,16 @@ def _default_safety_case_payload() -> dict[str, object]:
     return {
         "expected_observations": {
             "result": {"return_value": True, "raises": None},
-            "calls": {"seed_calls": 0},
+            "calls": {
+                "seed_calls": 0,
+                "sequence.fetch_indices_dense_ordered": True,
+                "sequence.normalize_source_index_mapping": True,
+                "sequence.post_delete_404_verified": True,
+                "sequence.upload_indices_dense_ordered": True,
+                "sequence.delete_index_zero_repeated": True,
+                "sequence.staging_retained_partial_failure": True,
+            },
+            "ordering": ["delete_before_upload"],
         },
         "expected_messages": [],
         "notes": "seed",

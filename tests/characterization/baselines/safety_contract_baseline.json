@@ -70,7 +70,13 @@
         },
         "calls": {
           "delete_calls": 2,
-          "upload_calls": 2
+          "upload_calls": 2,
+          "sequence.fetch_indices_dense_ordered": true,
+          "sequence.normalize_source_index_mapping": true,
+          "sequence.post_delete_404_verified": true,
+          "sequence.upload_indices_dense_ordered": true,
+          "sequence.delete_index_zero_repeated": true,
+          "sequence.staging_retained_partial_failure": true
         },
         "stats": {
           "successes": 1,

@@ -215,6 +215,71 @@ def _build_valid_parity_rows(required_ids: list[str]) -> list[dict[str, str]]:
     return rows
 
 
+def _workflow_index_payload() -> dict[str, object]:
+    """Build a valid workflow coverage index payload for Slice-11 checks."""
+    owner_path, owner_function = _owner_test_for_behavior("PIPE-BACKDROP-001")
+    return {
+        "version": 1,
+        "cells": {
+            "run|backdrop": {
+                "command": "run",
+                "mode": "backdrop",
+                "required_parity_ids": ["PIPE-BACKDROP-001"],
+                "required_owner_tests": [f"{owner_path}::{owner_function}"],
+                "evidence_layout": {
+                    "field_container": "expected_observations.calls",
+                    "ordering_container": "expected_observations.ordering",
+                },
+                "required_evidence_fields": [
+                    "sequence.fetch_indices_dense_ordered",
+                    "sequence.normalize_source_index_mapping",
+                    "sequence.post_delete_404_verified",
+                    "sequence.upload_indices_dense_ordered",
+                    "sequence.delete_index_zero_repeated",
+                    "sequence.staging_retained_partial_failure",
+                ],
+                "required_ordering_tokens": ["delete_before_upload"],
+                "severity": {"contract": "block", "sequence": "warn"},
+                "future_split_debt": {
+                    "id": "DEBT-BACKDROP-ID-SPLIT-001",
+                    "status": "open",
+                    "readiness_blocking": True,
+                    "enforcement_phase": "COV-03",
+                    "closure": {
+                        "type": "parity_id_count_min",
+                        "cell": "run|backdrop",
+                        "min_required": 2,
+                    },
+                },
+            }
+        },
+    }
+
+
+def _write_route_fence_artifact(repo_root: Path, parity_contract) -> None:
+    """Write a valid route-fence markdown artifact for workflow checks."""
+    route_rows = [
+        {
+            "command": command,
+            "mode": mode,
+            "route(v0|v1)": "v0",
+            "owner slice": "WI-00X",
+            "parity status": "pending",
+        }
+        for command, mode in parity_contract.REQUIRED_ROUTE_ROWS
+    ]
+    route_table_body = _render_table(
+        parity_contract.REQUIRED_ROUTE_FENCE_COLUMNS,
+        route_rows,
+    )
+    route_table = (
+        f"{parity_contract.ROUTE_FENCE_MARKER_START}\n"
+        f"{route_table_body}"
+        f"{parity_contract.ROUTE_FENCE_MARKER_END}\n"
+    )
+    _write_file(repo_root / "project/route-fence.md", route_table)
+
+
 def _write_surface_artifacts(
     repo_root: Path,
     characterization_contract,
@@ -544,6 +609,11 @@ def _write_valid_artifacts(
     parity_path = repo_root / "project/parity-matrix.md"
     _write_file(parity_path, parity_text)
     _write_verification_contract(repo_root)
+    _write_file(
+        repo_root / "project/workflow-coverage-index.json",
+        json.dumps(_workflow_index_payload(), indent=2) + "\n",
+    )
+    _write_route_fence_artifact(repo_root, parity_contract)
     _write_surface_artifacts(repo_root, characterization_contract)
     return repo_root, cli_baseline_path, parity_path
 

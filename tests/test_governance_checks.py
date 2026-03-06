@@ -418,3 +418,28 @@ def test_print_check_result_includes_collectability_ok_signal(
     governance_module._print_check_result("characterization", result)
     output = capsys.readouterr().out
     assert "Characterization collectability/linkage OK" in output
+
+
+def test_print_check_result_includes_workflow_sequence_lines(
+    governance_module,
+    capsys: pytest.CaptureFixture[str],
+):
+    """Characterization output should include workflow contract + warning counters."""
+    result = governance_module.CheckResult()
+    setattr(
+        result,
+        "workflow_coverage_report",
+        SimpleNamespace(
+            configured_cells=1,
+            validated_cells=1,
+            contract_errors=0,
+            sequence_warnings=2,
+            count_only_warnings=1,
+            open_debts=1,
+        ),
+    )
+
+    governance_module._print_check_result("characterization", result)
+    output = capsys.readouterr().out
+    assert "Workflow sequence contract OK" in output
+    assert "Workflow sequence evidence warnings: 2" in output

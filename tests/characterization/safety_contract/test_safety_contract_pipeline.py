@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 from unittest.mock import Mock
 
 import pytest
@@ -173,6 +173,7 @@ def test_pipe_backdrop_001_characterization(
         f"payload-{kwargs['index']}".encode("utf-8"),
         "image/jpeg",
     )
+    normalized_backdrop_indices: list[int] = []
 
     def fake_normalize_image_bytes(**kwargs):
         plan = ScalePlan(
@@ -184,6 +185,7 @@ def test_pipe_backdrop_001_characterization(
             orig_height=50,
         )
         idx = kwargs.get("backdrop_index") or 0
+        normalized_backdrop_indices.append(idx)
         return plan, f"normalized-{idx}".encode("utf-8"), "image/jpeg"
 
     monkeypatch.setattr(
@@ -225,12 +227,48 @@ def test_pipe_backdrop_001_characterization(
     first_upload_idx = next(
         i for i, c in enumerate(all_calls) if c[0] == "set_item_image_bytes"
     )
+    backdrop_count = item.backdrop_count or 0
+    fetch_calls = jf_client.get_item_image.call_args_list[:backdrop_count]
+    fetch_indices = [call.kwargs.get("index") for call in fetch_calls]
+
+    def _delete_index(call: Any) -> int | None:
+        if "index" in call.kwargs:
+            return cast(int | None, call.kwargs["index"])
+        if "image_index" in call.kwargs:
+            return cast(int | None, call.kwargs["image_index"])
+        if len(call.args) >= 3:
+            return cast(int | None, call.args[2])
+        return None
+
+    delete_indices = [
+        _delete_index(call) for call in jf_client.delete_image.call_args_list
+    ]
+    upload_indices = [
+        call.kwargs.get("backdrop_index")
+        for call in jf_client.set_item_image_bytes.call_args_list
+    ]
+    verify_call = jf_client.get_item_image_head.call_args
+    post_delete_404_verified = bool(
+        verify_call
+        and verify_call.kwargs.get("index") == 0
+        and jf_client.get_item_image_head.return_value is None
+    )
     staging_dir = tmp_path / "staging" / item.id
     observed = {
         "result": {"return_value": result, "raises": None},
         "calls": {
             "delete_calls": jf_client.delete_image.call_count,
             "upload_calls": jf_client.set_item_image_bytes.call_count,
+            "sequence.fetch_indices_dense_ordered": fetch_indices
+            == list(range(backdrop_count)),
+            "sequence.normalize_source_index_mapping": normalized_backdrop_indices
+            == list(range(backdrop_count)),
+            "sequence.post_delete_404_verified": post_delete_404_verified,
+            "sequence.upload_indices_dense_ordered": upload_indices
+            == list(range(backdrop_count)),
+            "sequence.delete_index_zero_repeated": delete_indices
+            == ([0] * backdrop_count),
+            "sequence.staging_retained_partial_failure": staging_dir.exists(),
         },
         "stats": {
             "successes": state.stats.successes,

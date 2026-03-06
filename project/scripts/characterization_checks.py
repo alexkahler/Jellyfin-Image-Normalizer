@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import subprocess
@@ -36,12 +37,20 @@ from governance_contract import (
     GovernanceError,
     parse_verification_contract,
 )
-from parity_contract import REQUIRED_PARITY_COLUMNS, load_markdown_table
+from parity_contract import (
+    REQUIRED_PARITY_COLUMNS,
+    load_markdown_table,
+    load_marked_route_fence_table,
+)
 from surface_coverage_checks import check_surface_coverage_artifacts
 
 REQUIRED_COLLECTABILITY_PYTEST_COMMAND = "PYTHONPATH=src ./.venv/bin/python -m pytest"
 COLLECT_ONLY_NODEID_PATTERN = re.compile(r"^tests[\\/].+::.+$")
 RUNTIME_GATE_TIMEOUT_BUFFER_SECONDS = 15
+WORKFLOW_COVERAGE_INDEX_PATH = "project/workflow-coverage-index.json"
+ALLOWED_WORKFLOW_SEVERITY_VALUES = {"block", "warn"}
+WORKFLOW_DEFAULT_CONTRACT_SEVERITY = "block"
+WORKFLOW_DEFAULT_SEQUENCE_SEVERITY = "warn"
 
 
 @dataclass(frozen=True)
@@ -65,6 +74,18 @@ class RuntimeGateReport:
     elapsed_seconds: float
     mapped_parity_ids: tuple[str, ...]
     infos: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class WorkflowCoverageReport:
+    """Workflow-coverage gate counters surfaced by governance output."""
+
+    configured_cells: int
+    validated_cells: int
+    contract_errors: int
+    sequence_warnings: int
+    count_only_warnings: int
+    open_debts: int
 
 
 def _add_collectability_error(
@@ -291,6 +312,36 @@ def _add_runtime_gate_warning(
 ) -> None:
     """Record one deterministic runtime-gate warning with stable taxonomy."""
     result.add_warning(f"runtime_gate.{category}: {detail}")
+
+
+def _add_workflow_contract_finding(
+    result: CheckResult,
+    *,
+    severity: str,
+    category: str,
+    detail: str,
+) -> None:
+    """Record one workflow-coverage contract finding."""
+    message = f"workflow_coverage.contract_{category}: {detail}"
+    if severity == "warn":
+        result.add_warning(message)
+        return
+    result.add_error(message)
+
+
+def _add_workflow_sequence_finding(
+    result: CheckResult,
+    *,
+    severity: str,
+    category: str,
+    detail: str,
+) -> None:
+    """Record one workflow-coverage sequence finding."""
+    message = f"workflow_coverage.sequence_gap.{category}: {detail}"
+    if severity == "block":
+        result.add_error(message)
+        return
+    result.add_warning(message)
 
 
 def _normalize_runtime_targets(targets: list[str]) -> list[str]:
@@ -520,6 +571,769 @@ def _check_runtime_characterization_gate(
     )
 
 
+def _load_all_parity_rows(
+    repo_root: Path,
+    result: CheckResult,
+) -> dict[str, dict[str, str]]:
+    """Load all parity-matrix rows by behavior ID."""
+    parity_matrix_path = repo_root / "project" / "parity-matrix.md"
+    try:
+        table = load_markdown_table(
+            parity_matrix_path,
+            REQUIRED_PARITY_COLUMNS,
+            "parity-matrix",
+        )
+    except Exception as exc:  # pragma: no cover - parity check tests cover this path
+        result.add_error(str(exc))
+        return {}
+    return {row["behavior_id"]: row for row in table.rows}
+
+
+def _resolve_dotted_path(
+    payload: dict[str, Any],
+    dotted_path: str,
+) -> tuple[bool, Any]:
+    """Resolve one dotted key-path from a dict payload."""
+    current: Any = payload
+    for token in dotted_path.split("."):
+        if not isinstance(current, dict) or token not in current:
+            return False, None
+        current = current[token]
+    return True, current
+
+
+def _normalize_string_list(
+    *,
+    value: Any,
+    field_name: str,
+    cell_key: str,
+    result: CheckResult,
+) -> list[str] | None:
+    """Normalize and validate one required list[str] workflow cell field."""
+    if not isinstance(value, list) or not value:
+        _add_workflow_contract_finding(
+            result,
+            severity="block",
+            category="schema",
+            detail=(
+                f"cell={cell_key} field '{field_name}' must be a non-empty list[str]."
+            ),
+        )
+        return None
+    normalized: list[str] = []
+    for item in value:
+        if not isinstance(item, str) or not item.strip():
+            _add_workflow_contract_finding(
+                result,
+                severity="block",
+                category="schema",
+                detail=(
+                    f"cell={cell_key} field '{field_name}' must contain non-empty strings."
+                ),
+            )
+            return None
+        normalized.append(item.strip())
+    return normalized
+
+
+def _normalize_workflow_cell(
+    *,
+    cell_key: str,
+    cell_payload: Any,
+    result: CheckResult,
+) -> dict[str, Any] | None:
+    """Validate and normalize one workflow-coverage index cell payload."""
+    if not isinstance(cell_payload, dict):
+        _add_workflow_contract_finding(
+            result,
+            severity="block",
+            category="schema",
+            detail=f"cell={cell_key} must be an object.",
+        )
+        return None
+
+    required_keys = {
+        "command",
+        "mode",
+        "required_parity_ids",
+        "required_owner_tests",
+        "evidence_layout",
+        "required_evidence_fields",
+        "required_ordering_tokens",
+        "future_split_debt",
+    }
+    missing_keys = sorted(required_keys - set(cell_payload))
+    if missing_keys:
+        _add_workflow_contract_finding(
+            result,
+            severity="block",
+            category="schema",
+            detail=f"cell={cell_key} missing required keys: {missing_keys}.",
+        )
+        return None
+
+    command = cell_payload.get("command")
+    mode = cell_payload.get("mode")
+    if not isinstance(command, str) or not command.strip():
+        _add_workflow_contract_finding(
+            result,
+            severity="block",
+            category="schema",
+            detail=f"cell={cell_key} field 'command' must be non-empty string.",
+        )
+        return None
+    if not isinstance(mode, str) or not mode.strip():
+        _add_workflow_contract_finding(
+            result,
+            severity="block",
+            category="schema",
+            detail=f"cell={cell_key} field 'mode' must be non-empty string.",
+        )
+        return None
+    command = command.strip()
+    mode = mode.strip()
+    expected_key = f"{command}|{mode}"
+    if cell_key != expected_key:
+        _add_workflow_contract_finding(
+            result,
+            severity="block",
+            category="schema",
+            detail=f"cell key '{cell_key}' must match command|mode '{expected_key}'.",
+        )
+        return None
+
+    required_parity_ids = _normalize_string_list(
+        value=cell_payload.get("required_parity_ids"),
+        field_name="required_parity_ids",
+        cell_key=cell_key,
+        result=result,
+    )
+    if required_parity_ids is None:
+        return None
+    required_owner_tests = _normalize_string_list(
+        value=cell_payload.get("required_owner_tests"),
+        field_name="required_owner_tests",
+        cell_key=cell_key,
+        result=result,
+    )
+    if required_owner_tests is None:
+        return None
+    required_evidence_fields = _normalize_string_list(
+        value=cell_payload.get("required_evidence_fields"),
+        field_name="required_evidence_fields",
+        cell_key=cell_key,
+        result=result,
+    )
+    if required_evidence_fields is None:
+        return None
+    required_ordering_tokens = _normalize_string_list(
+        value=cell_payload.get("required_ordering_tokens"),
+        field_name="required_ordering_tokens",
+        cell_key=cell_key,
+        result=result,
+    )
+    if required_ordering_tokens is None:
+        return None
+
+    evidence_layout = cell_payload.get("evidence_layout")
+    if not isinstance(evidence_layout, dict):
+        _add_workflow_contract_finding(
+            result,
+            severity="block",
+            category="schema",
+            detail=f"cell={cell_key} field 'evidence_layout' must be an object.",
+        )
+        return None
+    field_container = evidence_layout.get("field_container")
+    ordering_container = evidence_layout.get("ordering_container")
+    if not isinstance(field_container, str) or not field_container.strip():
+        _add_workflow_contract_finding(
+            result,
+            severity="block",
+            category="schema",
+            detail=(
+                f"cell={cell_key} evidence_layout.field_container must be non-empty string."
+            ),
+        )
+        return None
+    if not isinstance(ordering_container, str) or not ordering_container.strip():
+        _add_workflow_contract_finding(
+            result,
+            severity="block",
+            category="schema",
+            detail=(
+                f"cell={cell_key} evidence_layout.ordering_container must be non-empty string."
+            ),
+        )
+        return None
+
+    raw_severity = cell_payload.get("severity")
+    if raw_severity is None:
+        contract_severity = WORKFLOW_DEFAULT_CONTRACT_SEVERITY
+        sequence_severity = WORKFLOW_DEFAULT_SEQUENCE_SEVERITY
+    elif isinstance(raw_severity, dict):
+        contract_severity = str(
+            raw_severity.get("contract", WORKFLOW_DEFAULT_CONTRACT_SEVERITY)
+        ).strip()
+        sequence_severity = str(
+            raw_severity.get("sequence", WORKFLOW_DEFAULT_SEQUENCE_SEVERITY)
+        ).strip()
+    else:
+        _add_workflow_contract_finding(
+            result,
+            severity="block",
+            category="schema",
+            detail=f"cell={cell_key} field 'severity' must be an object when provided.",
+        )
+        return None
+
+    if contract_severity not in ALLOWED_WORKFLOW_SEVERITY_VALUES:
+        _add_workflow_contract_finding(
+            result,
+            severity="block",
+            category="schema",
+            detail=(
+                f"cell={cell_key} severity.contract must be one of "
+                f"{sorted(ALLOWED_WORKFLOW_SEVERITY_VALUES)}."
+            ),
+        )
+        return None
+    if sequence_severity not in ALLOWED_WORKFLOW_SEVERITY_VALUES:
+        _add_workflow_contract_finding(
+            result,
+            severity="block",
+            category="schema",
+            detail=(
+                f"cell={cell_key} severity.sequence must be one of "
+                f"{sorted(ALLOWED_WORKFLOW_SEVERITY_VALUES)}."
+            ),
+        )
+        return None
+
+    debt = cell_payload.get("future_split_debt")
+    if not isinstance(debt, dict):
+        _add_workflow_contract_finding(
+            result,
+            severity="block",
+            category="schema",
+            detail=f"cell={cell_key} future_split_debt must be an object.",
+        )
+        return None
+    for debt_key in (
+        "id",
+        "status",
+        "readiness_blocking",
+        "enforcement_phase",
+        "closure",
+    ):
+        if debt_key not in debt:
+            _add_workflow_contract_finding(
+                result,
+                severity="block",
+                category="schema",
+                detail=f"cell={cell_key} future_split_debt missing key '{debt_key}'.",
+            )
+            return None
+    if not isinstance(debt["id"], str) or not debt["id"].strip():
+        _add_workflow_contract_finding(
+            result,
+            severity="block",
+            category="schema",
+            detail=f"cell={cell_key} future_split_debt.id must be non-empty string.",
+        )
+        return None
+    if not isinstance(debt["status"], str) or not debt["status"].strip():
+        _add_workflow_contract_finding(
+            result,
+            severity="block",
+            category="schema",
+            detail=f"cell={cell_key} future_split_debt.status must be non-empty string.",
+        )
+        return None
+    if not isinstance(debt["readiness_blocking"], bool):
+        _add_workflow_contract_finding(
+            result,
+            severity="block",
+            category="schema",
+            detail=f"cell={cell_key} future_split_debt.readiness_blocking must be bool.",
+        )
+        return None
+    if (
+        not isinstance(debt["enforcement_phase"], str)
+        or not debt["enforcement_phase"].strip()
+    ):
+        _add_workflow_contract_finding(
+            result,
+            severity="block",
+            category="schema",
+            detail=(
+                f"cell={cell_key} future_split_debt.enforcement_phase must be non-empty string."
+            ),
+        )
+        return None
+    closure = debt["closure"]
+    if not isinstance(closure, dict):
+        _add_workflow_contract_finding(
+            result,
+            severity="block",
+            category="schema",
+            detail=f"cell={cell_key} future_split_debt.closure must be an object.",
+        )
+        return None
+    if closure.get("type") != "parity_id_count_min":
+        _add_workflow_contract_finding(
+            result,
+            severity="block",
+            category="schema",
+            detail=(
+                f"cell={cell_key} future_split_debt.closure.type must be "
+                "'parity_id_count_min'."
+            ),
+        )
+        return None
+    if closure.get("cell") != cell_key:
+        _add_workflow_contract_finding(
+            result,
+            severity="block",
+            category="schema",
+            detail=(
+                f"cell={cell_key} future_split_debt.closure.cell must equal '{cell_key}'."
+            ),
+        )
+        return None
+    min_required = closure.get("min_required")
+    if isinstance(min_required, bool) or not isinstance(min_required, int):
+        _add_workflow_contract_finding(
+            result,
+            severity="block",
+            category="schema",
+            detail=(
+                f"cell={cell_key} future_split_debt.closure.min_required must be integer."
+            ),
+        )
+        return None
+    if min_required < 1:
+        _add_workflow_contract_finding(
+            result,
+            severity="block",
+            category="schema",
+            detail=(
+                f"cell={cell_key} future_split_debt.closure.min_required must be >= 1."
+            ),
+        )
+        return None
+
+    return {
+        "cell_key": cell_key,
+        "command": command,
+        "mode": mode,
+        "required_parity_ids": required_parity_ids,
+        "required_owner_tests": required_owner_tests,
+        "field_container": field_container.strip(),
+        "ordering_container": ordering_container.strip(),
+        "required_evidence_fields": required_evidence_fields,
+        "required_ordering_tokens": required_ordering_tokens,
+        "contract_severity": contract_severity,
+        "sequence_severity": sequence_severity,
+        "future_split_debt_status": str(debt["status"]).strip().lower(),
+    }
+
+
+def _load_workflow_cells(
+    repo_root: Path,
+    result: CheckResult,
+) -> dict[str, dict[str, Any]]:
+    """Load and validate workflow-coverage index cells."""
+    workflow_path = repo_root / WORKFLOW_COVERAGE_INDEX_PATH
+    try:
+        payload = json.loads(workflow_path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        _add_workflow_contract_finding(
+            result,
+            severity="block",
+            category="missing_index",
+            detail=f"workflow coverage index not found: {WORKFLOW_COVERAGE_INDEX_PATH}",
+        )
+        return {}
+    except json.JSONDecodeError as exc:
+        _add_workflow_contract_finding(
+            result,
+            severity="block",
+            category="invalid_json",
+            detail=f"{WORKFLOW_COVERAGE_INDEX_PATH} JSON decode failed: {exc}",
+        )
+        return {}
+
+    if not isinstance(payload, dict):
+        _add_workflow_contract_finding(
+            result,
+            severity="block",
+            category="schema",
+            detail=f"{WORKFLOW_COVERAGE_INDEX_PATH} payload must be an object.",
+        )
+        return {}
+    if payload.get("version") != 1:
+        _add_workflow_contract_finding(
+            result,
+            severity="block",
+            category="schema",
+            detail=(
+                f"{WORKFLOW_COVERAGE_INDEX_PATH} version must be 1, found "
+                f"{payload.get('version')!r}."
+            ),
+        )
+        return {}
+
+    raw_cells = payload.get("cells")
+    if not isinstance(raw_cells, dict) or not raw_cells:
+        _add_workflow_contract_finding(
+            result,
+            severity="block",
+            category="schema",
+            detail=f"{WORKFLOW_COVERAGE_INDEX_PATH} cells must be a non-empty object.",
+        )
+        return {}
+
+    normalized_cells: dict[str, dict[str, Any]] = {}
+    for cell_key, cell_payload in raw_cells.items():
+        if not isinstance(cell_key, str) or not cell_key.strip():
+            _add_workflow_contract_finding(
+                result,
+                severity="block",
+                category="schema",
+                detail=(
+                    f"{WORKFLOW_COVERAGE_INDEX_PATH} cells must use non-empty string keys."
+                ),
+            )
+            continue
+        normalized = _normalize_workflow_cell(
+            cell_key=cell_key.strip(),
+            cell_payload=cell_payload,
+            result=result,
+        )
+        if normalized is None:
+            continue
+        normalized_cells[normalized["cell_key"]] = normalized
+    return normalized_cells
+
+
+def _collect_workflow_owner_nodeids(
+    repo_root: Path,
+    result: CheckResult,
+) -> set[str]:
+    """Collect pytest nodeids for workflow owner-test validation."""
+    completed = _run_pytest_command(
+        repo_root=repo_root,
+        args=["--collect-only", "-q", "tests/characterization"],
+    )
+    if completed.returncode != 0:
+        detail = _first_non_empty_output(completed.stderr, completed.stdout)
+        _add_workflow_contract_finding(
+            result,
+            severity="block",
+            category="owner_collect_only_failed",
+            detail=(
+                "pytest --collect-only failed for tests/characterization "
+                f"(exit_code={completed.returncode}, detail={detail!r})."
+            ),
+        )
+        return set()
+
+    nodeids: set[str] = set()
+    for line in completed.stdout.splitlines():
+        if _looks_like_collect_only_nodeid(line):
+            nodeids.add(_normalize_nodeid(line))
+    return nodeids
+
+
+def _check_workflow_coverage(
+    repo_root: Path,
+    all_parity_rows: dict[str, dict[str, str]],
+    baseline_cases_by_path: dict[str, dict[str, Any]],
+    result: CheckResult,
+) -> WorkflowCoverageReport:
+    """Run workflow sequence coverage contract + evidence checks."""
+    error_start = len(result.errors)
+    warning_start = len(result.warnings)
+
+    workflow_cells = _load_workflow_cells(repo_root, result)
+    configured_cells = len(workflow_cells)
+    validated_cells = 0
+    open_debts = 0
+
+    try:
+        route_table = load_marked_route_fence_table(
+            repo_root / "project" / "route-fence.md"
+        )
+        known_route_cells = {
+            (row["command"].strip(), row["mode"].strip()) for row in route_table.rows
+        }
+    except Exception as exc:  # pragma: no cover - route-fence checks cover this path
+        _add_workflow_contract_finding(
+            result,
+            severity="block",
+            category="route_fence_load_failed",
+            detail=str(exc),
+        )
+        known_route_cells = set()
+
+    collected_owner_nodeids: set[str] | None = None
+    collect_failed = False
+
+    for cell_key in sorted(workflow_cells):
+        cell = workflow_cells[cell_key]
+        contract_severity = cell["contract_severity"]
+        sequence_severity = cell["sequence_severity"]
+        cell_had_contract_issue = False
+
+        if (cell["command"], cell["mode"]) not in known_route_cells:
+            _add_workflow_contract_finding(
+                result,
+                severity=contract_severity,
+                category="route_cell_missing",
+                detail=(
+                    f"cell={cell_key} does not exist in project/route-fence.md command/mode rows."
+                ),
+            )
+            cell_had_contract_issue = True
+
+        if collected_owner_nodeids is None:
+            collected_owner_nodeids = _collect_workflow_owner_nodeids(repo_root, result)
+            collect_failed = not bool(collected_owner_nodeids)
+
+        for owner_ref in cell["required_owner_tests"]:
+            try:
+                owner_path_part, owner_function = parse_owner_test_reference(owner_ref)
+            except CharacterizationError as exc:
+                _add_workflow_contract_finding(
+                    result,
+                    severity=contract_severity,
+                    category="owner_ref_invalid",
+                    detail=f"cell={cell_key} owner_test={owner_ref!r}: {exc}",
+                )
+                cell_had_contract_issue = True
+                continue
+
+            normalized_owner_path = owner_path_part.replace("\\", "/")
+            if not normalized_owner_path.startswith("tests/characterization/"):
+                _add_workflow_contract_finding(
+                    result,
+                    severity=contract_severity,
+                    category="owner_ref_invalid",
+                    detail=(
+                        f"cell={cell_key} owner_test path must be under tests/characterization/, "
+                        f"found '{owner_path_part}'."
+                    ),
+                )
+                cell_had_contract_issue = True
+                continue
+
+            owner_test_path = repo_root / normalized_owner_path
+            if not owner_test_path.exists():
+                _add_workflow_contract_finding(
+                    result,
+                    severity=contract_severity,
+                    category="owner_file_missing",
+                    detail=(
+                        f"cell={cell_key} owner_test file not found: {normalized_owner_path}"
+                    ),
+                )
+                cell_had_contract_issue = True
+                continue
+            if not owner_test_exists(owner_test_path, owner_function):
+                _add_workflow_contract_finding(
+                    result,
+                    severity=contract_severity,
+                    category="owner_symbol_missing",
+                    detail=(
+                        f"cell={cell_key} owner_test function '{owner_function}' not found in "
+                        f"{normalized_owner_path}."
+                    ),
+                )
+                cell_had_contract_issue = True
+                continue
+
+            if not collect_failed:
+                owner_nodeid = _normalize_nodeid(
+                    f"{normalized_owner_path}::{owner_function}"
+                )
+                if owner_nodeid not in (collected_owner_nodeids or set()):
+                    _add_workflow_contract_finding(
+                        result,
+                        severity=contract_severity,
+                        category="owner_nodeid_uncollectable",
+                        detail=(
+                            f"cell={cell_key} owner_test nodeid is not collectable: "
+                            f"{owner_nodeid}."
+                        ),
+                    )
+                    cell_had_contract_issue = True
+
+        for parity_id in cell["required_parity_ids"]:
+            parity_row = all_parity_rows.get(parity_id)
+            if parity_row is None:
+                _add_workflow_contract_finding(
+                    result,
+                    severity=contract_severity,
+                    category="parity_id_missing",
+                    detail=f"cell={cell_key} required parity_id '{parity_id}' not found.",
+                )
+                cell_had_contract_issue = True
+                continue
+
+            baseline_source = parity_row.get("baseline_source", "").strip()
+            if not baseline_source:
+                _add_workflow_contract_finding(
+                    result,
+                    severity=contract_severity,
+                    category="baseline_link_invalid",
+                    detail=f"cell={cell_key} parity_id={parity_id} baseline_source is empty.",
+                )
+                cell_had_contract_issue = True
+                continue
+
+            try:
+                baseline_path_part, baseline_anchor = parse_baseline_source(
+                    baseline_source
+                )
+            except CharacterizationError as exc:
+                _add_workflow_contract_finding(
+                    result,
+                    severity=contract_severity,
+                    category="baseline_link_invalid",
+                    detail=f"cell={cell_key} parity_id={parity_id}: {exc}",
+                )
+                cell_had_contract_issue = True
+                continue
+
+            normalized_baseline_path = baseline_path_part.replace("\\", "/")
+            baseline_cases = baseline_cases_by_path.get(normalized_baseline_path)
+            if baseline_cases is None:
+                _add_workflow_contract_finding(
+                    result,
+                    severity=contract_severity,
+                    category="baseline_link_invalid",
+                    detail=(
+                        f"cell={cell_key} parity_id={parity_id} baseline path "
+                        f"'{normalized_baseline_path}' is unknown."
+                    ),
+                )
+                cell_had_contract_issue = True
+                continue
+            case_payload = baseline_cases.get(baseline_anchor)
+            if not isinstance(case_payload, dict):
+                _add_workflow_contract_finding(
+                    result,
+                    severity=contract_severity,
+                    category="baseline_link_invalid",
+                    detail=(
+                        f"cell={cell_key} parity_id={parity_id} baseline anchor "
+                        f"'{baseline_anchor}' not found."
+                    ),
+                )
+                cell_had_contract_issue = True
+                continue
+
+            fields_found, fields_payload = _resolve_dotted_path(
+                case_payload,
+                cell["field_container"],
+            )
+            evidence_fields = (
+                fields_payload
+                if fields_found and isinstance(fields_payload, dict)
+                else {}
+            )
+
+            required_fields = cell["required_evidence_fields"]
+            missing_fields: list[str] = []
+            satisfied_count = 0
+            for field_name in required_fields:
+                if field_name in evidence_fields and bool(evidence_fields[field_name]):
+                    satisfied_count += 1
+                else:
+                    missing_fields.append(field_name)
+
+            if missing_fields:
+                _add_workflow_sequence_finding(
+                    result,
+                    severity=sequence_severity,
+                    category="missing_evidence_fields",
+                    detail=(
+                        f"cell={cell_key} parity_id={parity_id} missing_fields={missing_fields}."
+                    ),
+                )
+
+            if required_fields and satisfied_count == 0:
+                _add_workflow_sequence_finding(
+                    result,
+                    severity=sequence_severity,
+                    category="count_only_detected",
+                    detail=(
+                        f"cell={cell_key} parity_id={parity_id} "
+                        f"satisfied=0/{len(required_fields)}."
+                    ),
+                )
+
+            ordering_found, ordering_payload = _resolve_dotted_path(
+                case_payload,
+                cell["ordering_container"],
+            )
+            ordering_tokens = (
+                ordering_payload
+                if ordering_found and isinstance(ordering_payload, list)
+                else []
+            )
+            normalized_ordering_tokens = [
+                token.strip()
+                for token in ordering_tokens
+                if isinstance(token, str) and token.strip()
+            ]
+            missing_tokens = [
+                token
+                for token in cell["required_ordering_tokens"]
+                if token not in normalized_ordering_tokens
+            ]
+            if missing_tokens:
+                _add_workflow_sequence_finding(
+                    result,
+                    severity=sequence_severity,
+                    category="missing_ordering_tokens",
+                    detail=(
+                        f"cell={cell_key} parity_id={parity_id} missing_tokens={missing_tokens}."
+                    ),
+                )
+
+        if cell["future_split_debt_status"] != "closed":
+            open_debts += 1
+        if not cell_had_contract_issue:
+            validated_cells += 1
+
+    new_errors = result.errors[error_start:]
+    new_warnings = result.warnings[warning_start:]
+    contract_errors = sum(
+        1 for error in new_errors if error.startswith("workflow_coverage.contract_")
+    )
+    sequence_warnings = sum(
+        1
+        for warning in new_warnings
+        if warning.startswith("workflow_coverage.sequence_gap.")
+    )
+    count_only_warnings = sum(
+        1
+        for warning in new_warnings
+        if warning.startswith("workflow_coverage.sequence_gap.count_only_detected")
+    )
+
+    return WorkflowCoverageReport(
+        configured_cells=configured_cells,
+        validated_cells=validated_cells,
+        contract_errors=contract_errors,
+        sequence_warnings=sequence_warnings,
+        count_only_warnings=count_only_warnings,
+        open_debts=open_debts,
+    )
+
+
 def _load_and_validate_baselines(
     repo_root: Path,
     result: CheckResult,
@@ -572,18 +1386,9 @@ def _load_required_parity_rows(
     repo_root: Path, result: CheckResult
 ) -> dict[str, dict[str, str]]:
     """Load parity matrix rows and return only required WI-004 behavior rows."""
-    parity_matrix_path = repo_root / "project" / "parity-matrix.md"
-    try:
-        table = load_markdown_table(
-            parity_matrix_path,
-            REQUIRED_PARITY_COLUMNS,
-            "parity-matrix",
-        )
-    except Exception as exc:  # pragma: no cover - handled by parity check tests
-        result.add_error(str(exc))
+    row_by_behavior = _load_all_parity_rows(repo_root, result)
+    if not row_by_behavior:
         return {}
-
-    row_by_behavior = {row["behavior_id"]: row for row in table.rows}
     required_rows: dict[str, dict[str, str]] = {}
     for behavior_id in REQUIRED_CHARACTERIZATION_BEHAVIOR_IDS:
         row = row_by_behavior.get(behavior_id)
@@ -789,6 +1594,7 @@ def check_characterization_artifacts(repo_root: Path) -> CheckResult:
     result = CheckResult()
     baseline_cases_by_path = _load_and_validate_baselines(repo_root, result)
     imaging_manifest = _load_and_validate_imaging_manifest(repo_root, result)
+    all_parity_rows = _load_all_parity_rows(repo_root, result)
     parity_rows = _load_required_parity_rows(repo_root, result)
 
     for behavior_id, row in parity_rows.items():
@@ -808,6 +1614,14 @@ def check_characterization_artifacts(repo_root: Path) -> CheckResult:
                 imaging_manifest=imaging_manifest,
                 result=result,
             )
+
+    workflow_coverage_report = _check_workflow_coverage(
+        repo_root=repo_root,
+        all_parity_rows=all_parity_rows,
+        baseline_cases_by_path=baseline_cases_by_path,
+        result=result,
+    )
+    setattr(result, "workflow_coverage_report", workflow_coverage_report)
 
     collectability_report = _check_owner_collectability(repo_root, parity_rows, result)
     setattr(result, "collectability_report", collectability_report)
