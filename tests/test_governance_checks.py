@@ -424,7 +424,7 @@ def test_print_check_result_includes_workflow_sequence_lines(
     governance_module,
     capsys: pytest.CaptureFixture[str],
 ):
-    """Characterization output should include workflow contract + warning counters."""
+    """Characterization output should include workflow sequence + trace counters."""
     result = governance_module.CheckResult()
     setattr(
         result,
@@ -433,6 +433,10 @@ def test_print_check_result_includes_workflow_sequence_lines(
             configured_cells=1,
             validated_cells=1,
             contract_errors=0,
+            trace_contract_errors=0,
+            trace_assertion_failures=0,
+            trace_required_rows=1,
+            trace_validated_rows=1,
             sequence_warnings=2,
             count_only_warnings=1,
             open_debts=1,
@@ -442,4 +446,6 @@ def test_print_check_result_includes_workflow_sequence_lines(
     governance_module._print_check_result("characterization", result)
     output = capsys.readouterr().out
     assert "Workflow sequence contract OK" in output
+    assert "Workflow trace contract OK" in output
+    assert "Workflow trace required rows: 1" in output
     assert "Workflow sequence evidence warnings: 2" in output

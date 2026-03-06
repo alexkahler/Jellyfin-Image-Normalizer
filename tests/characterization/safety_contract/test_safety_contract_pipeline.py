@@ -14,8 +14,11 @@ from jfin.client import JellyfinClient
 from tests.characterization.safety_contract._harness import (
     FakeResponse,
     assert_observation_subset,
+    build_backdrop_observed_trace_events,
+    extract_delete_index,
     load_baseline_cases,
     png_bytes,
+    project_backdrop_trace_events,
 )
 
 try:
@@ -230,18 +233,8 @@ def test_pipe_backdrop_001_characterization(
     backdrop_count = item.backdrop_count or 0
     fetch_calls = jf_client.get_item_image.call_args_list[:backdrop_count]
     fetch_indices = [call.kwargs.get("index") for call in fetch_calls]
-
-    def _delete_index(call: Any) -> int | None:
-        if "index" in call.kwargs:
-            return cast(int | None, call.kwargs["index"])
-        if "image_index" in call.kwargs:
-            return cast(int | None, call.kwargs["image_index"])
-        if len(call.args) >= 3:
-            return cast(int | None, call.args[2])
-        return None
-
     delete_indices = [
-        _delete_index(call) for call in jf_client.delete_image.call_args_list
+        extract_delete_index(call) for call in jf_client.delete_image.call_args_list
     ]
     upload_indices = [
         call.kwargs.get("backdrop_index")
@@ -254,6 +247,19 @@ def test_pipe_backdrop_001_characterization(
         and jf_client.get_item_image_head.return_value is None
     )
     staging_dir = tmp_path / "staging" / item.id
+    verify_index = (
+        cast(int | None, verify_call.kwargs.get("index")) if verify_call else None
+    )
+    verify_status_code = 404 if post_delete_404_verified else 200
+    trace_events = build_backdrop_observed_trace_events(
+        fetch_indices=cast(list[int], fetch_indices),
+        normalized_backdrop_indices=normalized_backdrop_indices,
+        delete_indices=cast(list[int], delete_indices),
+        verify_index=verify_index,
+        verify_status_code=verify_status_code,
+        upload_indices=cast(list[int], upload_indices),
+        staging_retained=staging_dir.exists(),
+    )
     observed = {
         "result": {"return_value": result, "raises": None},
         "calls": {
@@ -280,5 +286,13 @@ def test_pipe_backdrop_001_characterization(
             if first_delete_idx < first_upload_idx
             else ["upload_before_delete"]
         ),
+        "trace": {"events": trace_events},
     }
+    expected_trace_events = cast(
+        list[dict[str, Any]],
+        case["expected_observations"]["trace"]["events"],
+    )
+    assert project_backdrop_trace_events(trace_events) == project_backdrop_trace_events(
+        expected_trace_events
+    )
     assert_observation_subset(case["expected_observations"], observed)
