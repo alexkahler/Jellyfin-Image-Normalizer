@@ -271,6 +271,22 @@ def _print_check_result(check_name: str, result: CheckResult) -> None:
         else:
             print("  INFO: Workflow sequence contract NOT OK")
         print(
+            "  INFO: Workflow trace required rows: "
+            f"{workflow_coverage_report.trace_required_rows}"
+        )
+        print(
+            "  INFO: Workflow trace validated rows: "
+            f"{workflow_coverage_report.trace_validated_rows}"
+        )
+        print(
+            "  INFO: Workflow trace assertion failures: "
+            f"{workflow_coverage_report.trace_assertion_failures}"
+        )
+        if workflow_coverage_report.trace_contract_errors == 0:
+            print("  INFO: Workflow trace contract OK")
+        else:
+            print("  INFO: Workflow trace contract NOT OK")
+        print(
             "  INFO: Workflow sequence evidence warnings: "
             f"{workflow_coverage_report.sequence_warnings}"
         )

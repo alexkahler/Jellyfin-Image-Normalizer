@@ -87,7 +87,107 @@
         },
         "ordering": [
           "delete_before_upload"
-        ]
+        ],
+        "trace": {
+          "events": [
+            {
+              "phase": "fetch",
+              "index": 0,
+              "action": "get_item_image",
+              "result": "ok",
+              "details": {
+                "source_index": 0
+              }
+            },
+            {
+              "phase": "fetch",
+              "index": 1,
+              "action": "get_item_image",
+              "result": "ok",
+              "details": {
+                "source_index": 1
+              }
+            },
+            {
+              "phase": "normalize",
+              "index": 0,
+              "action": "normalize_image",
+              "result": "ok",
+              "details": {
+                "source_index": 0,
+                "target_index": 0
+              }
+            },
+            {
+              "phase": "normalize",
+              "index": 1,
+              "action": "normalize_image",
+              "result": "ok",
+              "details": {
+                "source_index": 1,
+                "target_index": 1
+              }
+            },
+            {
+              "phase": "delete",
+              "index": 0,
+              "action": "delete_image",
+              "result": "ok",
+              "details": {
+                "target_index": 0
+              }
+            },
+            {
+              "phase": "delete",
+              "index": 0,
+              "action": "delete_image",
+              "result": "ok",
+              "details": {
+                "target_index": 0
+              }
+            },
+            {
+              "phase": "verify",
+              "index": 0,
+              "action": "get_item_image_head",
+              "result": "not_found",
+              "details": {
+                "target_index": 0,
+                "status_code": 404
+              }
+            },
+            {
+              "phase": "upload",
+              "index": 0,
+              "action": "set_item_image_bytes",
+              "result": "ok",
+              "details": {
+                "source_index": 0,
+                "target_index": 0
+              }
+            },
+            {
+              "phase": "upload",
+              "index": 1,
+              "action": "set_item_image_bytes",
+              "result": "failed",
+              "details": {
+                "source_index": 1,
+                "target_index": 1
+              }
+            },
+            {
+              "phase": "finalize",
+              "index": null,
+              "action": "staging_retention",
+              "result": "retained",
+              "details": {
+                "retained": true,
+                "failure_kind": "partial_upload_failure"
+              }
+            }
+          ]
+        }
       },
       "notes": "Backdrop transaction deletes originals before upload and retains staging artifacts when uploads partially fail."
     },

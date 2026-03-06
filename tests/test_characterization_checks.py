@@ -564,6 +564,7 @@ def _write_valid_artifacts(
     safety_payload = build_valid_baseline_payload(
         characterization_contract.SAFETY_BEHAVIOR_IDS,
         safety=True,
+        include_backdrop_trace=True,
     )
     imaging_manifest = build_valid_imaging_manifest(
         characterization_contract.IMG_BEHAVIOR_IDS

@@ -75,6 +75,22 @@ OPTIONAL_CASE_KEYS = {
 }
 ALLOWED_PREFLIGHT_VALUES = {"not_reached", "mocked_ok", "mocked_fail"}
 ALLOWED_GOLDEN_COMPARE_MODES = {"exact", "tolerant"}
+ALLOWED_TRACE_PHASES = {
+    "fetch",
+    "normalize",
+    "delete",
+    "verify",
+    "upload",
+    "finalize",
+}
+TRACE_REQUIRED_DETAIL_KEYS = {
+    "fetch": {"source_index"},
+    "normalize": {"source_index", "target_index"},
+    "delete": {"target_index"},
+    "verify": {"target_index", "status_code"},
+    "upload": {"source_index", "target_index"},
+    "finalize": {"retained", "failure_kind"},
+}
 
 
 class CharacterizationError(Exception):
@@ -293,6 +309,105 @@ def _validate_scalar_mapping(
             )
 
 
+def _is_non_negative_int(value: Any) -> bool:
+    """Return True for non-bool integers >= 0."""
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+def _validate_trace_details(
+    *,
+    baseline_path: Path,
+    behavior_id: str,
+    event_index: int,
+    phase: str,
+    details: Any,
+) -> None:
+    """Validate phase-specific trace details payload."""
+    if not isinstance(details, dict):
+        raise CharacterizationError(
+            f"{baseline_path}#{behavior_id} expected_observations.trace.events[{event_index}].details "
+            "must be an object."
+        )
+    required_keys = TRACE_REQUIRED_DETAIL_KEYS[phase]
+    missing_keys = sorted(required_keys - set(details))
+    if missing_keys:
+        raise CharacterizationError(
+            f"{baseline_path}#{behavior_id} expected_observations.trace.events[{event_index}].details "
+            f"missing keys: {missing_keys}."
+        )
+
+    for key in ("source_index", "target_index", "status_code"):
+        if key in required_keys and not _is_non_negative_int(details.get(key)):
+            raise CharacterizationError(
+                f"{baseline_path}#{behavior_id} expected_observations.trace.events[{event_index}].details.{key} "
+                "must be a non-negative integer."
+            )
+    if "retained" in required_keys and not isinstance(details.get("retained"), bool):
+        raise CharacterizationError(
+            f"{baseline_path}#{behavior_id} expected_observations.trace.events[{event_index}].details.retained "
+            "must be bool."
+        )
+    if "failure_kind" in required_keys:
+        failure_kind = details.get("failure_kind")
+        if not isinstance(failure_kind, str) or not failure_kind.strip():
+            raise CharacterizationError(
+                f"{baseline_path}#{behavior_id} expected_observations.trace.events[{event_index}].details.failure_kind "
+                "must be non-empty string."
+            )
+
+
+def _validate_trace_event_schema(
+    *,
+    baseline_path: Path,
+    behavior_id: str,
+    event_index: int,
+    event_payload: Any,
+) -> None:
+    """Validate one structured trace event payload."""
+    if not isinstance(event_payload, dict):
+        raise CharacterizationError(
+            f"{baseline_path}#{behavior_id} expected_observations.trace.events[{event_index}] "
+            f"must be an object, found {type(event_payload)}."
+        )
+    required_keys = {"phase", "index", "action", "result", "details"}
+    missing_keys = sorted(required_keys - set(event_payload))
+    if missing_keys:
+        raise CharacterizationError(
+            f"{baseline_path}#{behavior_id} expected_observations.trace.events[{event_index}] "
+            f"missing keys: {missing_keys}."
+        )
+
+    phase = event_payload.get("phase")
+    if not isinstance(phase, str) or phase not in ALLOWED_TRACE_PHASES:
+        raise CharacterizationError(
+            f"{baseline_path}#{behavior_id} expected_observations.trace.events[{event_index}].phase "
+            f"must be one of {sorted(ALLOWED_TRACE_PHASES)}."
+        )
+
+    event_index_value = event_payload.get("index")
+    if event_index_value is not None and not _is_non_negative_int(event_index_value):
+        raise CharacterizationError(
+            f"{baseline_path}#{behavior_id} expected_observations.trace.events[{event_index}].index "
+            "must be non-negative integer or null."
+        )
+
+    for key in ("action", "result"):
+        value = event_payload.get(key)
+        if not isinstance(value, str) or not value.strip():
+            raise CharacterizationError(
+                f"{baseline_path}#{behavior_id} expected_observations.trace.events[{event_index}].{key} "
+                "must be non-empty string."
+            )
+
+    _validate_trace_details(
+        baseline_path=baseline_path,
+        behavior_id=behavior_id,
+        event_index=event_index,
+        phase=phase,
+        details=event_payload.get("details"),
+    )
+
+
 def _validate_safety_case_schema(
     *,
     baseline_path: Path,
@@ -356,6 +471,25 @@ def _validate_safety_case_schema(
             raise CharacterizationError(
                 f"{baseline_path}#{behavior_id} expected_observations.ordering must "
                 "be list[str]."
+            )
+
+    trace_payload = expected_observations.get("trace")
+    if trace_payload is not None:
+        if not isinstance(trace_payload, dict):
+            raise CharacterizationError(
+                f"{baseline_path}#{behavior_id} expected_observations.trace must be an object."
+            )
+        events = trace_payload.get("events")
+        if not isinstance(events, list) or not events:
+            raise CharacterizationError(
+                f"{baseline_path}#{behavior_id} expected_observations.trace.events must be a non-empty list."
+            )
+        for event_index, event_payload in enumerate(events):
+            _validate_trace_event_schema(
+                baseline_path=baseline_path,
+                behavior_id=behavior_id,
+                event_index=event_index,
+                event_payload=event_payload,
             )
 
     expected_messages = case_payload.get("expected_messages")

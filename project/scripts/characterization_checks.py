@@ -51,6 +51,7 @@ WORKFLOW_COVERAGE_INDEX_PATH = "project/workflow-coverage-index.json"
 ALLOWED_WORKFLOW_SEVERITY_VALUES = {"block", "warn"}
 WORKFLOW_DEFAULT_CONTRACT_SEVERITY = "block"
 WORKFLOW_DEFAULT_SEQUENCE_SEVERITY = "warn"
+TRACE_REQUIRED_WORKFLOW_PARITY_IDS = {"PIPE-BACKDROP-001"}
 
 
 @dataclass(frozen=True)
@@ -93,6 +94,10 @@ class WorkflowCoverageReport:
     configured_cells: int
     validated_cells: int
     contract_errors: int
+    trace_contract_errors: int
+    trace_assertion_failures: int
+    trace_required_rows: int
+    trace_validated_rows: int
     sequence_warnings: int
     count_only_warnings: int
     open_debts: int
@@ -652,6 +657,167 @@ def _resolve_dotted_path(
     return True, current
 
 
+def _is_non_negative_int(value: Any) -> bool:
+    """Return True when value is an integer >= 0 (excluding bool)."""
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+def _project_backdrop_trace(
+    trace_events: Any,
+) -> tuple[dict[str, Any] | None, str | None]:
+    """Project backdrop trace events into deterministic invariant inputs."""
+    if not isinstance(trace_events, list) or not trace_events:
+        return None, "trace.events must be a non-empty list."
+
+    fetch_source_indices: list[int] = []
+    normalize_pairs: list[tuple[int, int]] = []
+    delete_target_indices: list[int] = []
+    verify_status_pairs: list[tuple[int, int]] = []
+    upload_target_indices: list[int] = []
+    first_delete_position: int | None = None
+    first_upload_position: int | None = None
+    staging_retained_partial_failure = False
+
+    for event_position, event in enumerate(trace_events):
+        if not isinstance(event, dict):
+            return None, f"trace.events[{event_position}] must be an object."
+        phase = event.get("phase")
+        details = event.get("details")
+        if not isinstance(phase, str) or not phase.strip():
+            return (
+                None,
+                f"trace.events[{event_position}].phase must be non-empty string.",
+            )
+        if not isinstance(details, dict):
+            return None, f"trace.events[{event_position}].details must be an object."
+
+        if phase == "fetch":
+            source_index = details.get("source_index")
+            if not _is_non_negative_int(source_index):
+                return None, (
+                    f"trace.events[{event_position}] fetch.details.source_index "
+                    "must be non-negative integer."
+                )
+            fetch_source_indices.append(source_index)
+        elif phase == "normalize":
+            source_index = details.get("source_index")
+            target_index = details.get("target_index")
+            if not _is_non_negative_int(source_index) or not _is_non_negative_int(
+                target_index
+            ):
+                return None, (
+                    f"trace.events[{event_position}] normalize details source_index/target_index "
+                    "must be non-negative integers."
+                )
+            normalize_pairs.append((source_index, target_index))
+        elif phase == "delete":
+            target_index = details.get("target_index")
+            if not _is_non_negative_int(target_index):
+                return None, (
+                    f"trace.events[{event_position}] delete.details.target_index "
+                    "must be non-negative integer."
+                )
+            if first_delete_position is None:
+                first_delete_position = event_position
+            delete_target_indices.append(target_index)
+        elif phase == "verify":
+            target_index = details.get("target_index")
+            status_code = details.get("status_code")
+            if not _is_non_negative_int(target_index) or not _is_non_negative_int(
+                status_code
+            ):
+                return None, (
+                    f"trace.events[{event_position}] verify details target_index/status_code "
+                    "must be non-negative integers."
+                )
+            verify_status_pairs.append((target_index, status_code))
+        elif phase == "upload":
+            source_index = details.get("source_index")
+            target_index = details.get("target_index")
+            if not _is_non_negative_int(source_index) or not _is_non_negative_int(
+                target_index
+            ):
+                return None, (
+                    f"trace.events[{event_position}] upload details source_index/target_index "
+                    "must be non-negative integers."
+                )
+            if first_upload_position is None:
+                first_upload_position = event_position
+            upload_target_indices.append(target_index)
+        elif phase == "finalize":
+            retained = details.get("retained")
+            failure_kind = details.get("failure_kind")
+            if not isinstance(retained, bool):
+                return None, (
+                    f"trace.events[{event_position}] finalize.details.retained must be bool."
+                )
+            if not isinstance(failure_kind, str) or not failure_kind.strip():
+                return None, (
+                    f"trace.events[{event_position}] finalize.details.failure_kind "
+                    "must be non-empty string."
+                )
+            if retained and failure_kind == "partial_upload_failure":
+                staging_retained_partial_failure = True
+
+    expected_dense_indices = list(range(len(fetch_source_indices)))
+    projection = {
+        "fetch_source_indices": fetch_source_indices,
+        "normalize_pairs": normalize_pairs,
+        "delete_target_indices": delete_target_indices,
+        "verify_status_pairs": verify_status_pairs,
+        "upload_target_indices": upload_target_indices,
+        "fetch_dense_ordered": fetch_source_indices == expected_dense_indices,
+        "normalize_source_index_mapping": normalize_pairs
+        == [(index, index) for index in expected_dense_indices],
+        "post_delete_404_verified": bool(verify_status_pairs)
+        and all(pair == (0, 404) for pair in verify_status_pairs),
+        "upload_dense_ordered": upload_target_indices == expected_dense_indices,
+        "delete_index_zero_repeated": delete_target_indices
+        == ([0] * len(fetch_source_indices)),
+        "delete_before_upload": first_delete_position is not None
+        and first_upload_position is not None
+        and first_delete_position < first_upload_position,
+        "staging_retained_partial_failure": staging_retained_partial_failure,
+    }
+    return projection, None
+
+
+def _trace_projection_failures(projection: dict[str, Any]) -> list[str]:
+    """Return deterministic backdrop trace projection failures."""
+    failures: list[str] = []
+    fetch_source_indices = projection["fetch_source_indices"]
+    normalize_pairs = projection["normalize_pairs"]
+    upload_target_indices = projection["upload_target_indices"]
+    delete_target_indices = projection["delete_target_indices"]
+    verify_status_pairs = projection["verify_status_pairs"]
+
+    if not fetch_source_indices:
+        failures.append("fetch_source_indices empty")
+    if not projection["fetch_dense_ordered"]:
+        failures.append("fetch_source_indices are not dense ordered")
+    if len(normalize_pairs) != len(fetch_source_indices):
+        failures.append("normalize_pairs cardinality mismatch")
+    if not projection["normalize_source_index_mapping"]:
+        failures.append("normalize source->target mapping is not dense identity")
+    if not verify_status_pairs:
+        failures.append("verify_status_pairs empty")
+    if not projection["post_delete_404_verified"]:
+        failures.append("post-delete verification is not 404 on target_index 0")
+    if len(upload_target_indices) != len(fetch_source_indices):
+        failures.append("upload_target_indices cardinality mismatch")
+    if not projection["upload_dense_ordered"]:
+        failures.append("upload_target_indices are not dense ordered")
+    if len(delete_target_indices) != len(fetch_source_indices):
+        failures.append("delete_target_indices cardinality mismatch")
+    if not projection["delete_index_zero_repeated"]:
+        failures.append("delete_target_indices are not repeated 0")
+    if not projection["delete_before_upload"]:
+        failures.append("delete phase is not before upload phase")
+    if not projection["staging_retained_partial_failure"]:
+        failures.append("staging retained partial failure marker missing")
+    return failures
+
+
 def _normalize_string_list(
     *,
     value: Any,
@@ -1110,6 +1276,8 @@ def _check_workflow_coverage(
     configured_cells = len(workflow_cells)
     validated_cells = 0
     open_debts = 0
+    trace_required_rows = 0
+    trace_validated_rows = 0
 
     try:
         route_table = load_marked_route_fence_table(
@@ -1353,6 +1521,58 @@ def _check_workflow_coverage(
                     ),
                 )
 
+            if parity_id in TRACE_REQUIRED_WORKFLOW_PARITY_IDS:
+                trace_required_rows += 1
+                expected_observations = case_payload.get("expected_observations")
+                trace_payload = (
+                    expected_observations.get("trace")
+                    if isinstance(expected_observations, dict)
+                    else None
+                )
+                if not isinstance(trace_payload, dict):
+                    _add_workflow_contract_finding(
+                        result,
+                        severity="block",
+                        category="trace_missing",
+                        detail=(
+                            f"cell={cell_key} parity_id={parity_id} missing "
+                            "expected_observations.trace object."
+                        ),
+                    )
+                    cell_had_contract_issue = True
+                    continue
+
+                trace_events = trace_payload.get("events")
+                projection, projection_error = _project_backdrop_trace(trace_events)
+                if projection is None:
+                    _add_workflow_contract_finding(
+                        result,
+                        severity="block",
+                        category="trace_schema",
+                        detail=(
+                            f"cell={cell_key} parity_id={parity_id} "
+                            f"{projection_error or 'invalid trace schema'}"
+                        ),
+                    )
+                    cell_had_contract_issue = True
+                    continue
+
+                trace_failures = _trace_projection_failures(projection)
+                if trace_failures:
+                    _add_workflow_contract_finding(
+                        result,
+                        severity="block",
+                        category="trace_assertion_failed",
+                        detail=(
+                            f"cell={cell_key} parity_id={parity_id} "
+                            f"failures={trace_failures}."
+                        ),
+                    )
+                    cell_had_contract_issue = True
+                    continue
+
+                trace_validated_rows += 1
+
         if cell["future_split_debt_status"] != "closed":
             open_debts += 1
         if not cell_had_contract_issue:
@@ -1361,7 +1581,20 @@ def _check_workflow_coverage(
     new_errors = result.errors[error_start:]
     new_warnings = result.warnings[warning_start:]
     contract_errors = sum(
-        1 for error in new_errors if error.startswith("workflow_coverage.contract_")
+        1
+        for error in new_errors
+        if error.startswith("workflow_coverage.contract_")
+        and not error.startswith("workflow_coverage.contract_trace_")
+    )
+    trace_contract_errors = sum(
+        1
+        for error in new_errors
+        if error.startswith("workflow_coverage.contract_trace_")
+    )
+    trace_assertion_failures = sum(
+        1
+        for error in new_errors
+        if error.startswith("workflow_coverage.contract_trace_assertion_failed")
     )
     sequence_warnings = sum(
         1
@@ -1378,6 +1611,10 @@ def _check_workflow_coverage(
         configured_cells=configured_cells,
         validated_cells=validated_cells,
         contract_errors=contract_errors,
+        trace_contract_errors=trace_contract_errors,
+        trace_assertion_failures=trace_assertion_failures,
+        trace_required_rows=trace_required_rows,
+        trace_validated_rows=trace_validated_rows,
         sequence_warnings=sequence_warnings,
         count_only_warnings=count_only_warnings,
         open_debts=open_debts,

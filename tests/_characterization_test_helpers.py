@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 from typing import Any
 
 
@@ -51,11 +52,91 @@ def _default_safety_case_payload() -> dict[str, object]:
     }
 
 
+def build_backdrop_trace_events() -> list[dict[str, object]]:
+    """Build canonical PIPE-BACKDROP-001 trace events for COV-04 tests."""
+    return [
+        {
+            "phase": "fetch",
+            "index": 0,
+            "action": "get_item_image",
+            "result": "ok",
+            "details": {"source_index": 0},
+        },
+        {
+            "phase": "fetch",
+            "index": 1,
+            "action": "get_item_image",
+            "result": "ok",
+            "details": {"source_index": 1},
+        },
+        {
+            "phase": "normalize",
+            "index": 0,
+            "action": "normalize_image",
+            "result": "ok",
+            "details": {"source_index": 0, "target_index": 0},
+        },
+        {
+            "phase": "normalize",
+            "index": 1,
+            "action": "normalize_image",
+            "result": "ok",
+            "details": {"source_index": 1, "target_index": 1},
+        },
+        {
+            "phase": "delete",
+            "index": 0,
+            "action": "delete_image",
+            "result": "ok",
+            "details": {"target_index": 0},
+        },
+        {
+            "phase": "delete",
+            "index": 0,
+            "action": "delete_image",
+            "result": "ok",
+            "details": {"target_index": 0},
+        },
+        {
+            "phase": "verify",
+            "index": 0,
+            "action": "get_item_image_head",
+            "result": "not_found",
+            "details": {"target_index": 0, "status_code": 404},
+        },
+        {
+            "phase": "upload",
+            "index": 0,
+            "action": "set_item_image_bytes",
+            "result": "ok",
+            "details": {"source_index": 0, "target_index": 0},
+        },
+        {
+            "phase": "upload",
+            "index": 1,
+            "action": "set_item_image_bytes",
+            "result": "failed",
+            "details": {"source_index": 1, "target_index": 1},
+        },
+        {
+            "phase": "finalize",
+            "index": None,
+            "action": "staging_retention",
+            "result": "retained",
+            "details": {
+                "retained": True,
+                "failure_kind": "partial_upload_failure",
+            },
+        },
+    ]
+
+
 def build_valid_baseline_payload(
     required_ids: list[str],
     *,
     imaging: bool = False,
     safety: bool = False,
+    include_backdrop_trace: bool = False,
 ) -> dict[str, Any]:
     """Build a valid baseline JSON payload for required behavior IDs."""
     if imaging and safety:
@@ -66,9 +147,14 @@ def build_valid_baseline_payload(
         case_payload = _default_safety_case_payload()
     else:
         case_payload = _default_case_payload()
+    cases = {behavior_id: copy.deepcopy(case_payload) for behavior_id in required_ids}
+    if safety and include_backdrop_trace and "PIPE-BACKDROP-001" in cases:
+        expected_observations = cases["PIPE-BACKDROP-001"]["expected_observations"]
+        if isinstance(expected_observations, dict):
+            expected_observations["trace"] = {"events": build_backdrop_trace_events()}
     return {
         "version": 1,
-        "cases": {behavior_id: dict(case_payload) for behavior_id in required_ids},
+        "cases": cases,
     }
 
 
