@@ -16,6 +16,7 @@ Iteratively planned slices:
 - Slice 11 -> WI-001 COV-02 Backdrop workflow sequence governance gate (phase-1 warn ratchet, run|backdrop scope)
 - Slice 12 -> WI-001 COV-03 Route-fence readiness semantics gate (claim-scoped runtime proof, no route flips)
 - Slice 13 -> WI-001 COV-04 Backdrop trace contract (dual-proof, observed-vs-baseline)
+- Slice 14 -> WI-001 COV-05 Blueprint topology drift guard (governance docs-topology contract)
 
 After Slice 9, subsequent slices remain iterative. Governance-coverage slices
 (starting with COV-01b) take precedence before route-fence flip planning.
