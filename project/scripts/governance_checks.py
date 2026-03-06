@@ -250,6 +250,32 @@ def _print_check_result(check_name: str, result: CheckResult) -> None:
             "  INFO: Remaining parity/test linkage gaps: "
             f"{surface_report.parity_test_linkage_gaps}"
         )
+    workflow_coverage_report = getattr(result, "workflow_coverage_report", None)
+    if workflow_coverage_report is not None:
+        print(
+            "  INFO: Workflow sequence cells configured: "
+            f"{workflow_coverage_report.configured_cells}"
+        )
+        print(
+            "  INFO: Workflow sequence cells validated: "
+            f"{workflow_coverage_report.validated_cells}"
+        )
+        print(
+            "  INFO: Workflow sequence open debts: "
+            f"{workflow_coverage_report.open_debts}"
+        )
+        if workflow_coverage_report.contract_errors == 0:
+            print("  INFO: Workflow sequence contract OK")
+        else:
+            print("  INFO: Workflow sequence contract NOT OK")
+        print(
+            "  INFO: Workflow sequence evidence warnings: "
+            f"{workflow_coverage_report.sequence_warnings}"
+        )
+        print(
+            "  INFO: Workflow sequence count-only detections: "
+            f"{workflow_coverage_report.count_only_warnings}"
+        )
     collectability_report = getattr(result, "collectability_report", None)
     if collectability_report is not None:
         print(
