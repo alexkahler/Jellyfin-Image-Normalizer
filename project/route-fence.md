@@ -2,6 +2,11 @@
 
 This table tracks command/mode strangler routing ownership and parity readiness.
 
+Readiness semantics:
+- `parity status` values are `pending|ready`.
+- `ready` is machine-validated by governance checks against workflow/parity/runtime evidence.
+- `route=v1` requires `parity status=ready`.
+
 <!-- ROUTE_FENCE_TABLE_START -->
 | command | mode | route(v0\|v1) | owner slice | parity status |
 | --- | --- | --- | --- | --- |

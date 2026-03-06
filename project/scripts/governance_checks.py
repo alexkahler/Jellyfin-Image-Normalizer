@@ -20,6 +20,7 @@ from governance_contract import (
     parse_verification_contract,
 )
 from parity_checks import check_parity_artifacts
+from readiness_checks import check_readiness_artifacts
 
 SUPPORTED_CHECKS = (
     "schema",
@@ -29,6 +30,7 @@ SUPPORTED_CHECKS = (
     "architecture",
     "parity",
     "characterization",
+    "readiness",
 )
 EXPECTED_VENV_BOOTSTRAP = "python -m venv .venv"
 EXPECTED_GOVERNANCE_INSTALL_PREFIX = "./.venv/bin/python -m pip install"
@@ -332,6 +334,17 @@ def _print_check_result(check_name: str, result: CheckResult) -> None:
             print("  INFO: Characterization runtime gate OK (warn)")
         else:
             print("  INFO: Characterization runtime gate NOT OK (warn)")
+    readiness_report = getattr(result, "readiness_report", None)
+    if readiness_report is not None:
+        print(f"  INFO: Route readiness claims: {readiness_report.claimed_rows}")
+        print(
+            "  INFO: Route readiness claims validated: "
+            f"{readiness_report.validated_rows}"
+        )
+        if result.errors:
+            print("  INFO: Route readiness proof NOT OK")
+        else:
+            print("  INFO: Route readiness proof OK")
     for warning in result.warnings:
         print(f"  WARN: {warning}")
     for error in result.errors:
@@ -378,6 +391,7 @@ def run_selected_checks(
         "architecture": lambda: check_architecture_artifacts(repo_root),
         "parity": lambda: check_parity_artifacts(repo_root),
         "characterization": lambda: check_characterization_artifacts(repo_root),
+        "readiness": lambda: check_readiness_artifacts(repo_root),
     }
 
     selected_checks = SUPPORTED_CHECKS if check_name == "all" else (check_name,)

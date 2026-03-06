@@ -7,6 +7,7 @@ from pathlib import Path
 
 from governance_contract import CheckResult
 from parity_contract import (
+    ALLOWED_ROUTE_PARITY_STATUS,
     ALLOWED_PARITY_STATUS,
     APPROVAL_REQUIRED_STATUSES,
     PLACEHOLDER_APPROVAL_REFS,
@@ -128,6 +129,13 @@ def check_route_fence(route_fence_path: Path) -> CheckResult:
                 "route-fence: row "
                 f"{row_index} has invalid route(v0|v1) '{row['route(v0|v1)']}'."
             )
+        parity_status = row["parity status"].strip().lower()
+        if parity_status not in ALLOWED_ROUTE_PARITY_STATUS:
+            result.add_error(
+                "route-fence: row "
+                f"{row_index} has invalid parity status '{row['parity status']}'. "
+                f"Allowed={sorted(ALLOWED_ROUTE_PARITY_STATUS)}."
+            )
 
         route_key = (row["command"], row["mode"])
         if route_key in seen_route_keys:
@@ -155,7 +163,7 @@ def _canonical_route_row_from_markdown(row: dict[str, str]) -> dict[str, str]:
         "mode": row["mode"].strip(),
         "route": row["route(v0|v1)"].strip().lower(),
         "owner_slice": row["owner slice"].strip(),
-        "parity_status": row["parity status"].strip(),
+        "parity_status": row["parity status"].strip().lower(),
     }
 
 
@@ -221,6 +229,13 @@ def _load_route_fence_json_rows(
             if normalized["route"] not in {"v0", "v1"}:
                 result.add_error(
                     f"route-fence-json: row {index} has invalid route '{row['route']}'."
+                )
+            normalized["parity_status"] = normalized["parity_status"].lower()
+            if normalized["parity_status"] not in ALLOWED_ROUTE_PARITY_STATUS:
+                result.add_error(
+                    "route-fence-json: row "
+                    f"{index} has invalid parity_status '{row['parity_status']}'. "
+                    f"Allowed={sorted(ALLOWED_ROUTE_PARITY_STATUS)}."
                 )
 
             key = (normalized["command"], normalized["mode"])

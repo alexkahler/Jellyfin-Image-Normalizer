@@ -14,6 +14,7 @@ Iteratively planned slices:
 - Slice 9 -> WI-001 COV-01a Characterization collectability hardening (touches WI-004/WI-005 artifacts)
 - Slice 10 -> WI-001 COV-01b Characterization runtime gate (warn ratchet, safety_contract scope)
 - Slice 11 -> WI-001 COV-02 Backdrop workflow sequence governance gate (phase-1 warn ratchet, run|backdrop scope)
+- Slice 12 -> WI-001 COV-03 Route-fence readiness semantics gate (claim-scoped runtime proof, no route flips)
 
 After Slice 9, subsequent slices remain iterative. Governance-coverage slices
 (starting with COV-01b) take precedence before route-fence flip planning.

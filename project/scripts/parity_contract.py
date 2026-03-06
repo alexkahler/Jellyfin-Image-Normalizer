@@ -29,6 +29,7 @@ REQUIRED_ROUTE_FENCE_COLUMNS = [
     "parity status",
 ]
 ALLOWED_PARITY_STATUS = {"preserved", "changed", "removed", "suspicious"}
+ALLOWED_ROUTE_PARITY_STATUS = {"pending", "ready"}
 APPROVAL_REQUIRED_STATUSES = {"changed", "removed", "suspicious"}
 PLACEHOLDER_APPROVAL_REFS = {"", "-", "n/a", "na", "none", "pending", "tbd"}
 
