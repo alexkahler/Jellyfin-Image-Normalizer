@@ -18,6 +18,14 @@ Iteratively planned slices:
 - Slice 13 -> WI-001 COV-04 Backdrop trace contract (dual-proof, observed-vs-baseline)
 - Slice 14 -> WI-001 COV-05 Blueprint topology drift guard (governance docs-topology contract)
 
+Theme A iteration status (Governance Contract Posture Recovery):
+- Slice 15 -> Theme A A-01 Imaging LOC closure (completed; commit `1813243`)
+- Slice 16 -> Theme A A-02 Backup LOC closure (completed; commit `b1c6c29`)
+- Slice 17 -> Theme A A-03 Medium-coupling closure slot 1 (`client.py`) (completed; commit `b496423`)
+- Slice 18 -> Theme A A-04 Medium-coupling closure slot 2 (`config.py`) (completed; commit `3716216`)
+- Slice 19 -> Theme A A-05 High-coupling closure slot 1 (`pipeline.py`) (blocked; split to `A-05a`/`A-05b` required before proceeding)
+- Slice 20 -> Theme A A-05a Pipeline LOC closure split tranche 1 (`pipeline.py` backdrop seam extraction) (completed; commit `<pending>`)
+
 After Slice 9, subsequent slices remain iterative. Governance-coverage slices
 (starting with COV-01b) take precedence before route-fence flip planning.
 Route-fence flips must not be planned/executed until Slice 7 Surface Coverage Gate,
