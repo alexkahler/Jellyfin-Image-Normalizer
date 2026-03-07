@@ -1,243 +1,240 @@
 ---
 name: cli-and-config-contract
-description: Safely evolve a Python CLI and TOML configuration schema without breaking users. Use when adding/changing flags, defaults, validation rules, config generation, or config migration behavior. Includes a step-by-step workflow for: precedence rules, exclusivity constraints, deprecation strategy, documentation sync, and contract/characterization tests.  Don't use for runtime/image-processing behavior changes unless they are strictly driven by CLI/config interface changes.
+description: Primary skill for changing a user-facing CLI or configuration contract: flags/options, subcommands, config keys/schema, defaults, validation, precedence, help text, config generation, and migration behavior. Use this first when a request changes how users invoke the program or configure it, including argparse/click/typer interfaces and TOML/YAML/JSON/env-backed settings. Companion skill: use docs-self-healing-update-loop after the contract change when README, docs, examples, templates, or agent guidance must be synchronized. Don't use for purely internal refactors that do not affect user-visible behavior.
 metadata:
-  version: "2.0.0"
-  updated: "2026-03-04"
-  owners: "@codex @alexkahler"
-  notes: Assumes Python 3.11+ so TOML can be parsed via stdlib tomllib; if supporting older Python, you'll need tomli (and should document/pin it). If the repo uses baseline/characterization contracts for CLI/config (recommended), update those artifacts as part of this workflow.
+  version: "2.1.0"
+  updated: "2026-03-07"
+  owners: 
+    - "@codex"
+    - "@alexkahler"
+  notes: Repo-agnostic. Assumes the repo has AGENTS.md with verification gates and CI. If your repo does not have (a) a public CLI entrypoint, (b) documented config format, or (c) a config example/template, you must add those artifacts (or adjust this skill) before it can be applied as-written.
+compatibility: Primary language: Python. Works with argparse/click/typer and common config formats (TOML/YAML/JSON/env). If using TOML, prefer Python 3.11+ (tomllib) or a TOML library; adapt validation tooling as needed.
 ---
 
 # CLI and Config Contract
 
+This is the **primary skill** for user-facing interface contract changes. If a request changes how a user runs the program, supplies options, provides configuration, relies on defaults, or encounters validation/error behavior, start here.
+
+A CLI + config surface is a **public interface**. Treat changes like API changes: make behavior explicit, keep backward compatibility when feasible, and ship tests + docs with every externally observable change.
+
 ## Scope and intent
 
-This skill is a runbook for changing a CLI + TOML config **public interface** safely:
-- Add/change CLI flags or subcommands
-- Change defaults, constraints, or validation rules
-- Modify precedence (CLI vs config vs environment variables)
-- Modify config template generation (`--generate-config` / init commands)
-- Introduce config migration or schema versioning
-- Tighten/relax exclusivity rules (e.g., restore vs run flags)
+This skill owns:
+- Flags/options, subcommands, help text, exit codes, and user-facing error behavior
+- Config keys/schema, defaults, validation, deprecations, and compatibility shims
+- Precedence/merge behavior across CLI, config files, environment variables, and defaults
+- "Generate config" / "print config" / "validate config" features
+- Config migrations and contract-level behavior changes
 
-**Non-goals**
-- Refactoring internals that does not affect parsing/validation/precedence or user-visible docs
-- Changing operational semantics unrelated to CLI/config surface (do those separately, with their own contract tests)
+Use this skill as the **first-choice entry point** when the change affects the external invocation/configuration contract.
 
----
+Companion relationship:
+- If the contract change also requires README/docs/example/template/agent-guidance updates, use `docs-self-healing-update-loop` as a **companion after or alongside this skill**.
+- Documentation synchronization does **not** replace contract ownership; this skill remains primary for deciding and implementing the behavior change.
+
+Non-goals:
+- Pure refactors with zero user-visible effect (use normal dev process instead)
+- Large multi-module redesigns before the interface change is well-scoped (use your repo's planning skill / plan-first process)
+- Generic docs cleanup that does not follow from a contract change (prefer the docs skill directly)
+
+## Routing boundaries
+
+Choose this skill over nearby skills when:
+- The main question is **what users can pass, configure, or expect**
+- The change touches flags, options, keys, defaults, precedence, validation, help output, or config compatibility
+- The request includes words like: "flag", "option", "subcommand", "config", "settings", "default", "env var", "precedence", "schema", "YAML", "JSON", "TOML", "rename config key", "deprecate option"
+
+Prefer a different primary skill when:
+- The task is a purely internal Python refactor with no contract change → use the refactor/Python quality skill
+- The task is mainly about planning a risky multi-step change before implementation starts → use the planning skill first
+- The task is mainly about validating/proving an already-implemented change → use the verification skill
+- The task is only about syncing docs after behavior is already settled → use the docs skill as primary
 
 ## Inputs and preconditions
 
-Before editing code, confirm:
+Before editing code, identify and write down:
+- **Public entrypoints**:
+  - CLI executable/module (e.g., `python -m pkg`, `pkg` console script, `cli.py`)
+  - Config file(s) used/accepted (names, locations, discovery rules)
+- **Current behavior baseline**:
+  - Default values
+  - Precedence order (e.g., CLI > env > config > defaults)
+  - Validation rules and error behavior (messages + exit codes)
+- **Where docs live**:
+  - README usage examples
+  - `docs/` pages
+  - example config/template file(s) (if any)
 
-- Where parsing lives (e.g., `src/**/cli.py`, `src/**/config.py`)
-- Where user docs live (README, docs pages, `config.example.toml`)
-- Whether the repo has:
-  - Contract/characterization tests + baseline artifacts for CLI/config
-  - Governance/verification gates in `AGENTS.md` and CI
-- Whether config parsing is TOML-only and what the supported Python baseline is
+If you cannot point to a documented baseline, add minimal documentation first (even a short "Current behavior" section).
 
----
+## Tools and permissions
 
-## Contract principles (what must remain true)
+- Use unit tests as the source of truth for behavior.
+- Follow the repo's verification gates in **AGENTS.md** (do not invent new gate commands).
+- Avoid broad rewrites: keep diffs scoped to the contract change.
+- Treat contract changes as externally visible even when the code diff is small.
 
-### 1) One source of truth for "effective configuration"
-At runtime, the program should be able to explain:
-- Which value is effective
-- Where it came from (default vs config vs CLI vs env)
-- Why a conflicting value was ignored or rejected
+## Contract invariants (do not violate silently)
 
-### 2) Explicit precedence order (must be documented)
-Pick one and keep it stable unless intentionally changed:
-- CLI overrides config
-- Config overrides defaults
-- Environment variables (if used) have a defined position in precedence
+1) **Precedence must be explicit and stable**
+- Document and test the precedence order.
+- If you change precedence, treat it as a breaking/behavior change and add migration notes.
 
-### 3) Validation must be deterministic and user-facing
-- Invalid inputs must fail with a clear message and a non-zero exit status
-- Mutually exclusive combinations must be rejected early
-- "No-op" options (options that do nothing in the chosen mode) must either:
-  - warn clearly, or
-  - be rejected (choose one policy and enforce it consistently)
+2) **Errors must be actionable**
+- Invalid inputs/config must produce:
+  - clear error message (what + how to fix)
+  - stable non-zero exit code
+- Do not turn formerly-valid inputs into hard failures without a deprecation/migration path (unless explicitly requested).
 
-### 4) Backward compatibility is a deliberate choice
-For any interface change, choose one:
-- **Compatible**: accept old + new forms; warn on old; document migration
-- **Breaking**: reject old forms; add a prominent release note and upgrade guide
+3) **Defaults are part of the public surface**
+- Changing defaults is a behavioral change; tests and docs must reflect it.
 
----
+4) **Single-source-of-truth for parsing/validation**
+- Avoid duplicating validation rules across CLI parsing and config loading.
+- Prefer one canonical validation layer used by both CLI-only and config-driven paths.
 
 ## Workflow
 
-### Step 0 — Classify the change
-Write a one-paragraph change classification (in the PR description or issue):
-- **Surface**: new flag, renamed flag, changed default, new config key, removed key, new constraint, etc.
-- **Risk**: low/medium/high (high = could stop runs or change outputs broadly)
-- **Compatibility plan**: compatible vs breaking
+### 1) Classify the change (choose the smallest safe path)
+- **Additive**: new flag/config key that doesn't change existing behavior → usually safe.
+- **Behavioral**: changes defaults, precedence, or meaning of an existing flag/key → requires strong tests + docs updates.
+- **Breaking**: removes/renames flags/keys or changes accepted values → requires a deprecation/migration plan (or explicit approval).
 
-**If breaking:** add an explicit "upgrade notes" section in docs and ensure tests assert the new failure mode.
+### 2) Confirm primary ownership
+Before making changes, confirm that the request is primarily about the external contract:
+- If users will notice a different command, option, config shape, default, precedence rule, validation outcome, or migration path, this skill is the owner.
+- If docs/examples must also change, note that `docs-self-healing-update-loop` is a companion task, not the decision-maker for contract semantics.
 
----
+### 3) Update the contract surface (code)
+Make the smallest change that achieves the goal:
+- CLI:
+  - add/adjust flag/subcommand definitions
+  - update help text and examples (help output is user-facing)
+  - ensure parsing rules remain deterministic (avoid ambiguous combinations)
+- Config:
+  - update schema definition and validation
+  - maintain stable key naming and structure unless migrating
+  - keep config loading + CLI parsing aligned (same defaults, same validation)
 
-### Step 1 — Define the contract update (before coding)
-Make the change explicit as a set of contract statements:
+**If/then decision rules**
+- If you **rename/remove** a flag or key:
+  - keep a compatibility alias when feasible (old name still works)
+  - emit a deprecation warning (not a hard error) for at least one release cycle (or as your repo policy dictates)
+  - document the replacement and timeline
+- If you **change meaning** of a flag/key:
+  - prefer introducing a new flag/key and deprecating the old behavior
+  - only "flip semantics" directly when explicitly requested and versioned as breaking
 
-- New/changed CLI syntax (including help text intent)
-- New/changed config keys and their types
-- Precedence rule (who wins)
-- Exclusivity rules (what cannot be combined)
-- Default changes (old → new)
-- Deprecation behavior (warning text + timeline, if applicable)
+### 4) Add/extend tests (contract tests first)
+Minimum required tests for any contract change:
 
-**Output of this step:** a short checklist you can translate directly into tests.
+**CLI parsing tests**
+- Happy path: parses and maps to the intended internal representation
+- Invalid values: produces clear error + non-zero exit code
+- Interaction/exclusivity: incompatible options fail clearly (or resolve deterministically)
+- Precedence test(s): confirm CLI overrides config/env as documented
 
----
+**Config tests**
+- Schema validation: missing/unknown/invalid keys behave as intended
+- Defaults: loaded config + missing keys yield correct defaults
+- Merge behavior: multiple config sources merge deterministically (if supported)
 
-### Step 2 — Update parsing and data model
-Implement changes in a way that keeps parsing separate from execution:
+**Migration tests** (if applicable)
+- Old config/flags still work (or produce the expected deprecation warning)
+- New config/flags behave correctly
+- Round-trip test for config generation (if you have "generate-config"):
+  - generated config validates
+  - generated config is consistent with current defaults
 
-- Parse CLI → typed args structure
-- Load config TOML → typed config structure
-- Merge → "effective config" with provenance tracking where possible
+Testing guidance:
+- Prefer parametrized "decision tables" for flags/keys/value combos.
+- Use `tmp_path` for temporary config files.
+- Keep tests focused on observable behavior: output, exit codes, and parsed/validated results.
 
-**If introducing new config keys:**
-- Validate type and allowed values
-- Decide how unknown keys are handled:
-  - error (strict), or
-  - warning (permissive)
-Pick one consistent policy.
+### 5) Update docs and examples (keep them runnable)
+Update all user-facing references that mention the changed surface:
+- README "Usage" section and copy/paste examples
+- `docs/` pages (advanced usage, config reference)
+- Example config/template file(s)
+- Shell completions (if your repo generates them) and `--help` snapshots (if tracked)
 
-**If introducing new CLI flags:**
-- Make names stable and consistent (kebab-case for long options)
-- Avoid ambiguous boolean flags; prefer explicit enums where it helps clarity
+Rules:
+- Examples must match reality (commands and flags must actually work).
+- If behavior changes, include a short "Migration / Breaking changes" note with before/after snippets.
+- If the documentation impact is broad, load `docs-self-healing-update-loop` as a companion and synchronize every externally visible reference.
 
----
+### 6) Run verification
+Use `references/shared-verification-and-proof-template.md` for the common verification flow:
+- run the smallest relevant checks first,
+- use `AGENTS.md` as the canonical source for repo gates,
+- apply stop-and-fix,
+- and record a short verification note.
 
-### Step 3 — Enforce exclusivity and "mode correctness"
-Add hard checks for incompatible combinations.
+For this skill, the targeted checks should focus on CLI/config behavior first.
 
-Common patterns:
-- "Operational flags" must be rejected with "config init / generate config" commands
-- Restore operations must reject run-only flags
-- Single-target operations may require an explicit mode/image-type selector
+## Verification checklist (must complete before declaring done)
+- [ ] Tests cover new/changed flag and/or config behavior (including precedence)
+- [ ] Invalid inputs produce clear errors (message + exit code)
+- [ ] Docs/examples updated and consistent with the implementation
+- [ ] If breaking/behavioral: migration/deprecation path is documented and tested
+- [ ] Repo verification gates (AGENTS.md) pass
+- [ ] Contract ownership remained clear: external behavior decisions were made here, with docs sync handled as a companion if needed
 
-**If a flag is mode-specific:**
-- Decide policy for "flag provided but mode not selected":
-  - warn (and ignore), or
-  - error
-Document the policy and test it.
-
----
-
-### Step 4 — Deprecation strategy (when renaming/removing)
-If you are changing a CLI/config name:
-
-1) Keep the old name working (if compatible), but emit a warning:
-   - Warning must say: what to use instead
-2) Add a doc note + examples using the new name
-3) Add tests asserting:
-   - old name still works (until removal)
-   - warning is emitted
-   - new name works
-4) Decide removal timing and record it in changelog/release notes
-
-**If breaking now:** ensure error text includes the replacement and migration hint.
-
----
-
-### Step 5 — Update docs and templates (no drift allowed)
-Update all user-facing references in the same change:
-
-- README usage examples
-- `config.example.toml` (or equivalent template)
-- Advanced usage docs / feature tour pages
-- Any "generated config" output (if the tool emits comments or defaults)
-
-**Rule:** If the tool can generate a config, that output is a contract surface too.
-
----
-
-### Step 6 — Update contract tests / characterization baselines
-Add or update tests to pin the behavior.
-
-Minimum test set for any CLI/config change:
-- **Happy path parsing**: new syntax works
-- **Validation**: invalid values fail with clear messages
-- **Exclusivity**: incompatible combinations are rejected
-- **Precedence**: CLI overrides config (or whatever your rule is)
-- **No-op policy**: warn or error is asserted
-- **Template generation**: `--generate-config` output includes new key/default (when relevant)
-
-If your repo uses baseline/characterization artifacts:
-- Update the baseline JSON (or snapshot) to include the new behavior ID/entry
-- Ensure governance/linkage checks still pass
-
----
-
-### Step 7 — Verification gates (run before declaring done)
-Run the repo's verification commands (from `AGENTS.md` / CI contract).
-At minimum (typical Python repos):
-- Unit tests
-- Lint/format checks
-- Type checks (if enforced)
-- Governance/contract checks (if present)
-
----
-
-## Verification checklist (Definition of Done)
-
-- [ ] CLI help + examples reflect the new interface
-- [ ] Config template/example reflects the new schema
-- [ ] Exclusivity rules are enforced with clear errors
-- [ ] Precedence is tested (effective config is correct)
-- [ ] Deprecations (if any) warn with a migration hint
-- [ ] Contract/characterization baselines (if present) updated
-- [ ] All verification gates pass
-
----
+## Completion criteria (stop condition)
+You are done when:
+- The updated contract is enforced by tests,
+- Documentation and examples match the new behavior,
+- And CI/verification gates pass without special casing.
 
 ## Troubleshooting
 
-### Symptom: "Flag does nothing" confusion
-**Likely cause:** mode-specific option supplied without selecting that mode  
-**Fix:** enforce policy (warn+ignore or error), document it, add tests.
+**Symptom:** "Docs say X but CLI does Y"
+- Likely cause: examples weren't updated or defaults changed silently.
+- Fix: add a test that asserts the documented example behavior; update docs and/or code to match.
 
-### Symptom: "Generated config doesn't include the new key"
-**Likely cause:** template generator is not sourced from the same schema as runtime defaults  
-**Fix:** generate template from the same default config model; add a template regression test.
+**Symptom:** "Old config file no longer works"
+- Likely cause: key rename/removal without a compatibility shim.
+- Fix: add migration/alias handling and tests; add a deprecation warning and a migration note.
 
-### Symptom: "Users can't tell which value won"
-**Likely cause:** merge logic lacks provenance or logging  
-**Fix:** add an "effective config summary" log block (or debug output) and test for key lines.
+**Symptom:** "Ambiguous option combinations produce weird behavior"
+- Likely cause: missing mutual exclusion or precedence rule.
+- Fix: enforce exclusivity or deterministic precedence; add interaction tests.
 
-### Symptom: "Mutually exclusive flags still parse"
-**Likely cause:** exclusivity enforced in execution, not in parse/validate stage  
-**Fix:** move the check into validation; ensure error occurs before any side effects.
+**Symptom:** "Generated config differs from actual defaults"
+- Likely cause: defaults defined in multiple places.
+- Fix: centralize defaults and ensure generator reads from the same source; add a round-trip test.
 
----
+**Symptom:** "A docs-oriented skill started to drive interface semantics"
+- Likely cause: ownership confusion between contract and documentation updates.
+- Fix: return contract decisions to this skill, then use the docs skill only to propagate the already-decided external behavior.
 
 ## Examples
 
 ### SHOULD trigger this skill
-- "Add a new `--foo` flag and update the config to support it."
-- "Rename a config key and keep backward compatibility with a warning."
-- "Make `--restore` reject operational flags and document the behavior."
-- "Change the default size/quality and ensure docs + tests match."
+- "Add a new `--output-format` flag and document it."
+- "Change the default compression level in the CLI and config."
+- "Rename config key `foo_bar` to `foo-bar` but keep backward compatibility."
+- "Update precedence so env vars override config file values."
+- "Deprecate `--legacy-mode` and replace it with a config setting."
 
-### SHOULD NOT trigger this skill (near misses)
-- "Refactor the image pipeline for performance without changing CLI/config."
-- "Update Docker instructions without changing flags or config schema."
-- "Fix a bug in JPEG encoding output (unless a CLI/config option controls it)."
+### SHOULD NOT trigger this skill
+- "Refactor internal helper functions used by the CLI without changing behavior."
+- "Rename a private variable inside config loading code."
+- "Improve logging messages that are not part of user-facing errors/help."
+- "Sync README examples after the interface behavior has already been finalized." 
 
----
+## References and resources (optional, repo-dependent)
+If present, update the relevant artifacts:
+- README usage sections (CLI examples)
+- docs/ (config reference, advanced usage)
+- examples/ or assets/ config templates (e.g., `config.example.*`)
+- Any "generate-config / validate-config" documentation
+- AGENTS.md verification gates (do not duplicate the commands here)
+- references/shared-verification-and-proof-template.md — use for the common verification flow and final proof note
 
-## References and related resources (repo-local)
-- `config.example.toml` — example schema and defaults (must stay in sync)
-- `docs/advanced-usage.md` — advanced patterns and mode-specific options
-- `docs/TECHNICAL_NOTES.md` — reference for current CLI/config behavior and flow
-- Contract tests/baselines — if present under `tests/**/cli_*` and `tests/**/config_*`
+Companion usage:
+- `docs-self-healing-update-loop` — use when externally visible contract changes require synchronized updates across docs, examples, templates, release notes, or agent-facing guidance.
 
 ## Changelog
-- 2026-03-04 (v2.0.0): Rewritten as a contract-first runbook with explicit
-  precedence/exclusivity/deprecation workflows, verification checklist, troubleshooting,
-  and trigger/near-miss examples. Agnostic to internal implementation variants.
+- 2026-03-07 / 2.1.0: Added explicit primary-skill positioning for user-facing CLI/config contract changes; clarified routing boundaries; marked docs-self-healing-update-loop as a companion rather than a co-owner.
+- 2026-03-04 / 2.0.0: Generalized to be repo-agnostic; added explicit contract invariants, branching rules, verification-first workflow, and trigger examples.

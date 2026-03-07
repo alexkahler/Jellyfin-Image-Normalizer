@@ -1,72 +1,87 @@
 ---
 name: python-quality-bar
-description: Enforce a high, consistent quality bar for any Python code change: clear docstrings, maintainable structure (no copy/paste logic), strong tests, type-safety, security hygiene, and clean diffs. Use when adding/modifying Python code or tests. Don't use for pure docs-only PRs or non-Python changes. Includes a JFIN addendum (module boundaries + imaging/Jellyfin invariants) when working in that repo.
+description: Enforce the default quality overlay for Python code changes: readable structure, clear docstrings, strong tests, pragmatic type safety, security hygiene, and clean diffs. Use for most Python additions or modifications, including tests. Prefer this as the baseline companion for Python work. Do not use as the primary skill when a narrower Python skill is a better match (for example, behavior-preserving refactors owned by safe-refactor-python-modules), or for pure docs-only / non-Python changes.
 metadata:
   version: "2.1.0"
-  updated: "2026-03-04"
-  owners:
-    - "@codex"
-    - "@alexkahler"
-  notes: AGENTS.md is the authoritative source of repo verification gates. This skill is the procedure to meet that bar. If your repo mandates a different docstring style (e.g., NumPy or Sphinx), follow AGENTS.md instead of the defaults here. If ruff/mypy/bandit/pip-audit are not installed in the repo, run the equivalent tools defined in AGENTS.md and document what you ran.
+  updated: "2026-03-07"
+  owners: "@codex, @akaehler"
+  notes: This skill is repo-agnostic and assumes an AGENTS.md exists with the authoritative verification gates. If your repo mandates a different docstring style (e.g., NumPy or Sphinx), follow AGENTS.md instead of the defaults here. If ruff/mypy/bandit/pip-audit are not installed in the repo, run the equivalent tools defined in AGENTS.md and document what you ran.
 compatibility: Requires Python and the repo's standard tooling as defined in AGENTS.md (tests/linters/typechecks). Designed for repos with unit tests and CI verification gates.
 ---
 
 # Python Quality Bar
 
 ## Scope and intent
-This skill is a **repeatable runbook** for producing Python changes that are:
-- readable and reviewable,
-- correct and tested,
-- type-safe where practical,
-- secure by default,
-- consistent with repo gates and CI.
+This skill is the **default Python quality overlay** for Python code changes. Use it to keep Python edits readable, test-backed, type-aware, secure-by-default, and easy to review.
 
-This skill **does not replace** AGENTS.md. Treat AGENTS.md as policy ("must pass gates"),
-and this skill as procedure ("how to meet the bar").
+This skill is broad by design: it applies to most Python additions or modifications, and often loads alongside a narrower task-specific skill. It **does not replace** AGENTS.md, which remains the source of truth for repo policy and required gates.
+
+Use a narrower Python skill as the **primary** skill when the task clearly matches one:
+- choose `safe-refactor-python-modules` for behavior-preserving structural refactors,
+- choose a contract or migration skill when the main risk is interface, schema, or rollout behavior.
+
+Treat this skill as procedure and baseline expectations for Python quality, not as the owner of every specialized Python workflow.
 
 ## When to use
 Use this skill when you:
 - add or modify Python code (`*.py`)
-- change behavior (even small behavior)
-- refactor Python code
-- add or update tests
+- change Python behavior, even in a small way
+- add or update Python tests
+- need the default quality baseline for a Python change
+- are using a narrower Python skill and still need the standard Python quality bar
 
-Do not use when you:
-- only change docs/markdown
-- only change non-Python files (unless Python behavior is indirectly affected)
+Do not use this skill when you:
+- only change docs or markdown
+- only change non-Python files, unless Python behavior is indirectly affected
+- are doing a behavior-preserving structural refactor that is better owned by `safe-refactor-python-modules` as the primary skill
+- need a more specific workflow that clearly dominates the task
 
 ## Inputs and preconditions
 Before editing:
-1) Locate and read **AGENTS.md**.
-2) Identify the repo's **verification gates** (format/lint/typecheck/test/security, etc.).
-3) Confirm where tests live and how they're run.
-4) If this is the **JFIN** repo, read the **JFIN addendum** in this document and follow its module boundaries and invariants.
+1. Locate and read **AGENTS.md**.
+2. Identify the repo's **verification gates** (format, lint, typecheck, tests, security, packaging, etc.).
+3. Confirm where Python tests live and how they are run.
+4. Check whether a narrower skill should be primary, with this skill acting as a companion overlay.
 
 ## Tools and permissions
-- Prefer the repo's existing tools and commands.
+- Prefer the repo's existing Python tools and commands.
 - Do not introduce new tooling or dependencies unless the task explicitly requires it.
 - Never add secrets to code, tests, fixtures, logs, or docs.
+- Follow AGENTS.md for the authoritative formatter, linter, typechecker, test runner, and security checks.
 
 ## Workflow
 
-### 1) Plan the smallest correct change
+### 1) Choose the right role for this skill
+**Goal:** apply this skill at the correct level.
+
+- First decide whether this is the **primary** Python skill or a **companion overlay**.
+- If the task is a normal Python change, this skill can be primary.
+- If the task is a specialized refactor or another narrower workflow, let that skill lead and use this one to enforce the Python quality baseline.
+- Keep the change scoped to the actual requirement; do not turn a small fix into a broad cleanup.
+
+**If/then:**
+- If the task is primarily a behavior-preserving structural refactor, switch to `safe-refactor-python-modules` as primary and use this skill as the companion quality bar.
+- If the task is pure docs-only or non-Python, do not use this skill.
+
+### 2) Plan the smallest correct Python change
 **Goal:** avoid scope creep and review pain.
 
 - Restate the requirement in 1–2 sentences.
-- Identify the narrowest implementation point (prefer editing existing code over new layers).
-- Keep the diff focused: no "while I'm here" refactors.
+- Identify the narrowest implementation point.
+- Prefer editing existing code over adding new layers.
+- Keep the diff focused; avoid unrelated cleanup.
 
 **If/then:**
-- If the change looks like it will touch many files or exceed a few hundred lines, stop and switch to a planning/refactor skill (or follow the repo's "plan first" process in AGENTS.md).
+- If the change appears likely to touch many files or exceed a few hundred lines, stop and switch to a planning/refactor skill or follow the repo's plan-first process in AGENTS.md.
 
-### 2) Write maintainable structure (DRY without over-abstraction)
+### 3) Write maintainable structure (DRY without over-abstraction)
 **Goal:** reduce duplication while keeping code obvious.
 
 **Rules:**
 - Do not introduce copy/paste variants of the same logic.
-- If the same decision/transformation appears **2+ times** in the change, extract a helper.
-- Prefer *small* helpers with good names over big frameworks.
-- Keep responsibilities cohesive: avoid scattering the same concern across many modules.
+- If the same decision or transformation appears **2+ times** in the change, extract a helper.
+- Prefer *small* helpers with good names over large frameworks.
+- Keep responsibilities cohesive; avoid scattering the same concern across many modules.
 
 **Acceptable duplication (limited):**
 - small constants,
@@ -76,234 +91,139 @@ Before editing:
 **If/then:**
 - If you're refactoring and behavior must not change, add tests first (characterization tests if needed) before moving code.
 
-### 3) Docstrings and public intent
+### 4) Docstrings and public intent
 **Goal:** make code self-explanatory for future readers.
 
-**Default docstring style:** Google-style (unless AGENTS.md specifies otherwise).
-- Every new public function/class/module should have a docstring.
-- Helpers: docstring if non-trivial or if it has tricky invariants/side effects.
+**Default docstring style:** Google-style, unless AGENTS.md says otherwise.
+- Every new public function, class, and module should have a docstring.
+- Helpers should have docstrings when non-trivial or when they carry tricky invariants, side effects, or error behavior.
 
 **Docstring checklist:**
-- One-line summary (imperative mood).
+- One-line summary in imperative mood.
 - Document side effects (I/O, network, mutation).
-- Document invariants and constraints (especially safety/compatibility rules).
+- Document invariants and constraints.
 - Document error behavior (exceptions and why).
 
 **Generators:** use `Yields` instead of `Returns`.
 
-**If/then:**
-- If this is **JFIN**, docstrings are stricter: **every function must have a docstring**, including helpers (see JFIN addendum).
-
-### 4) Comments: explain "why", not "what"
+### 5) Comments: explain "why", not "what"
 Add comments when:
 - a decision is non-obvious,
-- you're preserving a subtle invariant,
-- you're preventing a known failure mode.
+- you are preserving a subtle invariant,
+- you are preventing a known failure mode.
 
 Avoid narrating the code.
 
-### 5) Tests: prove the behavior
+### 6) Tests: prove the behavior
 **Goal:** changes are validated, repeatable, and CI-safe.
 
 **Baseline expectations:**
 - Every behavior change should have test coverage.
-- Prefer unit tests with mocks/stubs for external systems (network, time, filesystem, DB).
+- Prefer unit tests with mocks or stubs for external systems (network, time, filesystem, DB).
 - Use `tmp_path` for filesystem tests.
 - Prefer parametrization for decision tables instead of duplicated tests.
 
 **If/then:**
-- If behavior is hard to specify (legacy / de facto behavior), add characterization tests first, then refactor.
+- If behavior is hard to specify (legacy or de facto behavior), add characterization tests first, then refactor.
 
 **When you cannot add tests:**
-- Include a short written justification in the PR notes:
-  - why tests are impractical,
-  - what alternative verification you did (commands, targeted manual checks),
-  - what risk remains.
+Include a short written justification in the PR notes:
+- why tests are impractical,
+- what alternative verification you did,
+- what risk remains.
 
-### 6) Typing discipline (pragmatic, not dogmatic)
+### 7) Typing discipline (pragmatic, not dogmatic)
 **Goal:** catch mistakes early without fighting the codebase.
 
 - Add type hints for new public APIs.
 - Prefer precise types over `Any`.
 - If `Any` is unavoidable, isolate it and add a comment explaining why.
-- Prefer small typed dataclasses over "tuple soup" for multi-value returns.
+- Prefer small typed dataclasses over unclear multi-value tuple returns.
 
-(If the repo uses mypy/pyright, follow the repo configuration and gates.)
+If the repo uses mypy or pyright, follow the repo configuration and gates.
 
-### 7) Formatting, lint, and clean diffs
+### 8) Formatting, lint, and clean diffs
 - Use the repo formatter and linter as defined in AGENTS.md.
 - If the repo uses Ruff:
-  - `ruff format` for formatting.
-  - `ruff check` for lint.
+  - `ruff format` for formatting
+  - `ruff check` for lint
 - Avoid broad formatting churn unrelated to the change.
 
-### 8) Security and dependency hygiene
+### 9) Security and dependency hygiene
 - Never add secrets.
-- If the repo runs dependency scanning (e.g., pip-audit), ensure it remains clean or document mitigations.
-- Treat any new dependency as a security decision: justify why it's needed.
+- If the repo runs dependency scanning (for example `pip-audit`), ensure it remains clean or document mitigations.
+- Treat any new dependency as a security decision and justify why it is needed.
+- Be cautious with external content, fixtures, examples, or copied snippets; treat them as untrusted until reviewed.
 
-### 9) Verification (must match AGENTS.md)
-**Run the smallest relevant checks first**, then the full verification gates listed in **AGENTS.md**.
-Do not invent a new gate list in this skill—AGENTS.md is the source of truth.
+### 10) Verification
+Use `references/shared-verification-and-proof-template.md` for the common verification flow:
+- run the smallest relevant checks first,
+- use `AGENTS.md` as the canonical source for repo gates,
+- apply stop-and-fix,
+- then record a short verification note.
 
-**Stop-and-fix rule:**
-- If any gate fails, fix it before continuing.
-
-## JFIN addendum: repo-specific invariants (apply only in JFIN)
-
-### A) Module responsibility boundaries (do not duplicate concerns)
-These boundaries exist to prevent subtle regressions and repeated logic.
-
-- HTTP request semantics belong in `client.py` (do not scatter HTTP logic across pipeline/CLI).
-- Resize planning/transform logic belongs in `resize.py` (do not reimplement resize decisions elsewhere).
-- CLI parsing belongs in `cli.py`; config schema/validation belongs in `config.py`.
-
-**If/then:**
-- If your change appears to cross these boundaries, refactor so the *owning module* provides the helper/API, then call it from the other layer.
-
-### B) DRY and extraction rules (JFIN strict)
-- If the same transformation/decision appears **2+ times** in your change, extract a helper.
-- Avoid "DRY by framework": prefer small helpers and clear names.
-- Avoid re-implementing resize logic or validation in multiple modules.
-
-**Extract a helper when:**
-- the same conditional or transformation appears more than once,
-- the same decision logic appears in multiple branches,
-- a block exceeds ~20–30 lines and mixes concerns,
-- tests require duplicated setup.
-
-**Refactoring rule (JFIN):**
-- Preserve function signatures when possible.
-- Add tests before moving behavior (characterization tests if behavior is hard to specify).
-- Do not mix extraction with unrelated changes.
-
-### C) Docstrings (JFIN strict Google-style)
-In JFIN:
-- **Every function must have a docstring** (including helpers).
-- Docstrings must mention side effects, invariants (especially dry-run write gating), and error behavior.
-
-**Template:**
-```python
-def foo(bar: str, *, dry_run: bool) -> int:
-    """One-line summary in imperative mood.
-
-    More details if needed. Include invariants and edge cases.
-
-    Args:
-        bar: What it is and valid forms.
-        dry_run: True means no write operations will occur.
-
-    Returns:
-        What the function returns.
-
-    Raises:
-        ValueError: When input is invalid.
-    """
-```
-
-**Generators:** use `Yields` instead of `Returns`.
-
-### D) Comments: preserve safety decisions
-Add "why" comments for:
-- Jellyfin API behavior quirks,
-- retry and idempotency decisions,
-- image format/mode constraints,
-- any safety gate (dry-run, write gating, destructive actions).
-
-Example:
-```python
-# We intentionally avoid retrying POST/DELETE to prevent duplicate writes if the
-# connection drops after the server has processed the request.
-```
-
-### E) Tests (JFIN): unit-first, mock-first
-- Unit tests must not require a live Jellyfin server.
-- Mock the client layer (e.g., `JellyfinClient`) or the underlying HTTP transport.
-- Use `tmp_path` for file I/O.
-- Prefer parametrized decision tables for mode/shape/size cases.
-
-**Characterization tests for imaging changes**
-If behavior is "de facto spec" and hard to articulate, lock it in with characterization tests:
-- assert dimensions,
-- assert format/mode,
-- assert the scale decision (`SCALE_UP` / `SCALE_DOWN` / `NO_SCALE`),
-- avoid byte-for-byte snapshots unless encoding is deterministic.
-
-**Minimum tests to add when changing…**
-- Resize logic: decision coverage for each branch.
-- Logo padding: `add` / `remove` / `none` cases.
-- Backdrop pipeline: multi-phase flow remains safe and idempotent.
-- Dry-run/write gating: POST/DELETE never happen in dry-run.
-
-### F) Typing (JFIN): keep integration seams explicit
-- Type hints required for new functions and public APIs.
-- Prefer precise return types; avoid `Any` unless unavoidable.
-- If you must use `Any`, isolate it at integration seams and document why.
-- Prefer small typed dataclasses for multi-value returns.
-
-### G) Formatting/lint/security (JFIN expectations, unless AGENTS.md says otherwise)
-- Prefer Ruff for format (`ruff format`) and lint (`ruff check`) if present.
-- Run security/dependency checks defined in AGENTS.md. Common JFIN expectations are:
-  - `bandit` for static security checks,
-  - `pip-audit` for dependency vulnerabilities.
-If these tools are not in the repo, do not add them unless required—follow AGENTS.md.
+Additional requirements for this skill:
+- run the relevant Python checks required by `AGENTS.md` (formatter, linter, typecheck, tests, security/dependency checks as applicable),
+- ensure tests meaningfully cover the behavior change or document why tests were impractical,
+- ensure docstrings/types/security hygiene expectations in this skill are satisfied before declaring done.
 
 ## Verification checklist (before calling it "done")
+- [ ] This skill was used in the right role: primary for a general Python change, or companion overlay for a narrower Python task.
 - [ ] Code changes are scoped to one objective.
-- [ ] No copy/paste variants introduced; helpers extracted where repeated.
-- [ ] Docstrings updated for new/changed public functions/classes (style per AGENTS.md; Google-style by default; **JFIN: every function**).
-- [ ] "Why" comments added for non-obvious logic and safety decisions.
-- [ ] Tests added/updated; external effects mocked/stubbed; `tmp_path` used for file ops.
-- [ ] Type hints added where practical; no unnecessary `Any`.
-- [ ] Formatter/linter/typecheck/test gates from AGENTS.md all pass.
-- [ ] Security/dependency checks (if present in AGENTS.md) are addressed.
-- [ ] **JFIN only:** module boundaries respected (`client.py`/`resize.py`/`cli.py`/`config.py`) and dry-run invariant preserved.
+- [ ] No copy/paste variants were introduced; helpers were extracted where repeated.
+- [ ] Docstrings were updated for new or changed public functions/classes/modules (style per AGENTS.md; Google-style by default).
+- [ ] "Why" comments were added for non-obvious logic.
+- [ ] Tests were added or updated; external effects were mocked/stubbed; `tmp_path` was used for file ops where appropriate.
+- [ ] Type hints were added where practical; unnecessary `Any` was avoided.
+- [ ] Formatter, linter, typecheck, and test gates from AGENTS.md all pass.
+- [ ] Security and dependency checks required by AGENTS.md were addressed.
 
 ## Completion criteria
 This skill is complete when:
-- the PR satisfies the repo's verification gates (AGENTS.md),
-- tests meaningfully cover the change (or a justification exists),
-- the diff is reviewable and focused.
+- the Python change satisfies the repo's verification gates in AGENTS.md,
+- tests meaningfully cover the change, or a written justification exists,
+- the diff is focused and reviewable,
+- and the task-specific primary skill, if any, has also been satisfied.
 
 ## Troubleshooting
-**Symptom:** formatting/lint fails in CI
-- Likely cause: local tools/config differ from repo gates.
-- Fix: run the exact AGENTS.md commands locally; don't guess.
+**Symptom:** formatting or lint fails in CI  
+- **Likely cause:** local tools or config differ from repo gates  
+- **Fix:** run the exact AGENTS.md commands locally; do not guess
 
-**Symptom:** tests are flaky
-- Likely cause: real time/network/filesystem dependencies.
-- Fix: mock time/network; use `tmp_path`; remove global shared state; parametrize cases.
+**Symptom:** tests are flaky  
+- **Likely cause:** real time, network, filesystem, or shared-state dependencies  
+- **Fix:** mock time/network, use `tmp_path`, remove shared global state, parametrize cases
 
-**Symptom:** typecheck fails unexpectedly
-- Likely cause: missing annotations at boundary or incorrect Optional/None handling.
-- Fix: add boundary types; narrow unions; isolate `Any` only at integration seams.
+**Symptom:** typecheck fails unexpectedly  
+- **Likely cause:** missing annotations at boundaries or incorrect Optional/None handling  
+- **Fix:** add boundary types, narrow unions, isolate `Any` only at integration seams
 
-**Symptom (JFIN): imaging test is brittle**
-- Likely cause: asserting exact bytes for encoded images.
-- Fix: assert invariants (dimensions/mode/decision) instead of bytes unless encoding is deterministic.
+**Symptom:** this skill feels too generic for the task  
+- **Likely cause:** a narrower Python skill should be primary  
+- **Fix:** switch the task lead to the narrower skill and keep this one as the companion quality overlay
 
 ## Examples
 
 ### SHOULD trigger
-- "Add a new function to parse this config and write tests."
-- "Refactor this module to remove duplication without changing behavior."
-- "Fix this bug and add coverage."
-- (JFIN) "Change resize planning and add decision-table tests for each branch."
+- "Add a new Python function to parse this config and write tests."
+- "Fix this Python bug and add coverage."
+- "Update these Python tests and make sure the change meets repo quality gates."
+- "Modify this Python module and keep the code quality bar high."
+
+### SHOULD trigger as a companion overlay
+- "Refactor this Python module without changing behavior."
+- "Rework this Python CLI parsing logic but keep tests, typing, and docstrings strong."
 
 ### SHOULD NOT trigger
 - "Update README wording."
-- "Change Dockerfile base image only."
+- "Change the Dockerfile base image only."
 - "Reformat markdown docs."
+- "Do a behavior-preserving refactor of this Python module."  
+  (Use `safe-refactor-python-modules` as primary; this skill may still accompany it.)
+
+## References and resources
+- `references/shared-verification-and-proof-template.md` — use for common verification mechanics when defining milestone gates and final completion checks
 
 ## Changelog
-- 2.1.0 (2026-03-04): Added JFIN addendum (module boundaries, strict docstrings, mock-first Jellyfin tests, imaging characterization guidance, dry-run/write-gating invariants) while preserving repo-agnostic workflow and AGENTS.md-as-policy structure.
+- 2.1.0 (2026-03-07): Clarified positioning as the default Python overlay; added primary-vs-companion guidance and explicit handoff to narrower Python skills.
 - 2.0.0 (2026-03-04): Rewritten as repo-agnostic runbook; removed project-specific module boundaries; made AGENTS.md the single source of truth for verification gates; added explicit workflow + examples.
-
-## References (non-normative; follow AGENTS.md when it conflicts)
-```text
-Google Python Style Guide (docstrings and conventions)
-pytest tmp_path documentation
-Ruff formatter documentation
-Python typing documentation
-mypy documentation
-```

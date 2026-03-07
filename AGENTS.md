@@ -10,17 +10,47 @@ Keep it concise, command-accurate, and synchronized with enforced governance art
 - Some tools load instruction files from root to leaf and effectively prioritize closer instructions.
 - Some tools stop loading instruction content after size limits; keep this root file small and move specialization to scoped overrides or skills.
 
+## Skill selection and routing
+
+This repository uses a skill library for task-scoped procedures.
+
+Rules:
+- Keep repo-wide invariant rules in this AGENTS.md.
+- Use skills for task-specific workflows and deeper procedures.
+- When multiple skills appear relevant, consult `references/skill-catalog-routing.md` and follow its:
+  - primary skill rules,
+  - companion skill rules,
+  - near-miss exclusions,
+  - handoff / escalation rules.
+- Prefer the most phase-specific and domain-specific skill over a broader default.
+- Do not duplicate full skill procedures into AGENTS.md; use this file for policy and repo conventions only.
+
+Minimum routing order:
+1. Check whether the task is primarily planning, implementation-shaping, verification, contract change, refactor, or docs synchronization.
+2. Select the primary skill accordingly.
+3. Load companion skills only when the routing document says they compose.
+4. If the task changes phase, hand off to the next appropriate skill rather than forcing one skill to cover the whole lifecycle.
+
+## Skill catalog maintenance
+
+When changing the skill library:
+- Update `references/skill-catalog-routing.md` if a skill’s scope, primary role, companion role, near-miss boundary, or handoff behavior changes.
+- Update affected skill `description` fields when routing distinctions change.
+- Add or update near-miss examples in the relevant `SKILL.md`.
+- If repo structure or commands referenced by a skill change, update AGENTS.md and the skill in the same change.
+
 ## Single Source of Truth and Enforcement Truth
 
-- Repository policy: `AGENTS.md` is the canonical committed instruction contract for agent operation.
-- Do not duplicate operational commands or invariants in other committed instruction files.
+- Repository policy: `AGENTS.md` is the canonical committed instruction contract for repo-wide agent operation.
+- Keep repo-wide invariants, canonical command sets, and enforcement-linked expectations in `AGENTS.md`.
+- Shared references may exist for reusable routing or verification mechanics, but they must not redefine or contradict repo policy in `AGENTS.md`.
+- Skills should reference shared routing/verification documents instead of duplicating repo-wide commands or invariants.
 - If a future tool requires a specific instruction filename, it must be a thin pointer/shim to `AGENTS.md`.
 - Personal/global local overrides are allowed for individual workflows but are non-contractual and must never be relied on for CI or shared team behavior.
 - CI enforcement truth is defined by:
   - `project/verification-contract.yml`
   - `.github/workflows/ci.yml`
 - `AGENTS.md` must mirror these enforcement artifacts and must not invent contradictory command sets.
-
 ## Environment Assumptions
 
 - Python baseline: `3.13`.
@@ -53,6 +83,13 @@ $env:PYTHONPATH='src'; .\.venv\Scripts\python.exe -m pytest
 .\.venv\Scripts\python.exe -m bandit -r src
 .\.venv\Scripts\python.exe -m pip_audit
 ```
+
+## Verification policy
+
+- `AGENTS.md` is the canonical source for repo-wide verification gates and governance checks.
+- Shared verification mechanics used by skills should live in `references/shared-verification-and-proof-template.md`.
+- Skills should reference that shared file for common verification flow, while keeping skill-specific assertions, stop conditions, and completion criteria local.
+- Do not duplicate the full repo gate command set into skills unless a strong local reason requires it.
 
 ## Governance Verification Commands
 
@@ -171,6 +208,8 @@ Local repository sources:
 - `.github/workflows/ci.yml`
 - `docs/TECHNICAL_NOTES.md`
 - `README.md`
+- `references/skill-catalog-routing.md`
+- `references/shared-verification-and-proof-template.md`
 
 External AGENTS guidance and examples:
 

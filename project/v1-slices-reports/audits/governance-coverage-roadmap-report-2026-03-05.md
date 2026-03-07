@@ -1,4 +1,4 @@
-Here’s the updated report with your fixes integrated **in-place**, keeping content, eliminating contradictions, and avoiding duplication. I only added what’s necessary to address the five issues + the three “small edits,” while preserving your structure.
+Here’s the updated report with your fixes integrated **in-place**, keeping content, eliminating contradictions, and avoiding duplication. I only added what’s necessary to address the five issues + the three "small edits," while preserving your structure.
 
 ---
 
@@ -97,7 +97,7 @@ Audit mapping:
 
 * UU-001, UU-005.
 
-**Clarification (to avoid “green while wrong” confusion):**
+**Clarification (to avoid "green while wrong" confusion):**
 
 * Today `verify_governance --check characterization` is a **linkage/surface completeness gate**, not a runtime equivalence gate.
 
@@ -137,7 +137,7 @@ Audit mapping:
    Failure mode prevented: manual readiness overclaims that bypass parity evidence.
 
 3. **Characterization reliability closure rule**
-   Characterization is “reliable” only when linkage checks pass **and** designated characterization suites execute and pass under governance/CI (not just collectable).
+   Characterization is "reliable" only when linkage checks pass **and** designated characterization suites execute and pass under governance/CI (not just collectable).
    Failure mode prevented: green metadata with drifting, flaky, or failing characterization behavior.
 
 4. **Schema expressiveness closure rule**
@@ -187,7 +187,7 @@ Tests/baselines to strengthen:
 Acceptance criteria:
 
 * Current 9 failing characterization tests pass **OR** are re-baselined with explicitly documented normalization changes.
-* Governance output includes an explicit “collectability/linkage OK” signal.
+* Governance output includes an explicit "collectability/linkage OK" signal.
 * `verify_governance --check characterization` and `--check all` surface collectability failures deterministically.
 
 Dependencies:
@@ -281,9 +281,9 @@ Objective:
 
 * Enforce route readiness semantics against parity evidence instead of free-text `parity_status`.
 
-**Important note (to avoid “no flips” ambiguity):**
+**Important note (to avoid "no flips" ambiguity):**
 
-* This is **metadata semantics hardening**. It does not flip routes, but it *does* change what “ready” means and can block/enable future flips.
+* This is **metadata semantics hardening**. It does not flip routes, but it *does* change what "ready" means and can block/enable future flips.
 
 Files/artifacts to touch:
 
@@ -364,7 +364,7 @@ New/updated checks (governance + CI):
 
 * Add lightweight doc-contract check for canonical characterization suite topology references.
 
-  * No doc-grepping required: implement as a small “must-exist path list” / canonical-path assertion in governance.
+  * No doc-grepping required: implement as a small "must-exist path list" / canonical-path assertion in governance.
 
 Tests/baselines to add or strengthen:
 

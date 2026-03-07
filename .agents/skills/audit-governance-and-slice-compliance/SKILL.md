@@ -41,7 +41,7 @@ but it should not perform the fix within this audit.
 Use this skill when you need a **formal, detailed audit report** for one of these targets:
 
 - A PR, branch, or commit range representing a slice or set of slices.
-- A claimed “slice complete” milestone requiring verification.
+- A claimed "slice complete" milestone requiring verification.
 - A governance-heavy change (parity/characterization/goldens/architecture guards/route-fence enforcement).
 - A release-readiness checkpoint for Track 1.
 
@@ -91,7 +91,7 @@ Prohibited actions:
 
 ### Step 0 — Establish audit envelope (required)
 
-**Goal:** define exactly what is being audited and what “compliance” means.
+**Goal:** define exactly what is being audited and what "compliance" means.
 
 1) Record:
 - Target (PR/branch/range)
@@ -100,11 +100,11 @@ Prohibited actions:
 - Expected outputs (what the work claims is done)
 
 2) Identify applicable governance contracts:
-- Track 1 “hard” contracts and gates
+- Track 1 "hard" contracts and gates
 - Verification contract commands + CI job requirements
 - Parity + route-fence rules
 
-**Output requirement:** a short “Audit Target Summary” section for the report.
+**Output requirement:** a short "Audit Target Summary" section for the report.
 
 ---
 
@@ -136,7 +136,7 @@ Run or obtain results for the verification contract:
 
 Also record CI job results vs `required_ci_jobs` in the verification contract.
 
-**Output requirement:** a “Verification Evidence” section listing exact commands and pass/fail status.
+**Output requirement:** a "Verification Evidence" section listing exact commands and pass/fail status.
 
 > If you cannot run a command, mark it as **Not Executed** and state why (missing environment, time, CI unavailable).
 
@@ -144,7 +144,7 @@ Also record CI job results vs `required_ci_jobs` in the verification contract.
 
 ### Step 2 — Verify governance compliance
 
-**Goal:** check the actual Track 1 governance rules, not “best effort”.
+**Goal:** check the actual Track 1 governance rules, not "best effort".
 
 Perform the checks below and record each as:
 - **PASS / FAIL / PARTIAL / NOT APPLICABLE / NOT VERIFIED**
@@ -185,28 +185,28 @@ Confirm governance linkage checks:
 
 ### Step 3 — Verify slice-plan compliance
 
-**Goal:** confirm the work aligns with the slice structure and constraints, not just “it works”.
+**Goal:** confirm the work aligns with the slice structure and constraints, not just "it works".
 
 #### 3A) Slice identification and WI acceptance criteria
 If the work claims a WI:
 - Compare outputs to the WI’s acceptance criteria and public interfaces list.
 - Verify that out-of-scope items were not silently included (especially: route flips, runtime behavior changes where prohibited).
 
-#### 3B) “One objective per slice” and diff discipline
-- Confirm the change set is slice-scoped (no “while I’m here” drift).
+#### 3B) "One objective per slice" and diff discipline
+- Confirm the change set is slice-scoped (no "while I’m here" drift).
 - If scope is broad, flag as governance risk and recommend slicing discipline remediation.
 
 (When recommending remediation, reference: `verification-gates-and-diff-discipline` skill.)
 
 #### 3C) Verification runtime budget (<10 minutes per slice)
-- Check the WI’s “Verification commands (<10 min)” and confirm evidence exists that these are runnable/passed (locally or in CI).
+- Check the WI’s "Verification commands (<10 min)" and confirm evidence exists that these are runnable/passed (locally or in CI).
 - If verification exceeds 10 minutes or isn’t independently runnable, flag as noncompliance with Track 1 slice policy.
 
 #### 3D) Rollback clarity
 - Confirm rollback steps exist and are actionable (WI template field 6).
 
 #### 3E) Behavior preservation statement
-- Confirm presence and truthfulness of “Behavior-preservation statement” (WI template field 7).
+- Confirm presence and truthfulness of "Behavior-preservation statement" (WI template field 7).
 - If behavior may have changed, confirm parity matrix reflects it and approvals are present.
 
 ---
@@ -278,7 +278,7 @@ For each finding:
 
 When recommending fixes, refer to the appropriate skill rather than inventing a new workflow:
 
-- Verification ordering + “How I verified” discipline → `verification-gates-and-diff-discipline`
+- Verification ordering + "How I verified" discipline → `verification-gates-and-diff-discipline`
 - Planning + risk register + rollback definition → `plan-first-scope-and-risks`
 - Python code quality bar + JFIN invariants → `python-quality-bar`
 - Characterization tests for imaging → `pytest-characterization-tests-for-imaging`
@@ -303,15 +303,15 @@ If you detect any Blocker early (governance checks failing, route-fence violatio
 ## Examples
 
 ### SHOULD trigger this skill
-- “Audit this PR to confirm it complies with Track 1 governance and the slice plan.”
-- “Produce an audit report showing whether WI-004 acceptance criteria are actually met.”
-- “Check that characterization baselines + parity matrix links are valid and governance gates pass.”
-- “Verify route-fence wasn’t flipped early and CI contract still matches verification-contract.yml.”
+- "Audit this PR to confirm it complies with Track 1 governance and the slice plan."
+- "Produce an audit report showing whether WI-004 acceptance criteria are actually met."
+- "Check that characterization baselines + parity matrix links are valid and governance gates pass."
+- "Verify route-fence wasn’t flipped early and CI contract still matches verification-contract.yml."
 
 ### SHOULD NOT trigger this skill
-- “Implement WI-00X for me.” (use implementation/planning skills)
-- “Refactor this module.” (use refactor/quality skills)
-- “Write new governance policy.” (out of scope for Track 1 audit)
+- "Implement WI-00X for me." (use implementation/planning skills)
+- "Refactor this module." (use refactor/quality skills)
+- "Write new governance policy." (out of scope for Track 1 audit)
 
 ## References and resources (repo-local)
 

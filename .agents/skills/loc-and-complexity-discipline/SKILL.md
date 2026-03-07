@@ -1,10 +1,10 @@
 ---
 name: loc-and-complexity-discipline
-description: "Keep changes small, reviewable, and maintainable by enforcing LOC/complexity budgets and remove before add discipline. Use when a change risks large net new LOC, growing file size, rising branching/complexity, or when you feel tempted to add scaffolding/frameworks. Don't use for pure formatting-only sweeps or when the task explicitly requires a large, approved rewrite (in those cases, follow AGENTS.md planning and slicing rules)."
+description: "Control implementation-time code growth and structural complexity during active coding. Use when a change is starting to sprawl in LOC, file size, branching, helper layers, or scaffolding, and you need to keep the implementation small, local, and maintainable. This skill is for shaping the code change itself, not for pre-coding risk planning or post-change verification ownership. Don’t use for formatting-only sweeps, docs-only work, or large approved rewrites that are already intentionally sliced and planned under AGENTS.md."
 metadata:
-  version: "2.0.0"
-  updated: "2026-03-04"
-  owners: 
+  version: "3.0.0"
+  updated: "2026-03-07"
+  owners:
     - "@codex"
     - "@alexkahler"
   notes: Repo-specific thresholds/tools vary. Before enforcing numeric limits, check AGENTS.md for verification gates and any existing size/complexity tooling (ruff rules, radon, mccabe, pylint, etc.). If the repo defines different LOC/file-size limits, follow those.
@@ -15,9 +15,16 @@ compatibility: Assumes a Python-first repo with AGENTS.md, unit tests, and CI ve
 
 ## Scope and intent
 
-This skill is a **change-sizing and complexity control runbook**.
+This skill is an **implementation-time complexity control runbook**.
 
-**Goal:** deliver the smallest correct change with the smallest new surface area, while keeping modules readable and testable.
+**Use it while coding** when a change is beginning to expand in size, branching, helpers, files, or abstraction layers and needs to be pulled back to the smallest correct shape.
+
+**Goal:** deliver the smallest correct implementation with the smallest reasonable new surface area, while keeping modules readable, testable, and easy to review.
+
+**This skill does not own:**
+- pre-coding risk framing, sequencing, rollback planning, or milestone design,
+- final verification strategy or proof/reporting ownership,
+- style-only cleanup governed by repo lint/format rules.
 
 **Non-goals:**
 - Not a style guide (use repo lint/format rules).
@@ -63,7 +70,7 @@ Do **not** introduce a new class/module/abstraction unless at least one is true:
 
 - It is reused across multiple call sites,
 - It creates a clear responsibility boundary that reduces coupling,
-- It materially improves testability (and simpler approaches don't).
+- It materially improves testability (and simpler approaches don’t).
 
 ### Rule 3 — Delete before you add
 If you add code, you must also look for one of:
@@ -73,7 +80,7 @@ If you add code, you must also look for one of:
 - unused parameters/config,
 - redundant indirection.
 
-### Rule 4 — Don't hide complexity in "configurability"
+### Rule 4 — Don’t hide complexity in "configurability"
 Avoid introducing config options to dodge a local, deterministic fix unless the repo already treats that surface as public API and the change truly requires configurability.
 
 ---
@@ -107,9 +114,17 @@ Use these as prompts to refactor *locally* (not repo-wide):
 - If a decision table emerges: convert to a mapping/dispatch table (only if it reduces branching).
 - If logic is duplicated twice: extract a helper.
 
-### 6) Verification (must follow AGENTS.md)
-- Run the **smallest relevant tests first**, then the full gates in AGENTS.md.
-- Apply "stop-and-fix": if a gate fails, fix it before continuing.
+### 6) Verification
+Use `references/shared-verification-and-proof-template.md` for the common verification flow:
+- run the smallest relevant checks first,
+- use `AGENTS.md` as the canonical source for repo gates,
+- apply stop-and-fix,
+- then record a short verification note.
+
+Additional requirements for this skill:
+- verify the changed behavior with the smallest relevant tests for the touched code path,
+- keep verification proportional to the scoped implementation change,
+- include the completion report items defined in this skill.
 
 ---
 
@@ -119,7 +134,7 @@ Use these as prompts to refactor *locally* (not repo-wide):
 ❌ Frameworks or plugin systems for a one-off case  
 ❌ Adding config knobs to avoid choosing a clear default behavior  
 ❌ Copy/paste variants with tiny differences  
-❌ "While I'm here…" refactors bundled into the same change  
+❌ "While I’m here…" refactors bundled into the same change  
 ❌ Splitting files/modules without tests that lock behavior
 
 ---
@@ -130,7 +145,7 @@ Use these as prompts to refactor *locally* (not repo-wide):
 - [ ] Net new production LOC is reported (exclude tests/docs)
 - [ ] Any added helper/type/layer has an explicit justification
 - [ ] Tests added/updated for changed behavior (or justification if not possible)
-- [ ] Smallest relevant tests run first; full AGENTS.md gates run before completion
+- [ ] Verification followed `references/shared-verification-and-proof-template.md`
 - [ ] No unrelated renames/reformatting/moves
 
 ---
@@ -175,12 +190,16 @@ When you declare success, you MUST include:
 ### SHOULD trigger
 - "This change is adding ~200 lines—how do we keep it small?"
 - "This module is 900 LOC and hard to navigate; we need to split it safely."
-- "I'm about to add a new ‘service' class—do we really need it?"
+- "I’m about to add a new ‘service’ class—do we really need it?"
+- "This fix keeps growing branches and helper functions. Keep the implementation contained."
 
 ### SHOULD NOT trigger
+- "Please plan the rollout, risks, and rollback for this multi-step change."
+- "Please run the repo verification gates and summarize what passed."
 - "Please run ruff/format on the repo" (format-only sweep)
 - "Implement a new subsystem across multiple packages" (use planning/slicing workflow first)
 - "Update documentation only" (docs workflow)
 
 ## Changelog
+- 2026-03-07 / 3.0.0: Repositioned the skill as implementation-time complexity control, sharpened boundaries against planning and verification skills, and added routing-focused non-trigger examples.
 - 2026-03-04 / 2.0.0: Rewritten to be repo-agnostic, added explicit runbook workflow, verification+reporting contract, and portability notes.

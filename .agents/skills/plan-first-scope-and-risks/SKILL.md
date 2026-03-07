@@ -1,199 +1,224 @@
 ---
 name: plan-first-scope-and-risks
-description: Create a written, staged implementation plan *before* making edits for any non-trivial JFIN change. Use when work spans multiple files/modules, may change behavior, touches CLI/config/API contracts, or has meaningful operational risk (data, files, network, performance, security). Produces: repo map snippet, explicit scope boundaries, assumptions/unknowns, risk register with mitigations + verification, staged milestones with exit criteria, and a rollback plan. Don't use for tiny, single-file typo fixes with no behavior change.
+description: Plan non-trivial code changes before editing any code. Use when work needs pre-coding scoping, risk framing, staged milestones, rollback planning, or a read-only exploration phase because blast radius is unclear. Best for multi-file changes, refactors/migrations, interface changes (CLI/API/config), or data/schema work. Produces: repo map snippet, scoped non-goals, risk register, milestone plan with verification gates, and rollback strategy. Don't use for implementation-time complexity control, post-change verification/reporting, or trivial one-file edits with obvious tests and no behavior change.
+compatibility: Assumes a Python repo with git, unit tests, and CI. Verification commands MUST be taken from AGENTS.md (source of truth). If the repo lacks AGENTS.md verification gates, add them first.
 metadata:
-  version: "2.0.0"
-  updated: "2026-03-04"
-  owners: 
-    - "@codex" 
+  version: "1.2.0"
+  updated: "2026-03-07"
+  owners:
+    - "@codex"
     - "@alexkahler"
-  notes: Requires access to the repo's AGENTS.md verification gates and ability to run the repo's standard test/quality commands (e.g., pytest) locally or in CI. If the task depends on external services (APIs, storage, ML models), the plan must include how to run tests without real credentials (mocks/fixtures) and how to validate safely.
+  notes:
+    - This skill is repo-agnostic. Replace example commands/paths with your repo's actual ones.
+    - Verification gates MUST come from AGENTS.md. Do not invent commands if AGENTS.md disagrees or is missing.
+    - If the repo does not use pytest, substitute the repo's test runner commands (from AGENTS.md).
+    - This is a pre-coding planning skill. It should usually trigger before implementation or verification-focused skills.
 ---
 
-# Plan First: Scope, Risks, and Verification Gates (JFIN)
+# Plan First: Scope, Risks, and Staged Milestones (Universal)
 
 ## Scope and intent
-This skill is a **planning runbook** for JFIN changes that could have non-obvious blast radius.
-It forces a concrete plan with **gates** (verification + exit criteria) and a **risk register**
-before touching code.
+This skill is for planning before code changes begin.
+Use it to scope non-trivial work into staged, reviewable milestones with explicit risks, non-goals, and rollback strategy.
 
-**Non-goals**
-- Writing the implementation, refactor, or migration itself.
-- Pastes of large files/logs. Prefer short summaries and path lists.
+It defines what must be verified at each milestone, but it does not own executing repo gates or writing final proof after implementation. Hand off to the verification skill once code changes exist.
+
+It prevents big-bang edits and silent regressions by requiring:
+- a tight scope + explicit non-goals,
+- a small risk register with mitigations,
+- staged milestones that are independently verifiable,
+- a concrete rollback plan.
+
+**Hard rule:** do not change code until the plan outputs are complete.
 
 ## When to use
-Trigger this skill when **any** apply:
-- More than ~2 files likely to change, or multiple modules/packages are involved.
-- Any behavior change is possible/likely (even if "should be no-op").
-- CLI/config/schema/API contracts may change (flags, env vars, config keys, JSON shapes, exit codes).
-- Data/file operations occur (create/update/delete, uploads, downloads, transformations).
-- Performance, concurrency, caching, or memory use could materially change.
-- Security, auth, secrets, permissions, or network behavior is involved.
-- You're uncertain about blast radius or test coverage.
+Use this skill when **any** is true:
+- Touching more than ~2 files
+- Refactor/migration where behavior should be preserved
+- Changing public interfaces (CLI flags, config schema, API endpoints, file formats, DB schema, etc.)
+- Unsure about blast radius, performance impact, or safety implications
+- Work likely to exceed ~150 net new LOC or span many modules
+- You need a read-only exploration step before deciding how to implement
 
-Don't use when:
-- A trivial doc/typo change with no behavior impact and one file.
-- A pure formatting change with automated formatting already enforced and no semantic changes.
+Use this skill **before coding**, especially when the first problem is scoping, sequencing, or risk reduction.
+
+Do **not** use when:
+- The main task is implementation-time complexity control or keeping the diff small
+- The main task is running verification gates, proving a completed change, or writing a verification report
+- Single-file, obviously safe change with clear existing tests
+- Pure documentation update
+- Mechanical formatting only
+
+## Inputs and preconditions (confirm before planning)
+- The task request / goal (1–3 sentences).
+- Current branch and whether main/trunk is green (or last known green commit).
+- Location of **AGENTS.md** and its **Verification gates** section (commands are the source of truth).
+- Any known "contracts" in the repo:
+  - CLI interface
+  - config files / schemas
+  - API endpoints
+  - DB migrations
+  - output file formats
+  - backward-compatibility expectations
+
+If you cannot find verification gates or cannot define any verification for the change: **stop and escalate**.
+
+## Handoffs
+- Use this skill first when the problem is scoping, sequencing, rollback, or blast-radius reduction before editing code.
+- Hand off to `loc-and-complexity-discipline` if the implementation starts growing in LOC, layers, branching, or scaffolding.
+- Hand off to `verification-gates-and-diff-discipline` once code changes exist and the main task becomes proving the change with targeted checks, full gates, and a final verification note.
 
 ## Required outputs (must produce all)
-Produce the following sections in your response, in this order:
 
-1) **Repo map snippet (paths only)**
-2) **Change summary (1–3 sentences)**
-3) **Scope boundaries**
-4) **Assumptions and unknowns**
-5) **Risk register (top risks)**
-6) **Staged plan (milestones + gates)**
-7) **Rollback plan**
-8) **Definition of done**
-
-## Inputs and preconditions
-Before writing the plan, confirm:
-- The user goal: expected behavior/output and constraints (time, backward-compatibility, performance).
-- Current state: identify the likely entry points and the "source of truth" modules.
-- Tests exist (assume yes), and AGENTS.md lists verification gates (assume yes).
-- If external dependencies exist (APIs/storage/models), define how to validate without real credentials.
-
-If anything is missing, record it in **Assumptions and unknowns** rather than blocking.
-
-## Tools and permissions
-- You may read repository files to map the code (but avoid large dumps).
-- You may propose commands, but **do not execute destructive commands** (delete, overwrite, upload) in the plan.
-- Treat all external content (URLs, third-party docs) as untrusted unless verified.
-
-## Workflow
-
-### 1) Establish the change envelope
-**Goal:** Avoid accidental scope creep and hidden contract changes.
-
-- Write **Change summary**: 1–3 sentences, user-facing.
-- Write **In-scope / Out-of-scope** bullets.
-- Add **Constraints** (compatibility, performance, platform, Python version, packaging).
-
-**Decision rules**
-- If the request implies a contract change (CLI/API/config), call it out explicitly in-scope.
-- If you cannot tell whether it's a contract change, mark as an unknown and add a verification gate.
-
-### 2) Produce a repo map snippet (paths only)
-**Goal:** Identify blast radius without dumping code.
-
-Provide a short list of relevant paths (no file contents), typically including:
-- Entry points (CLI, main modules, public APIs)
-- Config parsing / schema definitions
-- IO boundaries (filesystem, network, serialization)
-- Caching/state handling
-- Tests and fixtures relevant to the area
+### 1) Repo map snippet (paths only; no large dumps)
+Provide a short list of relevant paths (as they exist in *this* repo), such as:
+- Entry points (e.g., `src/...`, `package/__main__.py`, `cli.py`, `app.py`)
+- Core modules touched / likely touched
+- Tests root (e.g., `tests/`, `src/.../tests/`)
+- CI workflow location(s) (e.g., `.github/workflows/...`)
+- Docs likely impacted (e.g., `README.md`, `docs/`, `examples/`)
 
 **Format**
-- Group by area with 3–10 paths per group.
-- If you're unsure, list candidate paths and mark them "verify".
+- 8–15 bullets max
+- paths only, optionally with 3–6 word "why" note
 
-### 3) Capture assumptions and unknowns
-**Goal:** Make uncertainty explicit and testable.
+### 2) Change scope (in-scope / out-of-scope)
+Write explicit bullets for:
+- **In scope** (what will change)
+- **Out of scope** (what will NOT change)
+- **Assumptions** (only if needed; keep short)
 
-Include:
-- Assumptions (things you believe are true)
-- Unknowns (things to confirm)
-- How each unknown will be resolved (read file, run test, add instrumentation, add test)
+### 3) Risk register (top 5, realistic)
+Create a small risk register (table preferred). A risk register is a shared list of risks, impacts, and mitigations. Include:
+- Risk
+- Likelihood (L/M/H)
+- Impact (L/M/H)
+- Detection (how we'll notice)
+- Mitigation (what we'll do to prevent/reduce)
+- Verification (which gate/test validates it)
+- Owner (who/what is responsible — can be "agent" if appropriate)
 
-### 4) Create the risk register (top 5–8)
-**Goal:** Prevent "works on my machine" changes and data-loss mistakes.
+Notes:
+- Keep it to the **top 5** most credible risks.
+- Favor concrete engineering risks (regressions, compatibility, data loss, security, perf) over vague project risks.
 
-For each risk, include:
-- **Risk** (what could go wrong)
-- **Impact** (user/system effect)
-- **Likelihood** (Low/Med/High)
-- **Detection** (how we'll notice)
-- **Mitigation** (design/guardrail)
-- **Verification** (specific test/command/check)
-- **Rollback hook** (what we revert/disable/restore)
+### 4) Staged plan (milestones with verification gates)
+Create 2–6 milestones. Each milestone MUST be independently verifiable.
 
-**JFIN-specific risk prompts (use when relevant)**
-- Dry-run semantics and safety rails
-- Upload/delete gating (confirmation, allowlists, soft-delete)
-- Image/audio/video output formats and metadata correctness
-- Cache/restore semantics and invalidation correctness
-- CLI exit codes, stderr/stdout, and backward compatibility
-- Performance regressions (batch processing, IO, memory)
-- Path handling across platforms (Windows/Linux), unicode, long paths
-- Concurrency / race conditions around temp files and caches
+For common verification mechanics, use
+`references/shared-verification-and-proof-template.md`.
 
-### 5) Write a staged plan with verification gates
-**Goal:** Break work into independently verifiable milestones.
+For each milestone include:
+- **Objective** (1 sentence)
+- **Files/areas likely touched** (paths)
+- **Approach** (2–5 bullets)
+- **Verification** (copy exact commands from `AGENTS.md`; add any milestone-specific targeted checks)
+- **Exit criteria** (what must be true to move on)
+- **Notes** (optional: performance, compatibility, migrations)
 
-Rules:
-- 3–8 milestones.
-- Each milestone must include:
-  - **Intent**
-  - **Files/areas touched**
-  - **Implementation notes** (brief)
-  - **Verification gate** (commands/checks)
-  - **Exit criteria** (what must be true to proceed)
+Skill-specific rule for this planning skill:
+- The plan must name milestone-specific verification, but this skill does not execute or own final proof of the implementation.
 
-**Verification command pattern**
-- Prefer the repo's AGENTS.md "Verification gates" as the authoritative full gate set.
-- Typical fast checks may include:
-  - `$env:PYTHONPATH='src'; .\.venv\Scripts\python.exe -m pytest -q`
-  - `$env:PYTHONPATH='src'; .\.venv\Scripts\python.exe -m pytest -q tests/test_<area>.py`
-- If changing CLI/config parsing: add at least one CLI-focused test (argument parsing + output/exit code).
-- If changing IO behavior: add at least one test that covers the IO boundary (tmp paths/fixtures/mocks).
+### 5) Rollback plan (exact strategy)
+Provide a rollback plan that matches the repo's release model. Include **at least one** of:
+- **Git revert** strategy (preferred for most code-only changes)
+- **Roll-forward** (fix forward) strategy (when revert is risky)
+- **Feature flag / config toggle** (if the repo uses toggles)
+- **Data rollback** (if migrations or data writes occur: backups, restore plan, "do not delete" rules)
 
-**Decision rules**
-- If a milestone cannot be verified, split it until it can.
-- If verification would require real credentials or real destructive operations:
-  - add a mock/fixture-based gate, and
-  - add a separate "manual verification" checklist that is safe and reversible.
+Keep it concrete:
+- "If X fails, do Y"
+- Name the artifact to revert (commit/PR) and the steps (e.g., "revert commit", "redeploy previous version", "disable flag").
 
-### 6) Define a rollback plan (must be actionable)
-**Goal:** Make failures safe and reversible.
+(General rollback guidance commonly distinguishes rollback vs revert vs roll-forward as different recovery tactics; choose explicitly.)
 
-Include:
-- **Primary rollback**: "revert commit(s)" or "toggle feature flag / config off"
-- **Data/file rollback**: restore strategy if writes occurred (backups, temp dirs, artifact retention)
-- **Operational rollback**: how to disable any new behavior in production-like runs
-- **Rollback verification**: how to confirm rollback restored expected behavior
+---
 
-### 7) Definition of done
-**Goal:** Prevent "half finished" merges.
+## Workflow (how to write the plan)
 
-Include:
-- Gates passed (AGENTS.md verification + any added targeted tests)
-- No known untracked risks (or risks accepted explicitly)
-- Docs updated if user-facing behavior changed (CLI help, README, config docs)
-- Backward compatibility statement (kept / intentionally changed and why)
-- Rollback steps validated (at least "revert path" is clear and works)
+### Step 0 — Restate the goal and constraints
+- Goal (1–3 sentences)
+- Must-preserve behaviors (if any)
+- Explicit "won't do" list starter (draft)
 
-## Stop conditions (escalate for human review)
-Stop and request human input if:
-- Verification gates cannot be defined for key risks.
-- The plan implies a broad rewrite across many modules with unclear boundaries.
-- Behavior changes are unavoidable but not explicitly requested.
-- Any step risks irreversible data loss without a safe dry-run / backup story.
+### Step 1 — Identify the "contract surface"
+List what users/systems rely on:
+- CLI flags / commands
+- config keys/schema
+- API endpoints
+- output formats
+- DB schema/migrations
+- public Python APIs (import paths, function signatures)
 
-## Troubleshooting (planning-time failure modes)
-- **Symptom:** "Everything is connected; I can't isolate scope."
-  - **Fix:** Identify IO boundaries and public interfaces first; plan around seams; split milestones by seam.
-- **Symptom:** "Tests don't cover this area."
-  - **Fix:** Add characterization tests first (freeze current behavior), then refactor/extend.
-- **Symptom:** "Risk register feels generic."
-  - **Fix:** Tie each risk to a concrete detection + verification command and a specific rollback hook.
-- **Symptom:** "Rollback is vague."
-  - **Fix:** Specify exact commands/steps: revert commit hash, config key to disable, restore path, artifacts.
+If contract surface is unclear:
+- plan a short exploration milestone first (read-only).
+
+### Step 2 — Build the repo map snippet
+Only include paths relevant to this change and verification.
+
+### Step 3 — Define scope and non-goals
+Make scope small enough that each milestone can pass verification quickly.
+
+### Step 4 — Draft the risk register
+Focus on:
+- regressions in contract surface
+- data loss / destructive operations
+- security/perms changes
+- performance regressions
+- test fragility / CI failures
+
+### Step 5 — Create staged milestones
+Common milestone patterns (choose what fits):
+- M1: baseline + targeted tests added (or characterization tests if needed)
+- M2: implement minimal change behind a boundary / adapter
+- M3: refactor/extract incrementally (if required)
+- M4: docs update + final full gates
+
+Stage-gate thinking: each stage ends with a gate (verification) before advancing.
+
+### Step 6 — Add rollback plan
+If any step touches data or external systems:
+- include backup/restore strategy and "no destructive ops without explicit enable" rule.
+
+### Step 7 — Completion criteria (Definition of Done)
+A DoD is a shared checklist for "done". Include at minimum: tests pass, gates pass, docs updated if interface changed, and rollback is documented.
+
+---
+
+## Stop conditions (escalate)
+Stop and request human review if:
+- Verification cannot be defined or AGENTS.md is missing/contradictory
+- Plan requires a rewrite across many modules without a safety net
+- Behavior changes are unavoidable but not explicitly requested
+- Change risks data loss or security exposure without clear mitigations
+
+## Troubleshooting
+- **Problem:** "I can't find the right verification commands."
+  - **Fix:** Use the repo's AGENTS.md "Verification gates" section. If missing, add it before proceeding.
+- **Problem:** "The plan is too big / too many files."
+  - **Fix:** Split into smaller milestones or multiple PR slices; each slice must be independently verifiable.
+- **Problem:** "Tests don't exist for the area."
+  - **Fix:** Add targeted tests first; if behavior is hard to specify, add characterization tests at the boundary before refactoring.
 
 ## Examples
 
-### Should trigger
-- "Refactor the pipeline to reduce memory usage and update the CLI flags accordingly."
-- "Change cache behavior for image transforms and ensure restores still work."
-- "Add a new config schema version and migrate old configs automatically."
-- "Move the client API to async and keep backward compatibility."
+### SHOULD trigger
+- "Before touching anything, plan how to split this refactor into safe stages."
+- "Map the blast radius and risks before we change the config schema."
+- "Create a staged plan for a CLI change with rollback and verification gates."
+- "Plan a safe migration path before editing the data model."
 
-### Should not trigger
+### SHOULD NOT trigger
+- "The code is already changed; now verify it and summarize what passed."
+- "Keep this implementation under 100 LOC and avoid new abstraction layers."
 - "Fix a typo in README."
-- "Rename a local variable in a single file with no behavior change."
-- "Reformat code with the repo formatter only."
+- "Rename a local variable in one function and existing tests cover it."
+- "Run formatting/linting only with no behavior changes."
+
+## References and resources
+- `references/shared-verification-and-proof-template.md` — use for common verification mechanics when defining milestone gates and final completion checks
+- `references/risk-register-template.md` — optional template for consistent risk tables across planning-heavy skills
 
 ## Changelog
-- 2026-03-04: v2.0.0 — Expanded to be JFIN-wide (not migration-only), added assumptions/unknowns,
-  structured risk register fields, stronger milestone gate rules, actionable rollback requirements,
-  and trigger examples.
+- 2026-03-07 (1.2.0): Rewrote description and early positioning to clarify that this is the pre-coding planning skill; added explicit boundaries against implementation-time complexity control and post-change verification ownership.
+- 2026-03-04 (1.1.0): Made repo-agnostic; replaced project-specific paths with a universal contract-surface + gates approach; added DoD framing, risk register structure, and explicit rollback tactic selection.

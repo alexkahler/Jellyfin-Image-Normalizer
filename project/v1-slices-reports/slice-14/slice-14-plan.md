@@ -14,7 +14,7 @@
 5. Use one blocking error prefix only: `docs_topology.contract: ...`.
 6. Enforce robust, bounded extraction (format-tolerant, not free-form grepping):
    - parse only the `### Characterization suites` section block in `v1-plan.md`,
-   - parse only the “Characterization suites live in ...” statement in `TECHNICAL_NOTES.md`,
+   - parse only the "Characterization suites live in ..." statement in `TECHNICAL_NOTES.md`,
    - normalize path tokens (slashes, trailing `/`, punctuation/backticks), compare sets (order-insensitive).
 7. In the same check, assert required directories exist on disk:
 `tests/characterization/cli_contract/`, `config_contract/`, `imaging_contract/`, `safety_contract/`, and `tests/characterization/baselines/`.

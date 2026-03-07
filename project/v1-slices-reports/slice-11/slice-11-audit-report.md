@@ -54,7 +54,7 @@ Verification evidence:
 - `ruff format --check .` -> pass
 - `mypy src` -> pass
 - `bandit -r src` -> pass
-- `pip_audit` -> transient network failure first run; second run passed with “No known vulnerabilities found” (one local package skip note)
+- `pip_audit` -> transient network failure first run; second run passed with "No known vulnerabilities found" (one local package skip note)
 
 Key artifact checks:
 - Workflow index schema present and populated: [workflow-coverage-index.json#L2](c:/Users/akaehler/Proton%20Drive/alex.kahler/My%20files/Projects/Jellyfin%20Image%20Normalizer/project/workflow-coverage-index.json#L2)
