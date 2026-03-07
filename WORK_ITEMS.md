@@ -26,7 +26,8 @@ Theme A iteration status (Governance Contract Posture Recovery):
 - Slice 19 -> Theme A A-05 High-coupling closure slot 1 (`pipeline.py`) (blocked; split to `A-05a`/`A-05b` required before proceeding)
 - Slice 20 -> Theme A A-05a Pipeline LOC closure split tranche 1 (`pipeline.py` backdrop seam extraction) (completed; commit `bba7dda`)
 - Slice 21 -> Theme A A-05b Pipeline LOC closure split tranche 2 (`pipeline.py` blocker closure) (completed; commit `313c252`)
-- Slice 22 -> Theme A A-06 High-coupling closure slot 2 (`cli.py`) (completed; commit `<pending>`)
+- Slice 22 -> Theme A A-06 High-coupling closure slot 2 (`cli.py`) (completed; commit `1cf1c70`)
+- Slice 23 -> Theme A A-07 Residual blocker closure + GG-001 gate (completed; commit `<pending>`)
 
 After Slice 9, subsequent slices remain iterative. Governance-coverage slices
 (starting with COV-01b) take precedence before route-fence flip planning.
