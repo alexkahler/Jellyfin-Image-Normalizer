@@ -1,0 +1,48 @@
+{
+    "local_head_sha":  "7e837f93826e44b3a0a955a7fab2a956192dd58a",
+    "local_verify_governance_check_all":  "pass",
+    "checked_at_utc":  "2026-03-07T23:42:31Z",
+    "query_observations":  {
+                               "actions_runs_total_for_sha":  1,
+                               "canonical_ci_runs_for_sha":  1,
+                               "canonical_ci_completed_runs_for_sha":  1,
+                               "check_runs_total_for_sha":  4
+                           },
+    "workflow":  {
+                     "name":  "CI",
+                     "path":  ".github/workflows/ci.yml",
+                     "run_id":  22809696578,
+                     "run_url":  "https://github.com/alexkahler/Jellyfin-Image-Normalizer/actions/runs/22809696578",
+                     "head_sha":  "7e837f93826e44b3a0a955a7fab2a956192dd58a",
+                     "status":  "completed",
+                     "conclusion":  "failure"
+                 },
+    "required_jobs":  [
+                          {
+                              "name":  "test",
+                              "present":  true,
+                              "conclusion":  "success",
+                              "url":  "https://github.com/alexkahler/Jellyfin-Image-Normalizer/actions/runs/22809696578/job/66164345164"
+                          },
+                          {
+                              "name":  "security",
+                              "present":  true,
+                              "conclusion":  "success",
+                              "url":  "https://github.com/alexkahler/Jellyfin-Image-Normalizer/actions/runs/22809696578/job/66164345167"
+                          },
+                          {
+                              "name":  "quality",
+                              "present":  true,
+                              "conclusion":  "failure",
+                              "url":  "https://github.com/alexkahler/Jellyfin-Image-Normalizer/actions/runs/22809696578/job/66164345190"
+                          },
+                          {
+                              "name":  "governance",
+                              "present":  true,
+                              "conclusion":  "success",
+                              "url":  "https://github.com/alexkahler/Jellyfin-Image-Normalizer/actions/runs/22809696578/job/66164345163"
+                          }
+                      ],
+    "eligible_for_closure":  false,
+    "closure_reason":  "Canonical same-SHA CI run exists, but required job quality failed at step Run ruff format check."
+}
