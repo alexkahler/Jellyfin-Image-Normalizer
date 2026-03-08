@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from tests._readiness_test_helpers import (
+    runtime_report,
     set_parity_row,
     set_route_row,
     set_workflow_cell,
@@ -180,6 +181,7 @@ def test_readiness_fails_when_blocked_by_open_debt(readiness_modules, tmp_path: 
     repo_root, parity_contract, readiness_checks = setup_readiness_repo(
         readiness_modules, tmp_path
     )
+    set_workflow_cell(repo_root, debt_status="open")
     set_route_row(
         repo_root,
         parity_contract,
@@ -190,6 +192,64 @@ def test_readiness_fails_when_blocked_by_open_debt(readiness_modules, tmp_path: 
 
     result = readiness_checks.check_readiness_artifacts(repo_root)
     assert any(error.startswith("readiness.blocked_by_debt") for error in result.errors)
+
+
+def test_readiness_evaluates_run_backdrop_real_claim_candidate_after_debt_closure(
+    readiness_modules,
+    tmp_path: Path,
+    monkeypatch,
+):
+    """Readiness should validate a real run|backdrop claim candidate without route activation."""
+    (
+        _characterization_contract,
+        characterization_checks,
+        _parity_contract,
+        readiness_checks,
+        _parity_checks,
+    ) = readiness_modules
+    repo_root, parity_contract, _ = setup_readiness_repo(readiness_modules, tmp_path)
+    set_workflow_cell(
+        repo_root,
+        parity_ids=["PIPE-BACKDROP-001", "PIPE-BACKDROP-002"],
+        owner_tests=[
+            "tests/characterization/safety_contract/test_safety_contract_pipeline.py::test_pipe_backdrop_001",
+            "tests/characterization/safety_contract/test_safety_contract_pipeline_backdrop_split.py::test_pipe_backdrop_002",
+        ],
+        debt_status="closed",
+    )
+    set_route_row(
+        repo_root,
+        parity_contract,
+        command="run",
+        mode="backdrop",
+        parity_status="ready",
+    )
+
+    route_table = parity_contract.load_marked_route_fence_table(
+        repo_root / "project/route-fence.md"
+    )
+    run_backdrop_row = next(
+        row
+        for row in route_table.rows
+        if row["command"] == "run" and row["mode"] == "backdrop"
+    )
+    assert run_backdrop_row["route(v0|v1)"] == "v0"
+
+    monkeypatch.setattr(
+        readiness_checks,
+        "_check_runtime_characterization_gate",
+        lambda *_args, **_kwargs: runtime_report(
+            characterization_checks,
+            mapped_parity_ids=("PIPE-BACKDROP-001", "PIPE-BACKDROP-002"),
+            diagnostics=(),
+        ),
+    )
+
+    result = readiness_checks.check_readiness_artifacts(repo_root)
+    readiness_report = getattr(result, "readiness_report")
+    assert not result.errors
+    assert readiness_report.claimed_rows == 1
+    assert readiness_report.validated_rows == 1
 
 
 def test_readiness_passes_for_fully_proven_ready_claim(
