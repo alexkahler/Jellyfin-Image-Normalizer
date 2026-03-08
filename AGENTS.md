@@ -115,11 +115,17 @@ Contract values (from `project/verification-contract.yml`):
 
 - `src_max_lines: 300` with `src_mode: block`
 - `tests_max_lines: 300` with `tests_mode: warn`
+- anti-evasion policy is contract-bound:
+  - `# fmt: off` / `# fmt: on` cannot be used to claim LOC compliance.
+  - Multi-statement semicolon packing cannot be used to claim LOC compliance.
+  - Dense inline control-flow suite packing cannot be used to claim LOC compliance.
+  - Fail closed: if honest LOC cannot be established, mark the file/slice blocked.
 
 Required behavior:
 
 - Do not introduce or expand `src/` files past 300 LOC; split or extract instead.
 - Treat test files above 300 LOC as a warning condition that requires explicit review and splitting consideration.
+- LOC policy rationale: maintainability limits are valid only with honest, formatter-compatible structure; suppression/packing that hides readable line growth is noncompliant.
 - Keep changes scoped to one objective; avoid broad, unrelated cleanup.
 
 ## Safety Invariants (Non-Negotiable)
