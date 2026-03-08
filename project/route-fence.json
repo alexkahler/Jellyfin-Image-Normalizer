@@ -19,8 +19,8 @@
       "command": "run",
       "mode": "backdrop",
       "route": "v0",
-      "owner_slice": "WI-00X",
-      "parity_status": "pending"
+      "owner_slice": "Slice-35",
+      "parity_status": "ready"
     },
     {
       "command": "run",

@@ -42,6 +42,13 @@ Theme A iteration status (Governance Contract Posture Recovery):
 - Slice 32 -> Pipeline evasion remediation tranche 3d (`pipeline_backdrops.py`) (completed; commit `68e5b0d`)
 - Slice 33 -> A-08 same-SHA CI proof + Theme A closure gate (completed; commit `c77a57b`; run `22826331766` for SHA `c77a57bccf24d70fcf5b9a1784f3075ab8dd01c7` has required jobs `test/security/quality/governance` all successful; GG-001 closed; GG-008 closed; Theme A closed)
 
+Theme B iteration status (Workflow Readiness Baseline Unblock):
+- Slice 34 -> Theme B unblock: close `run|backdrop` readiness debt contract (completed; commit `3c37c44`; `DEBT-BACKDROP-ID-SPLIT-001` closed; GG-004 blocking portion closed; Theme B closed; next: Theme C1 route-fence ownership accountability for `run|backdrop`)
+
+Theme C iteration status (Route-Readiness Activation and Accountability):
+- Slice 35 -> Theme C1 route-fence ownership accountability for `run|backdrop` (completed; canonical owner claim `WI-00X -> Slice-35`; claimed-ready placeholder ownership now machine-blocked; Theme C remains open; next: Slice 36 Theme C2 canonical first-claim activation)
+- Slice 36 -> Theme C2 canonical first-claim activation on `run|backdrop` (completed; canonical readiness now non-vacuous `claimed_rows=1`, `validated_rows=1`; `route` preserved at `v0`; Theme C closed; next gate: Theme D only if explicitly authorized)
+
 After Slice 9, subsequent slices remain iterative. Governance-coverage slices
 (starting with COV-01b) take precedence before route-fence flip planning.
 Route-fence flips must not be planned/executed until Slice 7 Surface Coverage Gate,
