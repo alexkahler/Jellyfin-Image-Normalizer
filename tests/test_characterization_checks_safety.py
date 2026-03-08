@@ -186,8 +186,7 @@ def test_characterization_fails_when_workflow_index_schema_invalid(
 
     result = characterization_checks.check_characterization_artifacts(repo_root)
     assert any(
-        error.startswith("workflow_coverage.contract_schema")
-        for error in result.errors
+        error.startswith("workflow_coverage.contract_schema") for error in result.errors
     )
 
 
@@ -384,7 +383,9 @@ def test_characterization_warns_when_required_backdrop_ordering_token_missing(
         repo_root / "tests/characterization/baselines/safety_contract_baseline.json"
     )
     payload = json.loads(safety_baseline.read_text(encoding="utf-8"))
-    expected_observations = payload["cases"]["PIPE-BACKDROP-001"]["expected_observations"]
+    expected_observations = payload["cases"]["PIPE-BACKDROP-001"][
+        "expected_observations"
+    ]
     expected_observations["ordering"] = []
     _write_file(safety_baseline, json.dumps(payload, indent=2) + "\n")
 
@@ -413,7 +414,9 @@ def test_characterization_warns_when_required_backdrop_ordering_container_missin
         repo_root / "tests/characterization/baselines/safety_contract_baseline.json"
     )
     payload = json.loads(safety_baseline.read_text(encoding="utf-8"))
-    expected_observations = payload["cases"]["PIPE-BACKDROP-001"]["expected_observations"]
+    expected_observations = payload["cases"]["PIPE-BACKDROP-001"][
+        "expected_observations"
+    ]
     expected_observations.pop("ordering", None)
     _write_file(safety_baseline, json.dumps(payload, indent=2) + "\n")
 

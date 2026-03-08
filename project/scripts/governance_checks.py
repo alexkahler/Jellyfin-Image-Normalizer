@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import ast
+import io
 import re
+import tokenize
 from pathlib import Path
 from typing import Iterable
 
@@ -48,6 +51,19 @@ CHARACTERIZATION_PATH_TOKEN_PATTERN = re.compile(
     r"tests[\\/]+characterization[\\/]+[A-Za-z0-9_-]+[\\/]?",
     re.IGNORECASE,
 )
+FMT_SUPPRESSION_PATTERN = re.compile(r"#\s*fmt:\s*(off|on)\b", re.IGNORECASE)
+INLINE_CONTROL_FLOW_NODES: tuple[type[ast.AST], ...] = (
+    ast.If,
+    ast.For,
+    ast.AsyncFor,
+    ast.While,
+    ast.With,
+    ast.AsyncWith,
+    ast.Try,
+    ast.Match,
+)
+if hasattr(ast, "TryStar"):
+    INLINE_CONTROL_FLOW_NODES = (*INLINE_CONTROL_FLOW_NODES, ast.TryStar)
 
 
 def _extract_ci_job_block(ci_text: str, job_name: str) -> str | None:
@@ -146,6 +162,187 @@ def _mode_to_violation(result: CheckResult, mode: str, message: str) -> None:
     result.add_error(f"Unsupported LOC policy mode '{mode}' for message: {message}")
 
 
+def _add_anti_evasion_violation(
+    result: CheckResult,
+    relative_path: str,
+    category: str,
+    detail: str,
+) -> None:
+    """Record one anti-evasion policy violation as a blocking LOC error."""
+    result.add_error(f"{relative_path} [anti_evasion.{category}] {detail}")
+
+
+def _add_fail_closed_violation(
+    result: CheckResult,
+    relative_path: str,
+    detail: str,
+    fail_closed: bool,
+) -> None:
+    """Record analysis failures as errors when fail-closed mode is enabled."""
+    message = f"{relative_path} [anti_evasion.fail_closed] {detail}"
+    if fail_closed:
+        result.add_error(message)
+        return
+    result.add_warning(message)
+
+
+def _count_semicolons(file_text: str) -> int:
+    """Count semicolon tokens while ignoring comments and string literals."""
+    count = 0
+    reader = io.StringIO(file_text).readline
+    for token in tokenize.generate_tokens(reader):
+        if token.type == tokenize.OP and token.string == ";":
+            count += 1
+    return count
+
+
+def _count_fmt_suppression_markers(file_text: str) -> int:
+    """Count formatter suppression markers in comment tokens only."""
+    count = 0
+    reader = io.StringIO(file_text).readline
+    for token in tokenize.generate_tokens(reader):
+        if (
+            token.type == tokenize.COMMENT
+            and FMT_SUPPRESSION_PATTERN.search(token.string) is not None
+        ):
+            count += 1
+    return count
+
+
+def _iter_inline_suite_statements(node: ast.AST) -> Iterable[ast.stmt]:
+    """Yield statements that belong to one control-flow suite."""
+    for attribute in ("body", "orelse", "finalbody"):
+        suite = getattr(node, attribute, None)
+        if isinstance(suite, list):
+            for statement in suite:
+                if isinstance(statement, ast.stmt):
+                    yield statement
+    handlers = getattr(node, "handlers", None)
+    if isinstance(handlers, list):
+        for handler in handlers:
+            body = getattr(handler, "body", None)
+            if isinstance(body, list):
+                for statement in body:
+                    if isinstance(statement, ast.stmt):
+                        yield statement
+    cases = getattr(node, "cases", None)
+    if isinstance(cases, list):
+        for case in cases:
+            body = getattr(case, "body", None)
+            if isinstance(body, list):
+                for statement in body:
+                    if isinstance(statement, ast.stmt):
+                        yield statement
+
+
+def _count_inline_control_flow_suites(file_text: str) -> int:
+    """Count statements packed into inline control-flow suites."""
+    parsed = ast.parse(file_text)
+    inline_suite_count = 0
+    for node in ast.walk(parsed):
+        if not isinstance(node, INLINE_CONTROL_FLOW_NODES):
+            continue
+        node_line = getattr(node, "lineno", None)
+        if node_line is None:
+            continue
+        for statement in _iter_inline_suite_statements(node):
+            if getattr(statement, "lineno", None) == node_line:
+                inline_suite_count += 1
+    return inline_suite_count
+
+
+def _check_anti_evasion_policy(
+    contract: VerificationContract,
+    *,
+    relative_path: str,
+    file_text: str,
+    result: CheckResult,
+) -> None:
+    """Apply anti-evasion LOC checks to one Python file."""
+    loc_policy = contract.loc_policy
+
+    if loc_policy.anti_evasion_disallow_fmt:
+        try:
+            fmt_markers = _count_fmt_suppression_markers(file_text)
+        except tokenize.TokenError as exc:
+            _add_fail_closed_violation(
+                result,
+                relative_path,
+                (
+                    "tokenization failed while evaluating formatter suppression "
+                    f"markers: {exc}."
+                ),
+                loc_policy.anti_evasion_fail_closed,
+            )
+        else:
+            if fmt_markers > 0:
+                _add_anti_evasion_violation(
+                    result,
+                    relative_path,
+                    "fmt_suppression",
+                    (
+                        f"found {fmt_markers} formatter suppression marker(s); "
+                        "honest LOC cannot rely on # fmt: off/on."
+                    ),
+                )
+
+    if loc_policy.anti_evasion_disallow_multi_statement:
+        try:
+            semicolon_count = _count_semicolons(file_text)
+        except tokenize.TokenError as exc:
+            _add_fail_closed_violation(
+                result,
+                relative_path,
+                (
+                    "tokenization failed while evaluating multi-statement packing: "
+                    f"{exc}."
+                ),
+                loc_policy.anti_evasion_fail_closed,
+            )
+        else:
+            if semicolon_count > loc_policy.anti_evasion_multi_statement_max_semicolons:
+                _add_anti_evasion_violation(
+                    result,
+                    relative_path,
+                    "multi_statement",
+                    (
+                        f"semicolon token count {semicolon_count} exceeds max "
+                        f"{loc_policy.anti_evasion_multi_statement_max_semicolons}."
+                    ),
+                )
+
+    if loc_policy.anti_evasion_disallow_dense_control_flow:
+        try:
+            inline_suite_count = _count_inline_control_flow_suites(file_text)
+        except SyntaxError as exc:
+            location = (
+                f"line {exc.lineno}" if exc.lineno is not None else "unknown line"
+            )
+            _add_fail_closed_violation(
+                result,
+                relative_path,
+                (
+                    "AST parsing failed while evaluating dense inline control-flow "
+                    f"suites ({location}: {exc.msg})."
+                ),
+                loc_policy.anti_evasion_fail_closed,
+            )
+        else:
+            if (
+                inline_suite_count
+                > loc_policy.anti_evasion_control_flow_inline_suite_max
+            ):
+                _add_anti_evasion_violation(
+                    result,
+                    relative_path,
+                    "dense_control_flow",
+                    (
+                        f"inline suite count {inline_suite_count} exceeds max "
+                        f"{loc_policy.anti_evasion_control_flow_inline_suite_max}."
+                    ),
+                )
+
+
 def check_loc_policy(
     contract: VerificationContract,
     repo_root: Path,
@@ -162,9 +359,19 @@ def check_loc_policy(
         result.add_warning(f"Missing tests directory: {tests_dir}")
 
     for src_file in _iter_python_files(src_dir):
-        lines = _line_count(src_file)
+        relative_path = src_file.relative_to(repo_root).as_posix()
+        try:
+            file_text = src_file.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as exc:
+            _add_fail_closed_violation(
+                result,
+                relative_path,
+                f"unable to read UTF-8 text for LOC analysis: {exc}.",
+                contract.loc_policy.anti_evasion_fail_closed,
+            )
+            continue
+        lines = len(file_text.splitlines())
         if lines > contract.loc_policy.src_max_lines:
-            relative_path = src_file.relative_to(repo_root).as_posix()
             _mode_to_violation(
                 result,
                 contract.loc_policy.src_mode,
@@ -173,11 +380,27 @@ def check_loc_policy(
                     f"(max {contract.loc_policy.src_max_lines})."
                 ),
             )
+        _check_anti_evasion_policy(
+            contract,
+            relative_path=relative_path,
+            file_text=file_text,
+            result=result,
+        )
 
     for test_file in _iter_python_files(tests_dir):
-        lines = _line_count(test_file)
+        relative_path = test_file.relative_to(repo_root).as_posix()
+        try:
+            file_text = test_file.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as exc:
+            _add_fail_closed_violation(
+                result,
+                relative_path,
+                f"unable to read UTF-8 text for LOC analysis: {exc}.",
+                contract.loc_policy.anti_evasion_fail_closed,
+            )
+            continue
+        lines = len(file_text.splitlines())
         if lines > contract.loc_policy.tests_max_lines:
-            relative_path = test_file.relative_to(repo_root).as_posix()
             _mode_to_violation(
                 result,
                 contract.loc_policy.tests_mode,
@@ -186,6 +409,12 @@ def check_loc_policy(
                     f"(max {contract.loc_policy.tests_max_lines})."
                 ),
             )
+        _check_anti_evasion_policy(
+            contract,
+            relative_path=relative_path,
+            file_text=file_text,
+            result=result,
+        )
 
     return result
 

@@ -17,6 +17,10 @@ EXPECTED_VERIFICATION_COMMANDS = [
 EXPECTED_REQUIRED_CI_JOBS = ["test", "security", "quality", "governance"]
 EXPECTED_RUNTIME_GATE_TARGETS = ["tests/characterization/safety_contract"]
 EXPECTED_RUNTIME_GATE_BUDGET_SECONDS = 180
+EXPECTED_LOC_POLICY_ANTI_EVASION_RATIONALE = "honest_loc_required_for_maintainability"
+EXPECTED_LOC_POLICY_ANTI_EVASION_NONCOMPLIANCE_RULE = (
+    "suppression_or_packing_invalidates_loc_claim"
+)
 
 
 class GovernanceError(Exception):
@@ -31,6 +35,14 @@ class LocPolicy:
     src_mode: str
     tests_max_lines: int
     tests_mode: str
+    anti_evasion_disallow_fmt: bool
+    anti_evasion_disallow_multi_statement: bool
+    anti_evasion_disallow_dense_control_flow: bool
+    anti_evasion_fail_closed: bool
+    anti_evasion_rationale: str
+    anti_evasion_noncompliance_rule: str
+    anti_evasion_multi_statement_max_semicolons: int
+    anti_evasion_control_flow_inline_suite_max: int
 
 
 @dataclass(frozen=True)
@@ -145,6 +157,23 @@ def _parse_positive_int(value: str, key: str) -> int:
     return parsed
 
 
+def _parse_non_negative_int(value: str, key: str) -> int:
+    """Parse and validate a non-negative integer scalar."""
+    if not re.fullmatch(r"\d+", value):
+        raise GovernanceError(f"{key} must be a non-negative integer, got '{value}'.")
+    return int(value)
+
+
+def _parse_bool(value: str, key: str) -> bool:
+    """Parse and validate one YAML-like boolean scalar."""
+    normalized = value.strip().lower()
+    if normalized == "true":
+        return True
+    if normalized == "false":
+        return False
+    raise GovernanceError(f"{key} must be 'true' or 'false', got '{value}'.")
+
+
 def parse_verification_contract(contract_path: Path) -> VerificationContract:
     """Load and parse `project/verification-contract.yml`."""
     try:
@@ -175,7 +204,21 @@ def parse_verification_contract(contract_path: Path) -> VerificationContract:
         _extract_indented_block(text, "loc_policy"),
         "loc_policy",
     )
-    for required_key in ("src_max_lines", "src_mode", "tests_max_lines", "tests_mode"):
+    required_loc_policy_keys = (
+        "src_max_lines",
+        "src_mode",
+        "tests_max_lines",
+        "tests_mode",
+        "anti_evasion_disallow_fmt",
+        "anti_evasion_disallow_multi_statement",
+        "anti_evasion_disallow_dense_control_flow",
+        "anti_evasion_fail_closed",
+        "anti_evasion_rationale",
+        "anti_evasion_noncompliance_rule",
+        "anti_evasion_multi_statement_max_semicolons",
+        "anti_evasion_control_flow_inline_suite_max",
+    )
+    for required_key in required_loc_policy_keys:
         if required_key not in loc_policy_map:
             raise GovernanceError(f"loc_policy missing required key: {required_key}")
 
@@ -190,6 +233,34 @@ def parse_verification_contract(contract_path: Path) -> VerificationContract:
             "loc_policy.tests_max_lines",
         ),
         tests_mode=loc_policy_map["tests_mode"],
+        anti_evasion_disallow_fmt=_parse_bool(
+            loc_policy_map["anti_evasion_disallow_fmt"],
+            "loc_policy.anti_evasion_disallow_fmt",
+        ),
+        anti_evasion_disallow_multi_statement=_parse_bool(
+            loc_policy_map["anti_evasion_disallow_multi_statement"],
+            "loc_policy.anti_evasion_disallow_multi_statement",
+        ),
+        anti_evasion_disallow_dense_control_flow=_parse_bool(
+            loc_policy_map["anti_evasion_disallow_dense_control_flow"],
+            "loc_policy.anti_evasion_disallow_dense_control_flow",
+        ),
+        anti_evasion_fail_closed=_parse_bool(
+            loc_policy_map["anti_evasion_fail_closed"],
+            "loc_policy.anti_evasion_fail_closed",
+        ),
+        anti_evasion_rationale=loc_policy_map["anti_evasion_rationale"],
+        anti_evasion_noncompliance_rule=loc_policy_map[
+            "anti_evasion_noncompliance_rule"
+        ],
+        anti_evasion_multi_statement_max_semicolons=_parse_non_negative_int(
+            loc_policy_map["anti_evasion_multi_statement_max_semicolons"],
+            "loc_policy.anti_evasion_multi_statement_max_semicolons",
+        ),
+        anti_evasion_control_flow_inline_suite_max=_parse_non_negative_int(
+            loc_policy_map["anti_evasion_control_flow_inline_suite_max"],
+            "loc_policy.anti_evasion_control_flow_inline_suite_max",
+        ),
     )
     runtime_gate = RuntimeGatePolicy(
         targets=runtime_gate_targets,
@@ -233,6 +304,42 @@ def check_contract_schema(contract: VerificationContract) -> CheckResult:
         result.add_error("loc_policy.tests_max_lines must be 300.")
     if contract.loc_policy.tests_mode != "warn":
         result.add_error("loc_policy.tests_mode must be 'warn'.")
+    if not contract.loc_policy.anti_evasion_disallow_fmt:
+        result.add_error("loc_policy.anti_evasion_disallow_fmt must be true.")
+    if not contract.loc_policy.anti_evasion_disallow_multi_statement:
+        result.add_error(
+            "loc_policy.anti_evasion_disallow_multi_statement must be true."
+        )
+    if not contract.loc_policy.anti_evasion_disallow_dense_control_flow:
+        result.add_error(
+            "loc_policy.anti_evasion_disallow_dense_control_flow must be true."
+        )
+    if not contract.loc_policy.anti_evasion_fail_closed:
+        result.add_error("loc_policy.anti_evasion_fail_closed must be true.")
+    if (
+        contract.loc_policy.anti_evasion_rationale
+        != EXPECTED_LOC_POLICY_ANTI_EVASION_RATIONALE
+    ):
+        result.add_error(
+            "loc_policy.anti_evasion_rationale must be "
+            f"'{EXPECTED_LOC_POLICY_ANTI_EVASION_RATIONALE}'."
+        )
+    if (
+        contract.loc_policy.anti_evasion_noncompliance_rule
+        != EXPECTED_LOC_POLICY_ANTI_EVASION_NONCOMPLIANCE_RULE
+    ):
+        result.add_error(
+            "loc_policy.anti_evasion_noncompliance_rule must be "
+            f"'{EXPECTED_LOC_POLICY_ANTI_EVASION_NONCOMPLIANCE_RULE}'."
+        )
+    if contract.loc_policy.anti_evasion_multi_statement_max_semicolons != 0:
+        result.add_error(
+            "loc_policy.anti_evasion_multi_statement_max_semicolons must be 0."
+        )
+    if contract.loc_policy.anti_evasion_control_flow_inline_suite_max != 0:
+        result.add_error(
+            "loc_policy.anti_evasion_control_flow_inline_suite_max must be 0."
+        )
     if contract.runtime_gate.targets != EXPECTED_RUNTIME_GATE_TARGETS:
         result.add_error(
             "characterization_runtime_gate_targets must be exactly "

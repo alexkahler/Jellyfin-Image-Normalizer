@@ -1,6 +1,6 @@
 **Executive Summary**
 - Overall status: **Conditionally Compliant**
-- Final verdict: **GO** for “Slice 13 correctly completed according to `v1-plan` + COV-04”, with baseline debt caveats.
+- Final verdict: **GO** for "Slice 13 correctly completed according to `v1-plan` + COV-04", with baseline debt caveats.
 - Immediate blockers: none Slice-13-specific.
 - Top risks:
 1. **Medium**: 3 Slice 13 artifacts are still untracked in the current worktree (`plans/Slice-13.md`, `slice-13-work-report.md`, `tests/test_characterization_checks_safety_trace.py`).

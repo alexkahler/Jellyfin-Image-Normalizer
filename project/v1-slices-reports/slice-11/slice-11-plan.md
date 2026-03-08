@@ -74,7 +74,7 @@
 - print separate lines:
 - `Workflow sequence contract OK|NOT OK`
 - `Workflow sequence evidence warnings: <N>`
-- avoid single “OK (warn)” phrasing.
+- avoid single "OK (warn)" phrasing.
 
 ### Test Plan
 1. Add/extend tests in `tests/test_characterization_checks_safety.py`:
@@ -100,7 +100,7 @@
 - count-only evidence is always detected (`count_only_detected` warning).
 2. COV-02 full closure is deferred to ratchet phase 2:
 - flip `severity.sequence` from `warn` to `block` for `run|backdrop`,
-- then “count-only cannot pass governance” becomes fully enforced.
+- then "count-only cannot pass governance" becomes fully enforced.
 
 ### Assumptions
 1. COV-01a collectability/linkage is already green; if not, Slice 11 is paused or reduced to scaffolding-only.

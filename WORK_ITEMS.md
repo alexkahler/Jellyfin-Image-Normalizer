@@ -18,6 +18,30 @@ Iteratively planned slices:
 - Slice 13 -> WI-001 COV-04 Backdrop trace contract (dual-proof, observed-vs-baseline)
 - Slice 14 -> WI-001 COV-05 Blueprint topology drift guard (governance docs-topology contract)
 
+Theme A iteration status (Governance Contract Posture Recovery):
+- Slice 15 -> Theme A A-01 Imaging LOC closure (completed; commit `1813243`)
+- Slice 16 -> Theme A A-02 Backup LOC closure (completed; commit `b1c6c29`)
+- Slice 17 -> Theme A A-03 Medium-coupling closure slot 1 (`client.py`) (completed; commit `b496423`)
+- Slice 18 -> Theme A A-04 Medium-coupling closure slot 2 (`config.py`) (completed; commit `3716216`)
+- Slice 19 -> Theme A A-05 High-coupling closure slot 1 (`pipeline.py`) (blocked; split to `A-05a`/`A-05b` required before proceeding)
+- Slice 20 -> Theme A A-05a Pipeline LOC closure split tranche 1 (`pipeline.py` backdrop seam extraction) (completed; commit `bba7dda`)
+- Slice 21 -> Theme A A-05b Pipeline LOC closure split tranche 2 (`pipeline.py` blocker closure) (completed; commit `313c252`)
+- Slice 22 -> Theme A A-06 High-coupling closure slot 2 (`cli.py`) (completed; commit `1cf1c70`)
+- Slice 23 -> Theme A A-07 Residual blocker closure + GG-001 gate (completed; commit `db7bf05`)
+- Slice 24 -> Theme A A-08 Same-SHA CI proof + GG-008 gate (blocked; same-SHA CI run `22809696578` for `7e837f9` has required job `quality` failure on 2026-03-08)
+- Slice 25 -> Theme A A-08 quality remediation attempt (superseded/noncompliant historical work; relied on LOC-evasion tactics)
+- Slice 26 -> Theme A anti-evasion governance codification + honest LOC rebaseline (conditionally compliant; Theme A and A-08 remain open; next: Slice 27 anti-evasion enforcement parity)
+- Slice 27 -> Theme A anti-evasion enforcement parity in governance checks (completed; fail-closed `loc/all` enforcement active; next: Slice 28 config tranche remediation)
+- Slice 28 -> Runtime evasion remediation tranche 1 (config pair) (completed; commit `7514668`)
+- Slice 29a -> Runtime evasion remediation tranche 2a (`client_http` first, decomposed) (completed; commit `5572ff2`)
+- Slice 29b -> Runtime evasion remediation tranche 2b (`client.py`) (completed; commit `7e35f1e`)
+- Slice 30 -> Runtime evasion remediation tranche 3 (CLI pair) historical blocked-state capture (committed evidence only; commit `500a3cd`)
+- Slice 30a -> Runtime evasion remediation tranche 3a (`cli.py` first, decomposed) (completed; commit `ec9edba`)
+- Slice 30b -> Runtime evasion remediation tranche 3b (`cli_runtime.py`) (completed; commit `7fc7db7`)
+- Slice 31 -> Pipeline evasion remediation tranche 3c (`pipeline.py` first) (completed; commit `fdcd44c`)
+- Slice 32 -> Pipeline evasion remediation tranche 3d (`pipeline_backdrops.py`) (completed; commit `68e5b0d`)
+- Slice 33 -> A-08 same-SHA CI proof + Theme A closure gate (completed; commit `c77a57b`; run `22826331766` for SHA `c77a57bccf24d70fcf5b9a1784f3075ab8dd01c7` has required jobs `test/security/quality/governance` all successful; GG-001 closed; GG-008 closed; Theme A closed)
+
 After Slice 9, subsequent slices remain iterative. Governance-coverage slices
 (starting with COV-01b) take precedence before route-fence flip planning.
 Route-fence flips must not be planned/executed until Slice 7 Surface Coverage Gate,

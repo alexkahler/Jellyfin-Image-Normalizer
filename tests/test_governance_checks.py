@@ -45,6 +45,16 @@ def _contract_text(
     tests_mode: str = "warn",
     runtime_gate_targets: list[str] | None = None,
     runtime_gate_budget_seconds: int = 180,
+    anti_evasion_disallow_fmt: bool = True,
+    anti_evasion_disallow_multi_statement: bool = True,
+    anti_evasion_disallow_dense_control_flow: bool = True,
+    anti_evasion_fail_closed: bool = True,
+    anti_evasion_rationale: str = "honest_loc_required_for_maintainability",
+    anti_evasion_noncompliance_rule: str = (
+        "suppression_or_packing_invalidates_loc_claim"
+    ),
+    anti_evasion_multi_statement_max_semicolons: int = 0,
+    anti_evasion_control_flow_inline_suite_max: int = 0,
 ) -> str:
     """Create a contract YAML string using default WI-001 values."""
     commands = verification_commands or [
@@ -77,6 +87,18 @@ def _contract_text(
             f"  src_mode: {src_mode}",
             f"  tests_max_lines: {tests_max_lines}",
             f"  tests_mode: {tests_mode}",
+            f"  anti_evasion_disallow_fmt: {str(anti_evasion_disallow_fmt).lower()}",
+            "  anti_evasion_disallow_multi_statement: "
+            f"{str(anti_evasion_disallow_multi_statement).lower()}",
+            "  anti_evasion_disallow_dense_control_flow: "
+            f"{str(anti_evasion_disallow_dense_control_flow).lower()}",
+            f"  anti_evasion_fail_closed: {str(anti_evasion_fail_closed).lower()}",
+            f"  anti_evasion_rationale: {anti_evasion_rationale}",
+            f"  anti_evasion_noncompliance_rule: {anti_evasion_noncompliance_rule}",
+            "  anti_evasion_multi_statement_max_semicolons: "
+            f"{anti_evasion_multi_statement_max_semicolons}",
+            "  anti_evasion_control_flow_inline_suite_max: "
+            f"{anti_evasion_control_flow_inline_suite_max}",
         ]
     )
     return "\n".join(lines) + "\n"
@@ -193,6 +215,61 @@ def test_contract_schema_success(governance_module, tmp_path: Path):
 
     assert not result.errors
     assert not result.warnings
+
+
+def test_contract_parse_requires_anti_evasion_keys(governance_module, tmp_path: Path):
+    """Contract parsing should fail when anti-evasion keys are missing."""
+    contract_path = tmp_path / "verification-contract.yml"
+    _write_file(
+        contract_path,
+        _contract_text().replace("  anti_evasion_fail_closed: true\n", ""),
+    )
+
+    with pytest.raises(
+        governance_module.GovernanceError,
+        match="loc_policy missing required key: anti_evasion_fail_closed",
+    ):
+        governance_module.parse_verification_contract(contract_path)
+
+
+@pytest.mark.parametrize(
+    ("contract_kwargs", "expected_message"),
+    [
+        (
+            {"anti_evasion_disallow_fmt": False},
+            "loc_policy.anti_evasion_disallow_fmt must be true.",
+        ),
+        (
+            {"anti_evasion_fail_closed": False},
+            "loc_policy.anti_evasion_fail_closed must be true.",
+        ),
+        (
+            {"anti_evasion_multi_statement_max_semicolons": 1},
+            "loc_policy.anti_evasion_multi_statement_max_semicolons must be 0.",
+        ),
+        (
+            {
+                "anti_evasion_noncompliance_rule": "allow_packing",
+            },
+            "loc_policy.anti_evasion_noncompliance_rule must be "
+            "'suppression_or_packing_invalidates_loc_claim'.",
+        ),
+    ],
+)
+def test_contract_schema_fails_for_anti_evasion_drift(
+    governance_module,
+    tmp_path: Path,
+    contract_kwargs: dict[str, object],
+    expected_message: str,
+):
+    """Schema should fail when anti-evasion contract values drift."""
+    contract_path = tmp_path / "verification-contract.yml"
+    _write_file(contract_path, _contract_text(**contract_kwargs))
+
+    contract = governance_module.parse_verification_contract(contract_path)
+    result = governance_module.check_contract_schema(contract)
+
+    assert expected_message in result.errors
 
 
 @pytest.mark.parametrize(
@@ -365,6 +442,99 @@ def test_loc_policy_warns_for_tests_overflow(governance_module, tmp_path: Path):
     assert not result.errors
     assert any(
         "tests/test_large.py has 301 lines" in warning for warning in result.warnings
+    )
+
+
+def test_loc_policy_blocks_fmt_suppression(governance_module, tmp_path: Path):
+    """LOC check should fail when formatter suppression markers are present."""
+    contract_path = tmp_path / "verification-contract.yml"
+    src_file = tmp_path / "src" / "fmt_blocked.py"
+    _write_file(contract_path, _contract_text())
+    _write_file(src_file, "# fmt: off\nx = 1\n")
+    _write_file(tmp_path / "tests" / "test_ok.py", "def test_ok():\n    assert True\n")
+
+    contract = governance_module.parse_verification_contract(contract_path)
+    result = governance_module.check_loc_policy(
+        contract,
+        tmp_path,
+        tmp_path / "src",
+        tmp_path / "tests",
+    )
+
+    assert any(
+        "src/fmt_blocked.py [anti_evasion.fmt_suppression]" in error
+        for error in result.errors
+    )
+
+
+def test_loc_policy_blocks_semicolon_packing(governance_module, tmp_path: Path):
+    """LOC check should fail when semicolon packing exceeds policy max."""
+    contract_path = tmp_path / "verification-contract.yml"
+    src_file = tmp_path / "src" / "packed.py"
+    _write_file(contract_path, _contract_text())
+    _write_file(src_file, "x = 1; y = 2\n")
+    _write_file(tmp_path / "tests" / "test_ok.py", "def test_ok():\n    assert True\n")
+
+    contract = governance_module.parse_verification_contract(contract_path)
+    result = governance_module.check_loc_policy(
+        contract,
+        tmp_path,
+        tmp_path / "src",
+        tmp_path / "tests",
+    )
+
+    assert any(
+        "src/packed.py [anti_evasion.multi_statement]" in error
+        for error in result.errors
+    )
+
+
+def test_loc_policy_blocks_dense_inline_control_flow(
+    governance_module,
+    tmp_path: Path,
+):
+    """LOC check should fail when inline control-flow suites exceed policy max."""
+    contract_path = tmp_path / "verification-contract.yml"
+    src_file = tmp_path / "src" / "dense.py"
+    _write_file(contract_path, _contract_text())
+    _write_file(src_file, "if True: x = 1\n")
+    _write_file(tmp_path / "tests" / "test_ok.py", "def test_ok():\n    assert True\n")
+
+    contract = governance_module.parse_verification_contract(contract_path)
+    result = governance_module.check_loc_policy(
+        contract,
+        tmp_path,
+        tmp_path / "src",
+        tmp_path / "tests",
+    )
+
+    assert any(
+        "src/dense.py [anti_evasion.dense_control_flow]" in error
+        for error in result.errors
+    )
+
+
+def test_loc_policy_fail_closed_when_ast_analysis_unavailable(
+    governance_module,
+    tmp_path: Path,
+):
+    """LOC check should fail closed if dense-control-flow analysis cannot run."""
+    contract_path = tmp_path / "verification-contract.yml"
+    src_file = tmp_path / "src" / "broken.py"
+    _write_file(contract_path, _contract_text())
+    _write_file(src_file, "if True print('oops')\n")
+    _write_file(tmp_path / "tests" / "test_ok.py", "def test_ok():\n    assert True\n")
+
+    contract = governance_module.parse_verification_contract(contract_path)
+    result = governance_module.check_loc_policy(
+        contract,
+        tmp_path,
+        tmp_path / "src",
+        tmp_path / "tests",
+    )
+
+    assert any(
+        "src/broken.py [anti_evasion.fail_closed]" in error for error in result.errors
     )
 
 

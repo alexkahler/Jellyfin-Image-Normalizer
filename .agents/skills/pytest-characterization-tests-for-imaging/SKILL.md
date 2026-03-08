@@ -17,7 +17,7 @@ metadata:
 
 This skill is a **runbook** for adding **behavior-preserving tests** around JFIN’s imaging logic so refactors can proceed safely.
 
-In JFIN Track 1, “behavior preservation” is enforced through:
+In JFIN Track 1, "behavior preservation" is enforced through:
 - **Parity matrix rows** (e.g., `IMG-*`) that point to
 - **Characterization baselines** and
 - **Golden artifacts + manifest** (with governance checks validating linkage and budgets).  
@@ -95,7 +95,7 @@ Do this:
 
 ---
 
-### 2) Prefer “decision + properties” over “exact bytes” (unless stabilized)
+### 2) Prefer "decision + properties" over "exact bytes" (unless stabilized)
 
 **Goal:** make tests stable across environments while still catching real regressions.
 
@@ -122,7 +122,7 @@ Use these assertion layers in order:
 
 ---
 
-### 3) Build a representative image corpus (synthetic + “real-ish”)
+### 3) Build a representative image corpus (synthetic + "real-ish")
 
 **Goal:** cover the edge cases JFIN actually sees without turning tests into a brittle zoo.
 
@@ -141,7 +141,7 @@ Use a hybrid corpus:
 
 ### 4) Write (or extend) baseline-driven characterization tests
 
-**Goal:** tests read like “this is what the system does today.”
+**Goal:** tests read like "this is what the system does today."
 
 Pattern:
 - Load the baseline JSON entry for the behavior ID.
@@ -195,7 +195,7 @@ Confirm:
 
 You are done when:
 
-- The relevant `IMG-*` parity rows still report “matches-baseline / preserved”
+- The relevant `IMG-*` parity rows still report "matches-baseline / preserved"
 - Imaging characterization tests pass and cover the behavior you’re about to refactor
 - Governance characterization checks pass (linkage + budgets)
 - The tests are stable enough that a rerun without code changes does not flap
@@ -214,14 +214,14 @@ Recovery:
   - use tolerant pixel diff logic for lossy formats
 - If the harness is intended to be strict, pin Pillow (and document it)
 
-### Symptom: “NO_SCALE” cases unexpectedly upload/encode
+### Symptom: "NO_SCALE" cases unexpectedly upload/encode
 Likely causes:
 - `force_upload_noscale` behavior in other layers bleeding into your expectations  
 Recovery:
 - Keep characterization here at the imaging helper seam only
 - If you need write-path semantics, that’s a safety/pipeline contract, not imaging
 
-### Symptom: Padding removal behaves like a no-op on “obvious” transparent borders
+### Symptom: Padding removal behaves like a no-op on "obvious" transparent borders
 Likely causes:
 - sensitivity threshold too low/high; low-alpha pixels treated as content  
 Recovery:
@@ -233,14 +233,14 @@ Recovery:
 ## Examples
 
 ### Prompts that SHOULD trigger this skill
-- “I’m refactoring `src/jfin/imaging.py` and need goldens/characterization first.”
-- “We changed logo padding rules — add tests that preserve current behavior.”
-- “EXIF orientation handling might change; lock it down with imaging contracts.”
+- "I’m refactoring `src/jfin/imaging.py` and need goldens/characterization first."
+- "We changed logo padding rules — add tests that preserve current behavior."
+- "EXIF orientation handling might change; lock it down with imaging contracts."
 
 ### Prompts that SHOULD NOT trigger this skill
-- “The CLI flag parsing changed; add characterization for that.” (CLI/config skill)
-- “Dry-run allowed a POST; add safety tests.” (safety contract skill)
-- “Backdrop delete/upload transaction changed.” (pipeline/workflow characterization)
+- "The CLI flag parsing changed; add characterization for that." (CLI/config skill)
+- "Dry-run allowed a POST; add safety tests." (safety contract skill)
+- "Backdrop delete/upload transaction changed." (pipeline/workflow characterization)
 
 ---
 
