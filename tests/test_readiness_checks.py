@@ -57,6 +57,30 @@ def test_readiness_fails_when_route_v1_without_ready_status(
     )
 
 
+def test_readiness_fails_when_claimed_ready_owner_is_placeholder(
+    readiness_modules,
+    tmp_path: Path,
+):
+    """Claimed-ready rows must use non-placeholder ownership metadata."""
+    repo_root, parity_contract, readiness_checks = setup_readiness_repo(
+        readiness_modules, tmp_path
+    )
+    set_workflow_cell(repo_root, debt_status="closed")
+    set_route_row(
+        repo_root,
+        parity_contract,
+        command="run",
+        mode="backdrop",
+        owner_slice="WI-00X",
+        parity_status="ready",
+    )
+
+    result = readiness_checks.check_readiness_artifacts(repo_root)
+    assert any(
+        error.startswith("readiness.owner_placeholder") for error in result.errors
+    )
+
+
 def test_readiness_fails_for_unmapped_ready_cell(readiness_modules, tmp_path: Path):
     """Rows outside workflow mapping cannot claim readiness."""
     repo_root, parity_contract, readiness_checks = setup_readiness_repo(
@@ -91,6 +115,7 @@ def test_readiness_fails_for_missing_required_parity_id(
         parity_contract,
         command="run",
         mode="backdrop",
+        owner_slice="Slice-Test",
         parity_status="ready",
     )
 
@@ -112,6 +137,7 @@ def test_readiness_fails_when_parity_not_preserved(readiness_modules, tmp_path: 
         parity_contract,
         command="run",
         mode="backdrop",
+        owner_slice="Slice-Test",
         parity_status="ready",
     )
 
@@ -138,6 +164,7 @@ def test_readiness_fails_when_baseline_link_invalid(readiness_modules, tmp_path:
         parity_contract,
         command="run",
         mode="backdrop",
+        owner_slice="Slice-Test",
         parity_status="ready",
     )
 
@@ -167,6 +194,7 @@ def test_readiness_fails_on_owner_linkage_subset_violation(
         parity_contract,
         command="run",
         mode="backdrop",
+        owner_slice="Slice-Test",
         parity_status="ready",
     )
 
@@ -222,6 +250,7 @@ def test_readiness_evaluates_run_backdrop_real_claim_candidate_after_debt_closur
         parity_contract,
         command="run",
         mode="backdrop",
+        owner_slice="Slice-Test",
         parity_status="ready",
     )
 
@@ -265,6 +294,7 @@ def test_readiness_passes_for_fully_proven_ready_claim(
         parity_contract,
         command="run",
         mode="backdrop",
+        owner_slice="Slice-Test",
         parity_status="ready",
     )
 

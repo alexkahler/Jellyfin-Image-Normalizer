@@ -45,6 +45,9 @@ Theme A iteration status (Governance Contract Posture Recovery):
 Theme B iteration status (Workflow Readiness Baseline Unblock):
 - Slice 34 -> Theme B unblock: close `run|backdrop` readiness debt contract (completed; commit `3c37c44`; `DEBT-BACKDROP-ID-SPLIT-001` closed; GG-004 blocking portion closed; Theme B closed; next: Theme C1 route-fence ownership accountability for `run|backdrop`)
 
+Theme C iteration status (Route-Readiness Activation and Accountability):
+- Slice 35 -> Theme C1 route-fence ownership accountability for `run|backdrop` (completed; canonical owner claim `WI-00X -> Slice-35`; claimed-ready placeholder ownership now machine-blocked; Theme C remains open; next: Slice 36 Theme C2 canonical first-claim activation)
+
 After Slice 9, subsequent slices remain iterative. Governance-coverage slices
 (starting with COV-01b) take precedence before route-fence flip planning.
 Route-fence flips must not be planned/executed until Slice 7 Surface Coverage Gate,

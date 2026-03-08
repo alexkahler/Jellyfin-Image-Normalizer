@@ -33,6 +33,7 @@ from parity_contract import (
 )
 
 WORKFLOW_COVERAGE_INDEX_PATH = "project/workflow-coverage-index.json"
+PLACEHOLDER_OWNER_SLICES = {"wi-00x"}
 
 
 @dataclass(frozen=True)
@@ -350,6 +351,8 @@ def check_readiness_artifacts(repo_root: Path) -> CheckResult:
         command = row["command"].strip()
         mode = row["mode"].strip()
         route_value = row["route(v0|v1)"].strip().lower()
+        owner_slice = row["owner slice"].strip()
+        owner_slice_normalized = owner_slice.lower()
         parity_status = row["parity status"].strip().lower()
         cell_key = f"{command}|{mode}"
 
@@ -377,6 +380,17 @@ def check_readiness_artifacts(repo_root: Path) -> CheckResult:
         if not claimed_ready:
             continue
         claimed_rows += 1
+
+        if owner_slice_normalized in PLACEHOLDER_OWNER_SLICES:
+            _add_readiness_error(
+                result,
+                "owner_placeholder",
+                (
+                    f"cell={cell_key} claimed readiness requires a non-placeholder "
+                    f"owner slice, found '{owner_slice}'."
+                ),
+            )
+            row_has_error = True
 
         workflow_cell = workflow_cells.get(cell_key)
         if workflow_cell is None:

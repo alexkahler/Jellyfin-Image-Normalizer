@@ -67,6 +67,7 @@ def set_route_row(
     command: str,
     mode: str,
     route: str | None = None,
+    owner_slice: str | None = None,
     parity_status: str | None = None,
 ) -> None:
     """Update one route-fence row in markdown and keep JSON synchronized."""
@@ -77,6 +78,8 @@ def set_route_row(
         if row["command"] == command and row["mode"] == mode:
             if route is not None:
                 row["route(v0|v1)"] = route
+            if owner_slice is not None:
+                row["owner slice"] = owner_slice
             if parity_status is not None:
                 row["parity status"] = parity_status
             break
