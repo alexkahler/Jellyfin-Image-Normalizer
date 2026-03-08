@@ -191,6 +191,97 @@
       },
       "notes": "Backdrop transaction deletes originals before upload and retains staging artifacts when uploads partially fail."
     },
+    "PIPE-BACKDROP-002": {
+      "expected_observations": {
+        "result": {
+          "return_value": false,
+          "raises": null
+        },
+        "calls": {
+          "delete_calls": 1,
+          "upload_calls": 1,
+          "sequence.fetch_indices_dense_ordered": true,
+          "sequence.normalize_source_index_mapping": true,
+          "sequence.post_delete_404_verified": true,
+          "sequence.upload_indices_dense_ordered": true,
+          "sequence.delete_index_zero_repeated": true,
+          "sequence.staging_retained_partial_failure": true
+        },
+        "stats": {
+          "successes": 0,
+          "errors": 1
+        },
+        "filesystem": {
+          "staging_retained": true
+        },
+        "ordering": [
+          "delete_before_upload"
+        ],
+        "trace": {
+          "events": [
+            {
+              "phase": "fetch",
+              "index": 0,
+              "action": "get_item_image",
+              "result": "ok",
+              "details": {
+                "source_index": 0
+              }
+            },
+            {
+              "phase": "normalize",
+              "index": 0,
+              "action": "normalize_image",
+              "result": "ok",
+              "details": {
+                "source_index": 0,
+                "target_index": 0
+              }
+            },
+            {
+              "phase": "delete",
+              "index": 0,
+              "action": "delete_image",
+              "result": "ok",
+              "details": {
+                "target_index": 0
+              }
+            },
+            {
+              "phase": "verify",
+              "index": 0,
+              "action": "get_item_image_head",
+              "result": "not_found",
+              "details": {
+                "target_index": 0,
+                "status_code": 404
+              }
+            },
+            {
+              "phase": "upload",
+              "index": 0,
+              "action": "set_item_image_bytes",
+              "result": "ok",
+              "details": {
+                "source_index": 0,
+                "target_index": 0
+              }
+            },
+            {
+              "phase": "finalize",
+              "index": null,
+              "action": "staging_retention",
+              "result": "retained",
+              "details": {
+                "retained": true,
+                "failure_kind": "partial_upload_failure"
+              }
+            }
+          ]
+        }
+      },
+      "notes": "Backdrop transaction preserves dense index remap semantics and keeps staging artifacts when a single-index upload fails."
+    },
     "RST-BULK-001": {
       "expected_observations": {
         "result": {

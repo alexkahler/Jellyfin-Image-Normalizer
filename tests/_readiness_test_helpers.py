@@ -141,7 +141,10 @@ def set_parity_row(
 def runtime_report(
     characterization_checks,
     *,
-    mapped_parity_ids: tuple[str, ...] = ("PIPE-BACKDROP-001",),
+    mapped_parity_ids: tuple[str, ...] = (
+        "PIPE-BACKDROP-001",
+        "PIPE-BACKDROP-002",
+    ),
     diagnostics: tuple | None = None,
 ):
     """Build a deterministic runtime gate report for monkeypatching."""

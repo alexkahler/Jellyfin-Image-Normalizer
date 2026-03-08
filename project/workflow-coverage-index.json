@@ -5,10 +5,12 @@
       "command": "run",
       "mode": "backdrop",
       "required_parity_ids": [
-        "PIPE-BACKDROP-001"
+        "PIPE-BACKDROP-001",
+        "PIPE-BACKDROP-002"
       ],
       "required_owner_tests": [
-        "tests/characterization/safety_contract/test_safety_contract_pipeline.py::test_pipe_backdrop_001_characterization"
+        "tests/characterization/safety_contract/test_safety_contract_pipeline.py::test_pipe_backdrop_001_characterization",
+        "tests/characterization/safety_contract/test_safety_contract_pipeline_backdrop_split.py::test_pipe_backdrop_002_characterization"
       ],
       "evidence_layout": {
         "field_container": "expected_observations.calls",
@@ -31,7 +33,7 @@
       },
       "future_split_debt": {
         "id": "DEBT-BACKDROP-ID-SPLIT-001",
-        "status": "open",
+        "status": "closed",
         "readiness_blocking": true,
         "enforcement_phase": "COV-03",
         "closure": {

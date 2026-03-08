@@ -121,6 +121,11 @@ def _owner_test_for_behavior(behavior_id: str) -> tuple[str, str]:
                 function_name,
             )
         if behavior_id.startswith("PIPE-"):
+            if behavior_id == "PIPE-BACKDROP-002":
+                return (
+                    "tests/characterization/safety_contract/test_safety_contract_pipeline_backdrop_split.py",
+                    function_name,
+                )
             return (
                 "tests/characterization/safety_contract/test_safety_contract_pipeline.py",
                 function_name,
@@ -136,59 +141,26 @@ def _owner_test_for_behavior(behavior_id: str) -> tuple[str, str]:
 
 
 def _write_owner_test_files(required_ids: list[str], repo_root: Path) -> None:
-    cli_functions: list[str] = []
-    cfg_functions: list[str] = []
-    img_functions: list[str] = []
-    safety_functions: list[str] = []
+    owner_functions_by_path: dict[str, list[str]] = {}
     for behavior_id in required_ids:
-        _path, function_name = _owner_test_for_behavior(behavior_id)
+        path, function_name = _owner_test_for_behavior(behavior_id)
         function_line = f"def {function_name}():\n    assert True\n"
-        if behavior_id.startswith("CLI-"):
-            cli_functions.append(function_line)
-        elif behavior_id.startswith("IMG-"):
-            img_functions.append(function_line)
-        elif behavior_id.startswith(("API-", "PIPE-", "RST-")):
-            safety_functions.append(function_line)
-        else:
-            cfg_functions.append(function_line)
+        owner_functions_by_path.setdefault(path, []).append(function_line)
 
-    _write_file(
-        repo_root
-        / "tests/characterization/cli_contract/test_cli_contract_characterization.py",
-        "\n".join(cli_functions) + "\n",
-    )
-    _write_file(
-        repo_root
-        / "tests/characterization/config_contract/test_config_contract_characterization.py",
-        "\n".join(cfg_functions) + "\n",
-    )
-    _write_file(
-        repo_root
-        / "tests/characterization/imaging_contract/test_imaging_contract_characterization.py",
-        "\n".join(img_functions) + "\n",
-    )
-    safety_api_functions = [line for line in safety_functions if "test_api_" in line]
-    safety_pipeline_functions = [
-        line for line in safety_functions if "test_pipe_" in line
+    owner_paths = [
+        "tests/characterization/cli_contract/test_cli_contract_characterization.py",
+        "tests/characterization/config_contract/test_config_contract_characterization.py",
+        "tests/characterization/imaging_contract/test_imaging_contract_characterization.py",
+        "tests/characterization/safety_contract/test_safety_contract_api.py",
+        "tests/characterization/safety_contract/test_safety_contract_pipeline.py",
+        "tests/characterization/safety_contract/test_safety_contract_pipeline_backdrop_split.py",
+        "tests/characterization/safety_contract/test_safety_contract_restore.py",
     ]
-    safety_restore_functions = [
-        line for line in safety_functions if "test_rst_" in line
-    ]
-    _write_file(
-        repo_root
-        / "tests/characterization/safety_contract/test_safety_contract_api.py",
-        "\n".join(safety_api_functions) + "\n",
-    )
-    _write_file(
-        repo_root
-        / "tests/characterization/safety_contract/test_safety_contract_pipeline.py",
-        "\n".join(safety_pipeline_functions) + "\n",
-    )
-    _write_file(
-        repo_root
-        / "tests/characterization/safety_contract/test_safety_contract_restore.py",
-        "\n".join(safety_restore_functions) + "\n",
-    )
+    for path in owner_paths:
+        _write_file(
+            repo_root / path,
+            "\n".join(owner_functions_by_path.get(path, [])) + "\n",
+        )
 
 
 def _build_valid_parity_rows(required_ids: list[str]) -> list[dict[str, str]]:
@@ -225,15 +197,23 @@ def _build_valid_parity_rows(required_ids: list[str]) -> list[dict[str, str]]:
 
 def _workflow_index_payload() -> dict[str, object]:
     """Build a valid workflow coverage index payload for Slice-11 checks."""
-    owner_path, owner_function = _owner_test_for_behavior("PIPE-BACKDROP-001")
+    backdrop_001_path, backdrop_001_function = _owner_test_for_behavior(
+        "PIPE-BACKDROP-001"
+    )
+    backdrop_002_path, backdrop_002_function = _owner_test_for_behavior(
+        "PIPE-BACKDROP-002"
+    )
     return {
         "version": 1,
         "cells": {
             "run|backdrop": {
                 "command": "run",
                 "mode": "backdrop",
-                "required_parity_ids": ["PIPE-BACKDROP-001"],
-                "required_owner_tests": [f"{owner_path}::{owner_function}"],
+                "required_parity_ids": ["PIPE-BACKDROP-001", "PIPE-BACKDROP-002"],
+                "required_owner_tests": [
+                    f"{backdrop_001_path}::{backdrop_001_function}",
+                    f"{backdrop_002_path}::{backdrop_002_function}",
+                ],
                 "evidence_layout": {
                     "field_container": "expected_observations.calls",
                     "ordering_container": "expected_observations.ordering",
@@ -250,7 +230,7 @@ def _workflow_index_payload() -> dict[str, object]:
                 "severity": {"contract": "block", "sequence": "warn"},
                 "future_split_debt": {
                     "id": "DEBT-BACKDROP-ID-SPLIT-001",
-                    "status": "open",
+                    "status": "closed",
                     "readiness_blocking": True,
                     "enforcement_phase": "COV-03",
                     "closure": {
