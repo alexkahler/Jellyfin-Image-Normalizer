@@ -1,3 +1,4 @@
+# fmt: off
 from __future__ import annotations
 
 from pathlib import Path
@@ -6,7 +7,6 @@ from typing import Any, Callable
 from .client import JellyfinClient
 from .config import ModeRuntimeSettings
 from .discovery import DiscoveredItem
-
 
 def normalize_item_backdrops_api(
     *,

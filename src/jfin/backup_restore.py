@@ -14,6 +14,8 @@ class RestoreDeps:
     content_type_from_extension_fn: Callable[[str], str]
     image_type_to_mode: Mapping[str, str]
     mode_to_image_type: Mapping[str, str]
+
+
 def extract_backdrop_index(filename: str) -> int | None:
     stem = Path(filename).stem
     backdrop_stem = FILENAME_CONFIG.get("Backdrop", "backdrop")
@@ -25,6 +27,8 @@ def extract_backdrop_index(filename: str) -> int | None:
     if suffix.isdigit():
         return int(suffix)
     return None
+
+
 def restore_backup_payload(
     *,
     path: Path,
@@ -77,6 +81,8 @@ def restore_backup_payload(
         return True
     state_module.stats.record_error(str(path), upload_error or "restore upload failed")
     return False
+
+
 def restore_single_image_group(
     *,
     item_id: str,
@@ -109,6 +115,8 @@ def restore_single_image_group(
             deps=deps,
         )
     )
+
+
 def restore_backdrop_group(
     *,
     item_id: str,
@@ -151,7 +159,9 @@ def restore_backdrop_group(
             item_id,
             ordered_indices,
         )
-        state_module.stats.record_error(item_id, "backdrop indices not contiguous from 0")
+        state_module.stats.record_error(
+            item_id, "backdrop indices not contiguous from 0"
+        )
         return 0
 
     successes = 0
@@ -167,6 +177,8 @@ def restore_backdrop_group(
         ):
             successes += 1
     return successes
+
+
 def restore_from_backups(
     *,
     backup_root: Path,
@@ -225,6 +237,8 @@ def restore_from_backups(
                     deps=deps,
                 )
     state_module.log.info("Restore completed. Uploaded %s backup images.", restored)
+
+
 def restore_single_item_from_backup(
     *,
     backup_root: Path,

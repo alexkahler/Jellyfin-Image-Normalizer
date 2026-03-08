@@ -9,7 +9,12 @@ from PIL import Image
 from .client import JellyfinClient
 from .config import ModeRuntimeSettings
 from .discovery import find_user_by_name, profile_display_name
-from .imaging import apply_exif_orientation, build_normalized_image, encode_image_to_bytes, handle_no_scale
+from .imaging import (
+    apply_exif_orientation,
+    build_normalized_image,
+    encode_image_to_bytes,
+    handle_no_scale,
+)
 
 
 def normalize_profile_user(
@@ -132,7 +137,9 @@ def normalize_profile_user(
             return False
 
     except Exception as exc:
-        state_module.log.exception("[ERROR] Failed to process profile for %s", user_label)
+        state_module.log.exception(
+            "[ERROR] Failed to process profile for %s", user_label
+        )
         state_module.stats.record_error(user_label, str(exc))
         return False
 
@@ -187,7 +194,9 @@ def process_single_profile(
     state_module: Any,
 ) -> int | None:
     if is_restore:
-        state_module.log.warning("Restore is not supported for profile images; skipping.")
+        state_module.log.warning(
+            "Restore is not supported for profile images; skipping."
+        )
         state_module.stats.record_warning()
         return 1
 

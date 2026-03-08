@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# fmt: off
 import argparse
 import sys
 from typing import Any, cast

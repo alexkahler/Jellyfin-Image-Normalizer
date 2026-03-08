@@ -5,7 +5,12 @@ from typing import Any, Callable
 
 from .client import JellyfinClient
 from .config import ModeRuntimeSettings, build_discovery_settings
-from .discovery import DiscoveredItem, _item_backdrop_count, discover_all_library_items, discover_libraries
+from .discovery import (
+    DiscoveredItem,
+    _item_backdrop_count,
+    discover_all_library_items,
+    discover_libraries,
+)
 
 
 def process_discovered_items(
@@ -102,7 +107,9 @@ def process_libraries_via_api(
 
     items = discover_all_library_items(jf_client, libraries, discovery)
     if not items:
-        state_module.log.info("No items found with requested images in selected libraries.")
+        state_module.log.info(
+            "No items found with requested images in selected libraries."
+        )
         return
 
     state_module.log.info(
