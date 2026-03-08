@@ -36,6 +36,7 @@ def test_readiness_runtime_overlay_ignores_unrelated_target_warning(
         parity_contract,
         command="run",
         mode="backdrop",
+        owner_slice="Slice-Test",
         parity_status="ready",
     )
 
@@ -80,6 +81,7 @@ def test_readiness_runtime_overlay_fails_on_claim_target_warning(
         parity_contract,
         command="run",
         mode="backdrop",
+        owner_slice="Slice-Test",
         parity_status="ready",
     )
 
@@ -123,6 +125,7 @@ def test_readiness_runtime_overlay_fails_when_parity_unmapped(
         parity_contract,
         command="run",
         mode="backdrop",
+        owner_slice="Slice-Test",
         parity_status="ready",
     )
 

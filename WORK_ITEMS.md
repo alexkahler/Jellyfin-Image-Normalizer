@@ -47,6 +47,7 @@ Theme B iteration status (Workflow Readiness Baseline Unblock):
 
 Theme C iteration status (Route-Readiness Activation and Accountability):
 - Slice 35 -> Theme C1 route-fence ownership accountability for `run|backdrop` (completed; canonical owner claim `WI-00X -> Slice-35`; claimed-ready placeholder ownership now machine-blocked; Theme C remains open; next: Slice 36 Theme C2 canonical first-claim activation)
+- Slice 36 -> Theme C2 canonical first-claim activation on `run|backdrop` (completed; canonical readiness now non-vacuous `claimed_rows=1`, `validated_rows=1`; `route` preserved at `v0`; Theme C closed; next gate: Theme D only if explicitly authorized)
 
 After Slice 9, subsequent slices remain iterative. Governance-coverage slices
 (starting with COV-01b) take precedence before route-fence flip planning.
