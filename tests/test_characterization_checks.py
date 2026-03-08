@@ -88,6 +88,14 @@ def _write_verification_contract(repo_root: Path) -> None:
                 "  src_mode: block",
                 "  tests_max_lines: 300",
                 "  tests_mode: warn",
+                "  anti_evasion_disallow_fmt: true",
+                "  anti_evasion_disallow_multi_statement: true",
+                "  anti_evasion_disallow_dense_control_flow: true",
+                "  anti_evasion_fail_closed: true",
+                "  anti_evasion_rationale: honest_loc_required_for_maintainability",
+                "  anti_evasion_noncompliance_rule: suppression_or_packing_invalidates_loc_claim",
+                "  anti_evasion_multi_statement_max_semicolons: 0",
+                "  anti_evasion_control_flow_inline_suite_max: 0",
             ]
         )
         + "\n",
