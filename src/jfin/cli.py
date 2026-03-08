@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# fmt: off
 import argparse
 import sys
 from typing import Any, cast
@@ -80,7 +79,9 @@ def parse_size_pair(value: str) -> tuple[int, int]:
         width = int(width_str)
         height = int(height_str)
     except ValueError:
-        raise argparse.ArgumentTypeError("Width and height must be integers (e.g., 1000x562).")
+        raise argparse.ArgumentTypeError(
+            "Width and height must be integers (e.g., 1000x562)."
+        )
     if width <= 0 or height <= 0:
         raise argparse.ArgumentTypeError("Width and height must be positive integers.")
     return width, height
@@ -93,8 +94,9 @@ def parse_args() -> argparse.Namespace:
     )
 
 
-def validate_generate_config_args(argv: list[str]) -> None:
-    allowed = {"--generate-config", CONFIG_ARG, "--silent", "-s", "--verbose", "-v"}
+def _collect_unexpected_tokens(
+    argv: list[str], allowed: set[str], value_flags: set[str]
+) -> list[str]:
     extras: list[str] = []
     skip_next = False
 
@@ -102,49 +104,48 @@ def validate_generate_config_args(argv: list[str]) -> None:
         if skip_next:
             skip_next = False
             continue
-        if token == CONFIG_ARG:
+        if token in value_flags:
             skip_next = True
             continue
-        if token.startswith(f"{CONFIG_ARG}="):
+        if any(token.startswith(f"{flag}=") for flag in value_flags):
             continue
         if token in allowed:
             continue
         extras.append(token)
 
+    return extras
+
+
+def _raise_invalid_combination(
+    command_flag: str, extras: list[str], stats_detail: str
+) -> None:
+    state.log.critical(
+        "%s cannot be combined with other arguments (found: %s).",
+        command_flag,
+        ", ".join(extras),
+    )
+    state.stats.record_error("arguments", stats_detail)
+    raise SystemExit(1)
+
+
+def validate_generate_config_args(argv: list[str]) -> None:
+    allowed = {"--generate-config", CONFIG_ARG, "--silent", "-s", "--verbose", "-v"}
+    extras = _collect_unexpected_tokens(argv, allowed, {CONFIG_ARG})
+
     if extras:
-        state.log.critical(
-            "--generate-config cannot be combined with other arguments (found: %s).",
-            ", ".join(extras),
+        _raise_invalid_combination(
+            "--generate-config", extras, "generate-config combined with other args"
         )
-        state.stats.record_error("arguments", "generate-config combined with other args")
-        raise SystemExit(1)
 
 
 def validate_restore_all_args(argv: list[str]) -> None:
     allowed = {"--restore-all", CONFIG_ARG, "--silent", "-s", "--verbose", "-v"}
-    extras: list[str] = []
-    skip_next = False
-
-    for token in argv:
-        if skip_next:
-            skip_next = False
-            continue
-        if token == CONFIG_ARG:
-            skip_next = True
-            continue
-        if token.startswith(f"{CONFIG_ARG}="):
-            continue
-        if token in allowed:
-            continue
-        extras.append(token)
+    extras = _collect_unexpected_tokens(argv, allowed, {CONFIG_ARG})
 
     if extras:
-        state.log.critical(
-            "--restore-all cannot be combined with other arguments (found: %s).",
-            ", ".join(extras),
+        _raise_invalid_combination(
+            "--restore-all", extras, "restore-all combined with other args"
         )
-        state.stats.record_error("arguments", "restore-all combined with other args")
-        raise SystemExit(1)
 
 
 def validate_test_jf_args(argv: list[str]) -> None:
@@ -159,47 +160,41 @@ def validate_test_jf_args(argv: list[str]) -> None:
         "--jf-api-key",
         "--jf-delay-ms",
     }
-    extras: list[str] = []
-    skip_next = False
-
-    for token in argv:
-        if skip_next:
-            skip_next = False
-            continue
-        if token in {"--config", "--jf-url", "--jf-api-key", "--jf-delay-ms"}:
-            skip_next = True
-            continue
-        if token.startswith("--config=") or token.startswith("--jf-url=") or token.startswith("--jf-api-key=") or token.startswith("--jf-delay-ms="):
-            continue
-        if token in allowed:
-            continue
-        extras.append(token)
+    value_flags = {CONFIG_ARG, "--jf-url", "--jf-api-key", "--jf-delay-ms"}
+    extras = _collect_unexpected_tokens(argv, allowed, value_flags)
 
     if extras:
-        state.log.critical(
-            "--test-jf cannot be combined with other arguments (found: %s).",
-            ", ".join(extras),
+        _raise_invalid_combination(
+            "--test-jf", extras, "test-jf combined with other args"
         )
-        state.stats.record_error("arguments", "test-jf combined with other args")
-        raise SystemExit(1)
 
 
 def warn_unused_cli_overrides(args: argparse.Namespace, operations: list[str]) -> None:
     ops = set(operations)
     if getattr(args, "no_upscale", False) and getattr(args, "no_downscale", False):
-        state.log.warning("--no-upscale and --no-downscale together disable all scaling.")
+        state.log.warning(
+            "--no-upscale and --no-downscale together disable all scaling."
+        )
         state.stats.record_warning()
     if args.thumb_jpeg_quality is not None and "thumb" not in ops:
-        state.log.warning("--thumb-jpeg-quality has no effect because 'thumb' mode is not selected.")
+        state.log.warning(
+            "--thumb-jpeg-quality has no effect because 'thumb' mode is not selected."
+        )
         state.stats.record_warning()
     if args.backdrop_jpeg_quality is not None and "backdrop" not in ops:
-        state.log.warning("--backdrop-jpeg-quality has no effect because 'backdrop' mode is not selected.")
+        state.log.warning(
+            "--backdrop-jpeg-quality has no effect because 'backdrop' mode is not selected."
+        )
         state.stats.record_warning()
     if args.profile_webp_quality is not None and "profile" not in ops:
-        state.log.warning("--profile-webp-quality has no effect because 'profile' mode is not selected.")
+        state.log.warning(
+            "--profile-webp-quality has no effect because 'profile' mode is not selected."
+        )
         state.stats.record_warning()
     if getattr(args, "logo_padding", None) is not None and "logo" not in ops:
-        state.log.warning("--logo-padding has no effect because 'logo' mode is not selected.")
+        state.log.warning(
+            "--logo-padding has no effect because 'logo' mode is not selected."
+        )
         state.stats.record_warning()
 
     dim_warnings = [
@@ -210,14 +205,20 @@ def warn_unused_cli_overrides(args: argparse.Namespace, operations: list[str]) -
     ]
     for mode, value, flag in dim_warnings:
         if value is not None and mode not in ops:
-            state.log.warning("%s has no effect because '%s' mode is not selected.", flag, mode)
+            state.log.warning(
+                "%s has no effect because '%s' mode is not selected.", flag, mode
+            )
             state.stats.record_warning()
     if getattr(args, "item_types", None) and not ({"logo", "thumb", "backdrop"} & ops):
-        state.log.warning("--item-types has no effect without 'logo', 'thumb', or 'backdrop' modes selected.")
+        state.log.warning(
+            "--item-types has no effect without 'logo', 'thumb', or 'backdrop' modes selected."
+        )
         state.stats.record_warning()
 
 
-def warn_unrecommended_aspect_ratios(settings_by_mode: dict[str, ModeRuntimeSettings]) -> None:
+def warn_unrecommended_aspect_ratios(
+    settings_by_mode: dict[str, ModeRuntimeSettings],
+) -> None:
     for mode, settings in settings_by_mode.items():
         recommended_canvas = RECOMMENDED_CANVAS_BY_MODE.get(mode)
         if recommended_canvas is None:
@@ -248,7 +249,9 @@ def run_preflight_check(jf_client: JellyfinClient) -> None:
     if jf_client.test_connection():
         return
 
-    state.log.critical("Could not connect to Jellyfin server; aborting before processing.")
+    state.log.critical(
+        "Could not connect to Jellyfin server; aborting before processing."
+    )
     state.stats.record_error("connectivity", "Pre-flight Jellyfin connection failed.")
     raise SystemExit(1)
 
