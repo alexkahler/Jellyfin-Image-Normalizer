@@ -1,58 +1,14 @@
-# fmt: off
 from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import Any, Callable, cast
+from typing import Any, cast
 
 from .client import JellyfinClient
+from .cli_runtime_args import parse_args
 from .config import ModeRuntimeSettings
 
-
-def parse_args(
-    *,
-    default_config_name: str,
-    parse_size_pair_fn: Callable[[str], tuple[int, int]],
-) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description=(
-            "Normalize Jellyfin images (logos, thumbs, profiles) via the Jellyfin API.\n\n"
-            "- Logos: scale to fit inside canvas (defaults from config), preserve aspect ratio and pad with transparency.\n"
-            "- Thumbs: scale to cover canvas (defaults from config), preserve aspect ratio and center crop.\n"
-            "- Profile: cover-scale, center crop, and encode to WebP (defaults from config).\n\n"
-            "Configuration (Jellyfin URL, API key, discovery filters, sizes, etc.) "
-            "is loaded from a TOML config file. Use --generate-config to create one."
-        )
-    )
-    add = parser.add_argument
-    add("--config", help=f"Path to TOML config file (default: {default_config_name} in repo root).")
-    add("--generate-config", action="store_true", help="Generate a default config file and exit. Does not process images.")
-    add("--test-jf", action="store_true", help="Test Jellyfin connection (using config/CLI settings) and exit.")
-    add("--mode", help="Image types to handle, e.g. 'logo', 'thumb', 'profile', 'backdrop', or a pipe-separated list like 'logo|thumb'. Overrides the config 'operations' value if provided.")
-    add("--logo-target-size", metavar="WIDTHxHEIGHT", type=parse_size_pair_fn, help="Override logo canvas size with WIDTHxHEIGHT (e.g., 800x310).")
-    add("--thumb-target-size", metavar="WIDTHxHEIGHT", type=parse_size_pair_fn, help="Override thumb canvas size with WIDTHxHEIGHT (e.g., 1000x562).")
-    add("--backdrop-target-size", metavar="WIDTHxHEIGHT", type=parse_size_pair_fn, help="Override backdrop canvas size with WIDTHxHEIGHT (e.g., 1920x1080).")
-    add("--profile-target-size", metavar="WIDTHxHEIGHT", type=parse_size_pair_fn, help="Override profile canvas size with WIDTHxHEIGHT (e.g., 256x256).")
-    add("--thumb-jpeg-quality", type=int, default=None, help="JPEG quality for thumb output (1-95). Overrides config thumb.jpeg_quality.")
-    add("--backdrop-jpeg-quality", type=int, default=None, help="JPEG quality for backdrop output (1-95). Overrides config backdrop.jpeg_quality.")
-    add("--profile-webp-quality", type=int, default=None, help="WebP quality for profile output (1-100). Overrides config profile.webp_quality.")
-    add("--dry-run", action="store_true", help="Only report actions, do not modify files or call the API.")
-    add("--backup", action="store_true", help="Save originals to the configured backup folder before uploading replacements.")
-    add("--single", help="Process a single Jellyfin item by id (logo/thumb/backdrop). Use --mode to filter which image types run.")
-    add("--restore", action="store_true", help="Restore images from the backup folder via the API. Use with --mode to pick which image types.")
-    add("--restore-all", action="store_true", help="Restore all backup images (logo, thumb, profile) from the backup folder. Must be used alone (aside from optional --config/logging flags).")
-    add("--no-upscale", action="store_true", help="Do not upscale images; only allow downscaling.")
-    add("--no-downscale", action="store_true", help="Do not downscale images; only allow upscaling.")
-    add("--logo-padding", choices=("add", "remove", "none"), default=None, help="Logo padding policy: add (pad to canvas), remove (crop transparent border before scaling; never pad), or none (no add/remove; only scale). Overrides config logo.padding.")
-    add("--jf-url", help="Override Jellyfin base URL from config (e.g. https://jellyfin.example.com).")
-    add("--jf-api-key", help="Override Jellyfin API key from config.")
-    add("--libraries", help="Comma- or pipe-separated library names to include. Overrides config.")
-    add("--item-types", help="Item types to include for discovery (movies|series, pipe/comma-separated). Overrides config.")
-    add("--jf-delay-ms", type=int, help="Delay in milliseconds between API calls (overrides config jf_delay_ms).")
-    add("--force-upload-noscale", action="store_true", help="For NO_SCALE images (already at target size), force an upload to Jellyfin anyway. Useful for re-registering pre-normalized artwork.")
-    add("--silent", "-s", action="store_true", help="Suppress CLI output (file logging continues).")
-    add("--verbose", "-v", action="store_true", help="Enable debug logging to CLI (overrides logging.cli_level).")
-    return parser.parse_args()
+__all__ = ["parse_args", "run_main"]
 
 
 def run_main(
@@ -62,7 +18,11 @@ def run_main(
     cli_module: Any,
     state_module: Any,
 ) -> int:
-    config_path = Path(args.config).expanduser() if args.config else cli_module.default_config_path()
+    config_path = (
+        Path(args.config).expanduser()
+        if args.config
+        else cli_module.default_config_path()
+    )
     operations: list[str] = []
     run_started = False
     exit_code = 0
@@ -98,11 +58,17 @@ def run_main(
             return 1
 
         force_upload_noscale = bool(cfg.get("force_upload_noscale", False))
-        backup_mode = cli_module.normalize_backup_mode(cfg.get("backup_mode", "partial"))
+        backup_mode = cli_module.normalize_backup_mode(
+            cfg.get("backup_mode", "partial")
+        )
         if args.restore_all:
             operations = sorted(cli_module.VALID_MODES)
         else:
-            operations = ["test-jf"] if args.test_jf else cli_module.parse_operations(args.mode, cfg.get("operations"))
+            operations = (
+                ["test-jf"]
+                if args.test_jf
+                else cli_module.parse_operations(args.mode, cfg.get("operations"))
+            )
         restore_requested = bool(args.restore or args.restore_all)
         dry_run = bool(args.dry_run or cfg.get("dry_run", False))
         writes_enabled = not dry_run
@@ -126,7 +92,9 @@ def run_main(
             jf_url = cfg.get("jf_url") or args.jf_url
             jf_api_key = cfg.get("jf_api_key") or args.jf_api_key
             if not jf_url or not jf_api_key:
-                state_module.log.critical("--test-jf requires --jf-url and --jf-api-key flags or valid jf_url/jf_api_key values in config.")
+                state_module.log.critical(
+                    "--test-jf requires --jf-url and --jf-api-key flags or valid jf_url/jf_api_key values in config."
+                )
                 state_module.stats.record_error("test-jf", "Missing jf_url/jf_api_key")
                 return 1
 
@@ -140,7 +108,9 @@ def run_main(
         if restore_requested:
             cli_module._enforce_route("restore", "logo|thumb|backdrop|profile")
         if args.single and not args.mode:
-            state_module.log.critical("--single requires an explicit --mode to determine target type.")
+            state_module.log.critical(
+                "--single requires an explicit --mode to determine target type."
+            )
             state_module.stats.record_error("arguments", "--single missing --mode")
             return 1
         cli_module.warn_unused_cli_overrides(args, operations)
@@ -148,8 +118,12 @@ def run_main(
         jf_url = cfg.get("jf_url")
         jf_api_key = cfg.get("jf_api_key")
         if not jf_url or not jf_api_key:
-            state_module.log.critical("jf_url and jf_api_key must be set in config (or overridden via CLI) when processing images or running outside dry-run mode.")
-            state_module.stats.record_error("configuration", "Missing jf_url/jf_api_key")
+            state_module.log.critical(
+                "jf_url and jf_api_key must be set in config (or overridden via CLI) when processing images or running outside dry-run mode."
+            )
+            state_module.stats.record_error(
+                "configuration", "Missing jf_url/jf_api_key"
+            )
             return 1
         jf_client = cli_module.build_jellyfin_client_from_config(cfg)
         cli_module.run_preflight_check(jf_client)
@@ -158,7 +132,9 @@ def run_main(
             cli_module.validate_config_for_mode(cfg, mode)
             mode_cfg = cfg[mode]
             try:
-                settings_by_mode[mode] = cli_module.build_mode_runtime_settings(mode, mode_cfg, args)
+                settings_by_mode[mode] = cli_module.build_mode_runtime_settings(
+                    mode, mode_cfg, args
+                )
             except cli_module.ConfigError as exc:
                 state_module.log.critical(str(exc))
                 state_module.stats.record_error("configuration", str(exc))
@@ -172,22 +148,38 @@ def run_main(
             ops_set = set(operations)
             if "profile" in ops_set:
                 if operations != ["profile"]:
-                    state_module.log.critical("--single with profile mode cannot be combined with other modes.")
-                    state_module.stats.record_error("arguments", "--single profile combined with other modes")
+                    state_module.log.critical(
+                        "--single with profile mode cannot be combined with other modes."
+                    )
+                    state_module.stats.record_error(
+                        "arguments", "--single profile combined with other modes"
+                    )
                     return 1
                 if restore_requested:
                     users = jf_client.list_users(is_disabled=False)
                     user = cli_module.find_user_by_name(users, args.single)
                     if user is None:
-                        state_module.log.critical("User '%s' not found or disabled.", args.single)
-                        state_module.stats.record_error(args.single, "User not found or disabled")
+                        state_module.log.critical(
+                            "User '%s' not found or disabled.", args.single
+                        )
+                        state_module.stats.record_error(
+                            args.single, "User not found or disabled"
+                        )
                         return 1
                     target_id = user.get("Id")
                     if not target_id:
-                        state_module.log.critical("Resolved user '%s' is missing an Id.", args.single)
+                        state_module.log.critical(
+                            "Resolved user '%s' is missing an Id.", args.single
+                        )
                         state_module.stats.record_error(args.single, "User missing Id")
                         return 1
-                    ok = cli_module.restore_single_item_from_backup(backup_root=backup_root, jf_client=jf_client, mode="profile", target_id=target_id, dry_run=dry_run)
+                    ok = cli_module.restore_single_item_from_backup(
+                        backup_root=backup_root,
+                        jf_client=jf_client,
+                        mode="profile",
+                        target_id=target_id,
+                        dry_run=dry_run,
+                    )
                     return 0 if ok else 1
                 cli_module.process_single_profile(
                     username=args.single,
@@ -204,7 +196,13 @@ def run_main(
             if restore_requested:
                 ok_all = True
                 for mode in operations:
-                    ok = cli_module.restore_single_item_from_backup(backup_root=backup_root, jf_client=jf_client, mode=mode, target_id=args.single, dry_run=dry_run)
+                    ok = cli_module.restore_single_item_from_backup(
+                        backup_root=backup_root,
+                        jf_client=jf_client,
+                        mode=mode,
+                        target_id=args.single,
+                        dry_run=dry_run,
+                    )
                     ok_all = ok_all and ok
                 return 0 if ok_all else 1
             ok_all = True
@@ -237,13 +235,19 @@ def run_main(
         operation_modes = [m for m in operations if m in ("logo", "thumb", "backdrop")]
         if operation_modes:
             if jf_client is None:
-                state_module.log.critical("Jellyfin client is required for library processing.")
-                state_module.stats.record_error("configuration", "Missing Jellyfin client")
+                state_module.log.critical(
+                    "Jellyfin client is required for library processing."
+                )
+                state_module.stats.record_error(
+                    "configuration", "Missing Jellyfin client"
+                )
                 return 1
             cli_module.process_libraries_via_api(
                 cfg=cfg,
                 operations=operation_modes,
-                mode_settings={mode: settings_by_mode[mode] for mode in operation_modes},
+                mode_settings={
+                    mode: settings_by_mode[mode] for mode in operation_modes
+                },
                 jf_client=jf_client,
                 dry_run=dry_run,
                 force_upload_noscale=force_upload_noscale,
@@ -274,14 +278,20 @@ def run_main(
                 state_module.log.info("=== DOWNSCALED IMAGES (larger than target) ===")
                 for path, ow, oh, nw, nh in state_module.downscaled_images:
                     state_module.log.info(" - %s: %sx%s -> %sx%s", path, ow, oh, nw, nh)
-                state_module.log.info("Total downscaled: %s", len(state_module.downscaled_images))
+                state_module.log.info(
+                    "Total downscaled: %s", len(state_module.downscaled_images)
+                )
             if state_module.upscaled_images:
                 state_module.log.info("=== UPSCALED IMAGES (smaller than target) ===")
                 for path, ow, oh, nw, nh in state_module.upscaled_images:
                     state_module.log.info(" - %s: %sx%s -> %sx%s", path, ow, oh, nw, nh)
-                state_module.log.info("Total upscaled: %s", len(state_module.upscaled_images))
+                state_module.log.info(
+                    "Total upscaled: %s", len(state_module.upscaled_images)
+                )
             if state_module.api_failures:
-                state_module.log.error("%s API uploads failed.", len(state_module.api_failures))
+                state_module.log.error(
+                    "%s API uploads failed.", len(state_module.api_failures)
+                )
                 for entry in state_module.api_failures:
                     state_module.log.error("API failure: %s", entry)
             cli_module.log_run_summary(state_module.stats)
