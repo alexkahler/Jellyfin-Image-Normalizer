@@ -1,26 +1,39 @@
-# fmt: off
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
 
 from . import state
-from .backup import cleanup_staging_dir, get_staging_dir, guess_extension_from_content_type
+from .backup import (
+    cleanup_staging_dir,
+    get_staging_dir,
+    guess_extension_from_content_type,
+)
 from .client import JellyfinClient
 from .config import ModeRuntimeSettings
 from .constants import IMAGE_TYPE_TO_MODE, MODE_TO_IMAGE_TYPE
 from .discovery import DiscoveredItem
 from .imaging import ScalePlan
-from .pipeline_backdrops import normalize_item_backdrops_api as _normalize_item_backdrops_api
-from .pipeline_image_normalization import normalize_image_bytes as _normalize_image_bytes_impl
-from .pipeline_image_normalization import plan_and_backup_image as _plan_and_backup_image_impl
-from .pipeline_image_payload import process_item_image_payload as _process_item_image_payload_impl
-from .pipeline_orchestration import process_discovered_items as _process_discovered_items_impl
-from .pipeline_orchestration import process_libraries_via_api as _process_libraries_via_api_impl
-from .pipeline_orchestration import process_single_item_api as _process_single_item_api_impl
-from .pipeline_profiles import normalize_profile_user as _normalize_profile_user_impl
-from .pipeline_profiles import process_profiles as _process_profiles_impl
-from .pipeline_profiles import process_single_profile as _process_single_profile_impl
+from .pipeline_backdrops import (
+    normalize_item_backdrops_api as _normalize_item_backdrops_api,
+)
+from .pipeline_image_normalization import (
+    normalize_image_bytes as _normalize_image_bytes_impl,
+    plan_and_backup_image as _plan_and_backup_image_impl,
+)
+from .pipeline_image_payload import (
+    process_item_image_payload as _process_item_image_payload_impl,
+)
+from .pipeline_orchestration import (
+    process_discovered_items as _process_discovered_items_impl,
+    process_libraries_via_api as _process_libraries_via_api_impl,
+    process_single_item_api as _process_single_item_api_impl,
+)
+from .pipeline_profiles import (
+    normalize_profile_user as _normalize_profile_user_impl,
+    process_profiles as _process_profiles_impl,
+    process_single_profile as _process_single_profile_impl,
+)
 
 
 def _plan_and_backup_image(
