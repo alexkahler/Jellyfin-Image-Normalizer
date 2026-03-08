@@ -1,4 +1,3 @@
-# fmt: off
 from __future__ import annotations
 
 from pathlib import Path
@@ -7,6 +6,7 @@ from typing import Any, Callable
 from .client import JellyfinClient
 from .config import ModeRuntimeSettings
 from .discovery import DiscoveredItem
+
 
 def normalize_item_backdrops_api(
     *,
@@ -25,7 +25,6 @@ def normalize_item_backdrops_api(
     cleanup_staging_dir_fn: Callable[[Path, str], None],
     state_module: Any,
 ) -> bool:
-    """Normalize all backdrops for a single item using fetch-normalize-delete-upload phases."""
     _ = force_upload_noscale
     image_type = "Backdrop"
     mode = image_type_to_mode.get(image_type)
@@ -101,7 +100,6 @@ def normalize_item_backdrops_api(
                 staged_file_path,
             )
         else:
-            # In dry-run, keep in memory for phase 2.
             staged_files.append((src_index, None, content_type))
 
     if len(staged_files) != total:
@@ -183,7 +181,9 @@ def normalize_item_backdrops_api(
             cleanup_staging_on_failure()
             return False
 
-        normalized_payloads.append((src_index, normalized_bytes, normalized_content_type))
+        normalized_payloads.append(
+            (src_index, normalized_bytes, normalized_content_type)
+        )
 
     if len(normalized_payloads) != total:
         state_module.log.error(
