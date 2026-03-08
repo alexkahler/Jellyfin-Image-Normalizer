@@ -1,9 +1,8 @@
-# fmt: off
 from __future__ import annotations
 
 import copy
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any, Callable, Literal, TypeGuard
 
 from . import state
 from .constants import DEFAULT_ITEM_TYPES
@@ -40,56 +39,41 @@ def parse_str_list(value: Any) -> list[str]:
         return []
     if isinstance(value, str):
         raw_parts = value.replace("|", ",").split(",")
-    elif isinstance(value, list):
-        raw_parts = value
-    else:
+    elif not isinstance(value, list):
         return []
+    else:
+        raw_parts = value
 
-    seen: set[str] = set()
-    result: list[str] = []
-    for part in raw_parts:
-        text = str(part).strip()
-        if not text or text in seen:
-            continue
-        seen.add(text)
-        result.append(text)
-    return result
+    cleaned = (str(part).strip() for part in raw_parts)
+    return list(dict.fromkeys(part for part in cleaned if part))
 
 
 def parse_item_types(value: Any) -> list[str]:
     if value is None:
         raw_parts: list[str] = []
-    elif isinstance(value, (str, list)):
-        raw_parts = parse_str_list(value)
-    else:
+    elif not isinstance(value, (str, list)):
         raise ConfigError("item_types must be a string or a list of strings.")
+    else:
+        raw_parts = parse_str_list(value)
 
     if not raw_parts:
         return list(DEFAULT_ITEM_TYPES)
 
-    canonical: list[str] = []
-    for part in raw_parts:
-        token = part.strip().lower()
-        if token in {"movie", "movies"}:
-            mapped = "Movie"
-        elif token == "series":  # nosec B105
-            mapped = "Series"
-        else:
-            raise ConfigError("item_types must contain only movies and/or series.")
-
-        if mapped not in canonical:
-            canonical.append(mapped)
-
-    return canonical
+    type_mapping = {"movie": "Movie", "movies": "Movie", "series": "Series"}  # nosec B105
+    try:
+        canonical = [type_mapping[part.strip().lower()] for part in raw_parts]
+    except KeyError as exc:
+        raise ConfigError("item_types must contain only movies and/or series.") from exc
+    return list(dict.fromkeys(canonical))
 
 
 def apply_cli_overrides(args: Any, cfg: dict[str, Any]) -> dict[str, Any]:
     merged = copy.deepcopy(cfg)
 
-    if getattr(args, "jf_url", None):
-        merged["jf_url"] = args.jf_url
-    if getattr(args, "jf_api_key", None):
-        merged["jf_api_key"] = args.jf_api_key
+    for key in ("jf_url", "jf_api_key"):
+        value = getattr(args, key, None)
+        if value:
+            merged[key] = value
 
     if "libraries" not in merged or merged["libraries"] is None:
         merged["libraries"] = {}
@@ -98,35 +82,34 @@ def apply_cli_overrides(args: Any, cfg: dict[str, Any]) -> dict[str, Any]:
     if getattr(args, "item_types", None):
         merged["item_types"] = args.item_types
 
-    if getattr(args, "dry_run", False):
-        merged["dry_run"] = True
-    if getattr(args, "backup", False):
-        merged["backup"] = True
+    for flag in ("dry_run", "backup", "force_upload_noscale"):
+        if getattr(args, flag, False):
+            merged[flag] = True
 
     for mode in ("logo", "thumb", "profile", "backdrop"):
         mode_cfg = merged.setdefault(mode, {})
 
         dim_override = getattr(args, f"{mode}_target_size", None)
         if dim_override:
-            width, height = dim_override
-            mode_cfg["width"] = width
-            mode_cfg["height"] = height
+            mode_cfg["width"], mode_cfg["height"] = dim_override
 
         if getattr(args, "no_upscale", False):
             mode_cfg["no_upscale"] = True
         if getattr(args, "no_downscale", False):
             mode_cfg["no_downscale"] = True
 
-    if getattr(args, "thumb_jpeg_quality", None) is not None:
-        merged["thumb"]["jpeg_quality"] = args.thumb_jpeg_quality
-    if getattr(args, "backdrop_jpeg_quality", None) is not None:
-        merged["backdrop"]["jpeg_quality"] = args.backdrop_jpeg_quality
-    if getattr(args, "profile_webp_quality", None) is not None:
-        merged["profile"]["webp_quality"] = args.profile_webp_quality
+    quality_overrides = {
+        "thumb_jpeg_quality": ("thumb", "jpeg_quality"),
+        "backdrop_jpeg_quality": ("backdrop", "jpeg_quality"),
+        "profile_webp_quality": ("profile", "webp_quality"),
+    }
+    for arg_name, (mode, key) in quality_overrides.items():
+        value = getattr(args, arg_name, None)
+        if value is not None:
+            merged[mode][key] = value
+
     if getattr(args, "jf_delay_ms", None) is not None:
         merged["jf_delay_ms"] = args.jf_delay_ms
-    if getattr(args, "force_upload_noscale", False):
-        merged["force_upload_noscale"] = True
 
     return merged
 
@@ -162,23 +145,28 @@ def _derive_canvas_size(
 def validate_config_types(cfg: dict[str, Any]) -> None:
     errors: list[str] = []
 
-    def expect_bool(container: dict[str, Any], key: str, context: str) -> None:
-        if key in container and not isinstance(container[key], bool):
-            errors.append(f"{context}.{key} must be a boolean.")
+    def is_bool(value: Any) -> TypeGuard[bool]:
+        return isinstance(value, bool)
 
-    def expect_int(container: dict[str, Any], key: str, context: str) -> None:
-        if key in container:
-            value = container[key]
-            if isinstance(value, bool) or not isinstance(value, int):
-                errors.append(f"{context}.{key} must be an integer.")
+    def is_int(value: Any) -> TypeGuard[int]:
+        return isinstance(value, int) and not isinstance(value, bool)
 
-    def expect_number(container: dict[str, Any], key: str, context: str) -> None:
-        if key in container:
-            value = container[key]
-            if isinstance(value, bool) or not isinstance(value, (int, float)):
-                errors.append(f"{context}.{key} must be a number.")
+    def is_number(value: Any) -> TypeGuard[int | float]:
+        return isinstance(value, (int, float)) and not isinstance(value, bool)
 
-    def expect_string(container: dict[str, Any], key: str, context: str, allow_empty: bool = True) -> None:
+    def expect(
+        container: dict[str, Any],
+        key: str,
+        context: str,
+        validator: Callable[[Any], bool],
+        expectation: str,
+    ) -> None:
+        if key in container and not validator(container[key]):
+            errors.append(f"{context}.{key} must be {expectation}.")
+
+    def expect_string(
+        container: dict[str, Any], key: str, context: str, allow_empty: bool = True
+    ) -> None:
         if key in container:
             value = container[key]
             if not isinstance(value, str):
@@ -199,11 +187,11 @@ def validate_config_types(cfg: dict[str, Any]) -> None:
             continue
         expect_string(cfg, required, "config", allow_empty=False)
 
-    expect_number(cfg, "timeout", "config")
+    expect(cfg, "timeout", "config", is_number, "a number")
     for key in ("jf_delay_ms", "api_retry_count", "api_retry_backoff_ms"):
-        expect_int(cfg, key, "config")
+        expect(cfg, key, "config", is_int, "an integer")
     for key in ("verify_tls", "fail_fast", "dry_run", "backup", "force_upload_noscale"):
-        expect_bool(cfg, key, "config")
+        expect(cfg, key, "config", is_bool, "a boolean")
     for key in ("backup_mode", "backup_dir"):
         expect_string(cfg, key, "config")
 
@@ -219,11 +207,10 @@ def validate_config_types(cfg: dict[str, Any]) -> None:
         if not isinstance(logging_cfg, dict):
             errors.append("config.logging must be a table/object.")
         else:
-            expect_string(logging_cfg, "file_path", "config.logging")
-            expect_bool(logging_cfg, "file_enabled", "config.logging")
-            expect_string(logging_cfg, "file_level", "config.logging")
-            expect_string(logging_cfg, "cli_level", "config.logging")
-            expect_bool(logging_cfg, "silent", "config.logging")
+            for key in ("file_path", "file_level", "cli_level"):
+                expect_string(logging_cfg, key, "config.logging")
+            for key in ("file_enabled", "silent"):
+                expect(logging_cfg, key, "config.logging", is_bool, "a boolean")
 
     libraries_cfg = cfg.get("libraries")
     if libraries_cfg is not None:
@@ -243,14 +230,15 @@ def validate_config_types(cfg: dict[str, Any]) -> None:
         mode_cfg = cfg.get(mode)
         if mode_cfg is None:
             continue
+        context = f"config.{mode}"
         if not isinstance(mode_cfg, dict):
-            errors.append(f"config.{mode} must be a table/object.")
+            errors.append(f"{context} must be a table/object.")
             continue
 
-        expect_int(mode_cfg, "width", f"config.{mode}")
-        expect_int(mode_cfg, "height", f"config.{mode}")
-        expect_bool(mode_cfg, "no_upscale", f"config.{mode}")
-        expect_bool(mode_cfg, "no_downscale", f"config.{mode}")
+        for key in ("width", "height"):
+            expect(mode_cfg, key, context, is_int, "an integer")
+        for key in ("no_upscale", "no_downscale"):
+            expect(mode_cfg, key, context, is_bool, "a boolean")
 
         if mode == "logo":
             if "no_padding" in mode_cfg:
@@ -263,37 +251,47 @@ def validate_config_types(cfg: dict[str, Any]) -> None:
                     "config.logo.no_padding has been removed. "
                     'Use logo.padding = "none" instead of no_padding=true.'
                 )
-            expect_string(mode_cfg, "padding", f"config.{mode}")
-            expect_number(mode_cfg, "padding_remove_sensitivity", f"config.{mode}")
+            expect_string(mode_cfg, "padding", context)
+            expect(
+                mode_cfg,
+                "padding_remove_sensitivity",
+                context,
+                is_number,
+                "a number",
+            )
 
         if mode in {"thumb", "backdrop"}:
-            expect_int(mode_cfg, "jpeg_quality", f"config.{mode}")
+            expect(mode_cfg, "jpeg_quality", context, is_int, "an integer")
         if mode == "profile":
-            expect_int(mode_cfg, "webp_quality", f"config.{mode}")
+            expect(mode_cfg, "webp_quality", context, is_int, "an integer")
 
-        width = mode_cfg.get("width")
-        height = mode_cfg.get("height")
-        if isinstance(width, int) and not isinstance(width, bool) and width <= 0:
-            errors.append(f"config.{mode}.width must be greater than zero.")
-        if isinstance(height, int) and not isinstance(height, bool) and height <= 0:
-            errors.append(f"config.{mode}.height must be greater than zero.")
+        for key in ("width", "height"):
+            value = mode_cfg.get(key)
+            if is_int(value) and value <= 0:
+                errors.append(f"{context}.{key} must be greater than zero.")
 
         if mode in {"thumb", "backdrop"}:
             quality = mode_cfg.get("jpeg_quality")
-            if isinstance(quality, int) and not isinstance(quality, bool) and not 1 <= quality <= 95:
+            if is_int(quality) and not 1 <= quality <= 95:
                 errors.append("jpeg_quality must be between 1 and 95.")
 
         if mode == "profile":
             quality = mode_cfg.get("webp_quality")
-            if isinstance(quality, int) and not isinstance(quality, bool) and not 1 <= quality <= 100:
+            if is_int(quality) and not 1 <= quality <= 100:
                 errors.append("config.profile.webp_quality must be between 1 and 100.")
 
         if mode == "logo":
             padding = mode_cfg.get("padding")
-            if isinstance(padding, str) and padding.strip().lower() not in {"add", "remove", "none"}:
-                errors.append('config.logo.padding must be one of "add", "remove", or "none".')
+            if isinstance(padding, str) and padding.strip().lower() not in {
+                "add",
+                "remove",
+                "none",
+            }:
+                errors.append(
+                    'config.logo.padding must be one of "add", "remove", or "none".'
+                )
             sensitivity = mode_cfg.get("padding_remove_sensitivity")
-            if isinstance(sensitivity, (int, float)) and not isinstance(sensitivity, bool) and sensitivity < 0:
+            if is_number(sensitivity) and sensitivity < 0:
                 errors.append("config.logo.padding_remove_sensitivity must be >= 0.")
 
     if errors:

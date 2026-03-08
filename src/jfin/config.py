@@ -1,4 +1,3 @@
-# fmt: off
 from __future__ import annotations
 
 import sys
@@ -48,8 +47,7 @@ def _merge_section_keys(cfg: dict[str, Any]) -> dict[str, Any]:
 
 def default_config_path() -> Path:
     """Return the default config path relative to the repository root."""
-    repo_root = Path(__file__).resolve().parents[2]
-    return repo_root / DEFAULT_CONFIG_NAME
+    return Path(__file__).resolve().parents[2] / DEFAULT_CONFIG_NAME
 
 
 def generate_default_config(config_path: Path) -> None:
@@ -216,7 +214,9 @@ def build_mode_runtime_settings(
     logo_padding_remove_sensitivity = 0.0
     if mode == "logo":
         cfg_padding = mode_cfg.get("padding", "add")
-        cfg_padding = cfg_padding.strip().lower() if isinstance(cfg_padding, str) else "add"
+        cfg_padding = (
+            cfg_padding.strip().lower() if isinstance(cfg_padding, str) else "add"
+        )
         if cfg_padding not in {"add", "remove", "none"}:
             raise ConfigError(
                 f"logo.padding must be one of add/remove/none (got {cfg_padding!r})."
