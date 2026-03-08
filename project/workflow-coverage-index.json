@@ -42,6 +42,42 @@
           "min_required": 2
         }
       }
+    },
+    "restore|logo|thumb|backdrop|profile": {
+      "command": "restore",
+      "mode": "logo|thumb|backdrop|profile",
+      "required_parity_ids": [
+        "RST-REFUSE-001"
+      ],
+      "required_owner_tests": [
+        "tests/characterization/safety_contract/test_safety_contract_restore.py::test_rst_refuse_001_characterization"
+      ],
+      "evidence_layout": {
+        "field_container": "expected_observations.result",
+        "ordering_container": "expected_messages"
+      },
+      "required_evidence_fields": [
+        "raises",
+        "exit_code"
+      ],
+      "required_ordering_tokens": [
+        "Backup directory does not exist"
+      ],
+      "severity": {
+        "contract": "block",
+        "sequence": "warn"
+      },
+      "future_split_debt": {
+        "id": "DEBT-RESTORE-REFUSE-CELL-001",
+        "status": "closed",
+        "readiness_blocking": false,
+        "enforcement_phase": "COV-03",
+        "closure": {
+          "type": "parity_id_count_min",
+          "cell": "restore|logo|thumb|backdrop|profile",
+          "min_required": 1
+        }
+      }
     }
   }
 }
