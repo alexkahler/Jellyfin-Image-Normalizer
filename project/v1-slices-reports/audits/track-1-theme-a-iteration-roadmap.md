@@ -338,16 +338,16 @@ Preserved. Evidence-only closure step.
 Date: 2026-03-08
 
 ### GG-001 closure evidence
-- `git rev-parse HEAD` -> `68e5b0d683bdccf088361b98a254e10fa7521b92`
+- `git rev-parse HEAD` -> `c77a57bccf24d70fcf5b9a1784f3075ab8dd01c7`
 - `python project/scripts/verify_governance.py --check all` -> PASS (warnings only)
 - Interpretation: all `src/` anti-evasion/LOC blockers are cleared; GG-001 is closed.
 
 ### GG-008 same-SHA CI evidence
 - workflow name: `CI`
 - workflow path: `.github/workflows/ci.yml`
-- run id: `22826238345`
-- run URL: `https://github.com/alexkahler/Jellyfin-Image-Normalizer/actions/runs/22826238345`
-- run head SHA: `68e5b0d683bdccf088361b98a254e10fa7521b92`
+- run id: `22826331766`
+- run URL: `https://github.com/alexkahler/Jellyfin-Image-Normalizer/actions/runs/22826331766`
+- run head SHA: `c77a57bccf24d70fcf5b9a1784f3075ab8dd01c7`
 - run status/conclusion: `completed/success`
 
 Required jobs:

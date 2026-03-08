@@ -9,7 +9,7 @@ Auditor posture: evidence validation
 - Theme A closure criteria are met.
 
 ## Required Checks
-1. Same SHA captured from local head: **PASS** (`68e5b0d683bdccf088361b98a254e10fa7521b92`).
+1. Same SHA captured from local head: **PASS** (`c77a57bccf24d70fcf5b9a1784f3075ab8dd01c7`).
 2. Local `verify_governance --check all` on same SHA: **PASS**.
 3. Workflow identity matches canonical CI workflow: **PASS** (`CI`, `.github/workflows/ci.yml`).
 4. CI run head SHA equals local SHA: **PASS**.
@@ -22,9 +22,9 @@ Auditor posture: evidence validation
 - Theme A: **closed**.
 
 ## Evidence
-- Run URL: `https://github.com/alexkahler/Jellyfin-Image-Normalizer/actions/runs/22826238345`
-- Run ID: `22826238345`
-- Head SHA: `68e5b0d683bdccf088361b98a254e10fa7521b92`
+- Run URL: `https://github.com/alexkahler/Jellyfin-Image-Normalizer/actions/runs/22826331766`
+- Run ID: `22826331766`
+- Head SHA: `c77a57bccf24d70fcf5b9a1784f3075ab8dd01c7`
 - Jobs:
   - governance: success
   - quality: success

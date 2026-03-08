@@ -40,7 +40,7 @@ Theme A iteration status (Governance Contract Posture Recovery):
 - Slice 30b -> Runtime evasion remediation tranche 3b (`cli_runtime.py`) (completed; commit `7fc7db7`)
 - Slice 31 -> Pipeline evasion remediation tranche 3c (`pipeline.py` first) (completed; commit `fdcd44c`)
 - Slice 32 -> Pipeline evasion remediation tranche 3d (`pipeline_backdrops.py`) (completed; commit `68e5b0d`)
-- Slice 33 -> A-08 same-SHA CI proof + Theme A closure gate (completed; run `22826238345` for SHA `68e5b0d683bdccf088361b98a254e10fa7521b92` has required jobs `test/security/quality/governance` all successful; GG-001 closed; GG-008 closed; Theme A closed)
+- Slice 33 -> A-08 same-SHA CI proof + Theme A closure gate (completed; commit `c77a57b`; run `22826331766` for SHA `c77a57bccf24d70fcf5b9a1784f3075ab8dd01c7` has required jobs `test/security/quality/governance` all successful; GG-001 closed; GG-008 closed; Theme A closed)
 
 After Slice 9, subsequent slices remain iterative. Governance-coverage slices
 (starting with COV-01b) take precedence before route-fence flip planning.

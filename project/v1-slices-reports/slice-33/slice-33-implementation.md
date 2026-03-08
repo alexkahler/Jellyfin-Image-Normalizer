@@ -8,15 +8,15 @@ Date: 2026-03-08
 
 ## Evidence Collection
 - Local head SHA:
-  - `68e5b0d683bdccf088361b98a254e10fa7521b92`
+  - `c77a57bccf24d70fcf5b9a1784f3075ab8dd01c7`
 - Local governance gate on same SHA:
   - `python project/scripts/verify_governance.py --check all` -> **PASS** (warnings only, no failures).
 - CI run (same SHA):
   - workflow name: `CI`
   - workflow path: `.github/workflows/ci.yml`
-  - run id: `22826238345`
-  - run URL: `https://github.com/alexkahler/Jellyfin-Image-Normalizer/actions/runs/22826238345`
-  - run head SHA: `68e5b0d683bdccf088361b98a254e10fa7521b92`
+  - run id: `22826331766`
+  - run URL: `https://github.com/alexkahler/Jellyfin-Image-Normalizer/actions/runs/22826331766`
+  - run head SHA: `c77a57bccf24d70fcf5b9a1784f3075ab8dd01c7`
   - run status/conclusion: `completed/success`
 - Required job conclusions:
   - `test`: `success`
