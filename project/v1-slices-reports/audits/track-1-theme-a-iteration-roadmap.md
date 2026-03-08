@@ -332,3 +332,33 @@ Preserved. Evidence-only closure step.
 ## Assumptions
 - High-coupling closure slices are intentionally provisional and must be revalidated at each gate.
 - Any unresolved pre-existing CI issue that blocks required-job success keeps GG-008 open until corrected and reproved on same SHA.
+
+## SECTION 3 - Theme A Closure Evidence (Slice-33)
+
+Date: 2026-03-08
+
+### GG-001 closure evidence
+- `git rev-parse HEAD` -> `68e5b0d683bdccf088361b98a254e10fa7521b92`
+- `python project/scripts/verify_governance.py --check all` -> PASS (warnings only)
+- Interpretation: all `src/` anti-evasion/LOC blockers are cleared; GG-001 is closed.
+
+### GG-008 same-SHA CI evidence
+- workflow name: `CI`
+- workflow path: `.github/workflows/ci.yml`
+- run id: `22826238345`
+- run URL: `https://github.com/alexkahler/Jellyfin-Image-Normalizer/actions/runs/22826238345`
+- run head SHA: `68e5b0d683bdccf088361b98a254e10fa7521b92`
+- run status/conclusion: `completed/success`
+
+Required jobs:
+- `test`: success
+- `security`: success
+- `quality`: success
+- `governance`: success
+
+Interpretation: GG-008 same-SHA proof contract is satisfied.
+
+### Theme A status
+- GG-001: closed
+- GG-008: closed
+- Theme A: closed
