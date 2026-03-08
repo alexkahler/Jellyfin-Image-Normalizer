@@ -37,7 +37,14 @@ class JellyfinClient:
         return client_http.get_response(self, request_fn=requests.get, url=url, params=params, stream=stream, label=label, sleep_fn=time.sleep)
 
     def _get_json(self, url: str, *, params: dict[str, Any] | None = None, label: str) -> Any | None:
-        return client_http.get_json_payload(self, get_fn=self._get, url=url, params=params, label=label)
+        resp = self._get(url, params=params, stream=False, label=label)
+        if resp is None:
+            return None
+        try:
+            return resp.json()
+        except Exception as exc:
+            self.logger.error("[API-ERROR] Failed to decode JSON from %s: %s (%s)", url, exc, (resp.text or "")[:200].replace("\n", " "))
+            return None
 
     def _head(
         self,

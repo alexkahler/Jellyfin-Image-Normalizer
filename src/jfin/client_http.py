@@ -1,4 +1,3 @@
-# fmt: off
 from __future__ import annotations
 
 import base64
@@ -11,7 +10,6 @@ if TYPE_CHECKING:
 
 SleepFn = Callable[[float], Any]
 RequestFn = Callable[..., requests.Response]
-GetFn = Callable[..., requests.Response | None]
 
 
 def _http_error(resp: requests.Response) -> str:
@@ -48,15 +46,39 @@ def _request_with_retry(
             if resp.ok:
                 return resp
             last_error = _http_error(resp)
-        client.logger.error("[API-ERROR] Attempt %s/%s failed for %s: %s", attempt, attempts, label, last_error)
+        client.logger.error(
+            "[API-ERROR] Attempt %s/%s failed for %s: %s",
+            attempt,
+            attempts,
+            label,
+            last_error,
+        )
         if allow_retry and attempt < attempts and backoff > 0:
             sleep_fn(backoff)
             backoff *= 2
     return None
 
 
-def get_response(client: JellyfinClient, *, request_fn: RequestFn, url: str, params: dict[str, Any] | None, stream: bool, label: str, sleep_fn: SleepFn) -> requests.Response | None:
-    return _request_with_retry(client, request_fn=request_fn, url=url, params=params, stream=stream, label=label, sleep_fn=sleep_fn, allow_retry=True)
+def get_response(
+    client: JellyfinClient,
+    *,
+    request_fn: RequestFn,
+    url: str,
+    params: dict[str, Any] | None,
+    stream: bool,
+    label: str,
+    sleep_fn: SleepFn,
+) -> requests.Response | None:
+    return _request_with_retry(
+        client,
+        request_fn=request_fn,
+        url=url,
+        params=params,
+        stream=stream,
+        label=label,
+        sleep_fn=sleep_fn,
+        allow_retry=True,
+    )
 
 
 def head_response(
@@ -70,21 +92,21 @@ def head_response(
     sleep_fn: SleepFn,
     allow_retry: bool,
 ) -> requests.Response | None:
-    return _request_with_retry(client, request_fn=request_fn, url=url, params=params, stream=stream, label=label, sleep_fn=sleep_fn, allow_retry=allow_retry)
+    return _request_with_retry(
+        client,
+        request_fn=request_fn,
+        url=url,
+        params=params,
+        stream=stream,
+        label=label,
+        sleep_fn=sleep_fn,
+        allow_retry=allow_retry,
+    )
 
 
-def get_json_payload(client: JellyfinClient, *, get_fn: GetFn, url: str, params: dict[str, Any] | None, label: str) -> Any | None:
-    resp = get_fn(url, params=params, stream=False, label=label)
-    if resp is None:
-        return None
-    try:
-        return resp.json()
-    except Exception as exc:
-        client.logger.error("[API-ERROR] Failed to decode JSON from %s: %s (%s)", url, exc, (resp.text or "")[:200].replace("\n", " "))
-        return None
-
-
-def test_connection(client: JellyfinClient, *, request_fn: RequestFn, sleep_fn: SleepFn) -> bool:
+def test_connection(
+    client: JellyfinClient, *, request_fn: RequestFn, sleep_fn: SleepFn
+) -> bool:
     url = f"{client.base_url}/System/Info"
     attempts = max(1, int(client.retry_count))
     backoff = max(0.0, float(client.backoff_base))
@@ -92,16 +114,25 @@ def test_connection(client: JellyfinClient, *, request_fn: RequestFn, sleep_fn: 
     for attempt in range(1, attempts + 1):
         try:
             client.logger.debug("Knock, knock.")
-            resp = request_fn(url, headers=client._headers(), timeout=client.timeout, verify=client.verify_tls)
+            resp = request_fn(
+                url,
+                headers=client._headers(),
+                timeout=client.timeout,
+                verify=client.verify_tls,
+            )
         except Exception as exc:
             last_error = f"Exception: {exc}"
         else:
             status = resp.status_code
             if status == 401:
-                client.logger.critical("[API-ERROR] Unauthorized (401) when calling /System/Info. Check API key.")
+                client.logger.critical(
+                    "[API-ERROR] Unauthorized (401) when calling /System/Info. Check API key."
+                )
                 return False
             if status == 403:
-                client.logger.critical("[API-ERROR] Forbidden (403) when calling /System/Info. Check Jellyfin permissions.")
+                client.logger.critical(
+                    "[API-ERROR] Forbidden (403) when calling /System/Info. Check Jellyfin permissions."
+                )
                 return False
             if status == 503:
                 last_error = "HTTP 503 Service Unavailable (server starting or temporarily unavailable). Try again later."
@@ -111,15 +142,26 @@ def test_connection(client: JellyfinClient, *, request_fn: RequestFn, sleep_fn: 
                 try:
                     payload = resp.json()
                 except Exception as exc:
-                    client.logger.error("[API-ERROR] Failed to decode JSON from /System/Info: %s (%s)", exc, (resp.text or "")[:200].replace("\n", " "))
+                    client.logger.error(
+                        "[API-ERROR] Failed to decode JSON from /System/Info: %s (%s)",
+                        exc,
+                        (resp.text or "")[:200].replace("\n", " "),
+                    )
                     return False
                 if isinstance(payload, dict) and payload.get("IsShuttingDown"):
-                    client.logger.error("[API-ERROR] Jellyfin reported that it is shutting down; aborting to avoid data loss.")
+                    client.logger.error(
+                        "[API-ERROR] Jellyfin reported that it is shutting down; aborting to avoid data loss."
+                    )
                     return False
                 client.logger.debug("Who's there?")
                 client.logger.info("[API-TEST] Jellyfin connection OK.")
                 return True
-        client.logger.error("[API-ERROR] Attempt %s/%s failed for system info: %s.", attempt, attempts, last_error)
+        client.logger.error(
+            "[API-ERROR] Attempt %s/%s failed for system info: %s.",
+            attempt,
+            attempts,
+            last_error,
+        )
         if attempt < attempts and backoff > 0:
             client.logger.debug("*Waiting for a response...*")
             sleep_fn(backoff)
@@ -144,7 +186,9 @@ def post_image(
     fail_fast_prefix: str,
 ) -> bool:
     if not client._writes_allowed(action_label):
-        client.logger.debug("DRY RUN - Would upload normalized image for %s.", action_label)
+        client.logger.debug(
+            "DRY RUN - Would upload normalized image for %s.", action_label
+        )
         return True
     attempts = max(1, int(client.retry_count))
     backoff = max(0.0, float(client.backoff_base))
@@ -152,7 +196,13 @@ def post_image(
     payload = base64.b64encode(data) if encode_base64 else data
     for attempt in range(1, attempts + 1):
         try:
-            resp = request_fn(url, headers=headers, data=payload, timeout=client.timeout, verify=client.verify_tls)
+            resp = request_fn(
+                url,
+                headers=headers,
+                data=payload,
+                timeout=client.timeout,
+                verify=client.verify_tls,
+            )
         except Exception as exc:
             last_error_msg = f"Exception: {exc}"
         else:
@@ -165,7 +215,13 @@ def post_image(
                     sleep_fn(client.delay)
                 return True
             last_error_msg = _http_error(resp)
-        client.logger.error("[API-ERROR] Attempt %s/%s failed for %s: %s", attempt, attempts, error_label, last_error_msg)
+        client.logger.error(
+            "[API-ERROR] Attempt %s/%s failed for %s: %s",
+            attempt,
+            attempts,
+            error_label,
+            last_error_msg,
+        )
         if attempt < attempts:
             sleep_fn(backoff)
             backoff *= 2.0
@@ -201,21 +257,37 @@ def delete_image(
     headers = client._headers()
     for attempt in range(1, attempts + 1):
         try:
-            resp = request_fn(url, headers=headers, timeout=client.timeout, verify=client.verify_tls)
+            resp = request_fn(
+                url, headers=headers, timeout=client.timeout, verify=client.verify_tls
+            )
         except Exception as exc:
-            client.logger.error("[API-ERROR] Failed to get image for uuid %s: %s", uuid, exc)
+            client.logger.error(
+                "[API-ERROR] Failed to get image for uuid %s: %s", uuid, exc
+            )
             return False
         else:
             if resp.ok:
-                client.logger.debug(f"[API] Deleted image for uuid {uuid} type {image_type}")
+                client.logger.debug(
+                    f"[API] Deleted image for uuid {uuid} type {image_type}"
+                )
                 if client.delay > 0:
                     sleep_fn(client.delay)
                 return True
             last_error_msg = _http_error(resp)
-        client.logger.debug("  -> Attempt %s/%s failed at deleting image for uuid %s: %s", attempt, attempts, uuid, last_error_msg)
+        client.logger.debug(
+            "  -> Attempt %s/%s failed at deleting image for uuid %s: %s",
+            attempt,
+            attempts,
+            uuid,
+            last_error_msg,
+        )
         if attempt < attempts:
             sleep_fn(backoff)
             backoff *= 2.0
     if client.fail_fast:
-        raise RuntimeError("[API-ERROR] Deletion failed for item " f"{uuid} type {image_type}: " f"{last_error_msg}")
+        raise RuntimeError(
+            "[API-ERROR] Deletion failed for item "
+            f"{uuid} type {image_type}: "
+            f"{last_error_msg}"
+        )
     return False
