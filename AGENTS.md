@@ -109,6 +109,21 @@ PowerShell equivalent:
 .\.venv\Scripts\python.exe project/scripts/verify_governance.py --check all
 ```
 
+## Same-SHA CI Closure Discipline
+
+For future route-work closure/progression claims, closure records must handle same-SHA CI evidence explicitly.
+
+Required closure-evidence fields:
+- local SHA
+- workflow identity
+- CI run id/url when same-SHA evidence exists
+- per-required-job status summary for required CI jobs from `project/verification-contract.yml` (currently `test`, `security`, `quality`, `governance`)
+
+If same-SHA CI evidence cannot be obtained:
+- explicitly state inability to obtain CI evidence and why
+- include a residual-risk note
+- do not silently imply same-SHA evidence was validated
+
 ## LOC and Complexity Guardrails
 
 Contract values (from `project/verification-contract.yml`):

@@ -49,6 +49,14 @@ Do **not** use this reference as a substitute for:
 5. **Record proof, not just confidence**
 - End with a short verification note that states what was run, what passed, what was intentionally not run, and why.
 
+6. **Handle same-SHA CI evidence explicitly for closure claims**
+- For route-work closure/progression claims, include a minimal closure-evidence record:
+  - local SHA,
+  - workflow identity,
+  - CI run id/url when same-SHA evidence exists,
+  - per-required-job status summary for required CI jobs from `project/verification-contract.yml` (currently `test/security/quality/governance`).
+- If same-SHA CI evidence cannot be obtained, explicitly record inability, include residual risk, and do not imply same-SHA validation occurred.
+
 ## Inputs and preconditions
 Before using this template, identify:
 - the changed surface,
