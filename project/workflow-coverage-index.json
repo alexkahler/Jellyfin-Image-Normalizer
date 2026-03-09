@@ -78,6 +78,41 @@
           "min_required": 1
         }
       }
+    },
+    "test_connection|n/a": {
+      "command": "test_connection",
+      "mode": "n/a",
+      "required_parity_ids": [
+        "CLI-TESTJF-001"
+      ],
+      "required_owner_tests": [
+        "tests/characterization/cli_contract/test_cli_contract_characterization.py::test_cli_test_jf_blocks_operational_flags"
+      ],
+      "evidence_layout": {
+        "field_container": "expected_stats",
+        "ordering_container": "expected_messages"
+      },
+      "required_evidence_fields": [
+        "errors"
+      ],
+      "required_ordering_tokens": [
+        "--test-jf cannot be combined with other arguments"
+      ],
+      "severity": {
+        "contract": "block",
+        "sequence": "warn"
+      },
+      "future_split_debt": {
+        "id": "DEBT-TEST-CONNECTION-CELL-001",
+        "status": "closed",
+        "readiness_blocking": false,
+        "enforcement_phase": "COV-03",
+        "closure": {
+          "type": "parity_id_count_min",
+          "cell": "test_connection|n/a",
+          "min_required": 1
+        }
+      }
     }
   }
 }

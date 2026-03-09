@@ -55,6 +55,7 @@ Theme D iteration status (Workflow Readiness Coverage Expansion, post-activation
 Post-Theme-D route-readiness scaling status:
 - Slice 38 -> Governance hygiene and roadmap refresh (completed; post-Theme-D roadmap narrative refreshed; architecture ratchet baseline synced so `--check architecture` warning drift is removed; route fence preserved at all `v0`; next: Slice 39 ownership completion for one additional non-backdrop route)
 - Slice 39 -> Ownership completion for `test_connection|n/a` route-fence row (completed; owner changed `WI-00X -> Slice-39`; route remains `v0`; parity remains `pending`; owner placeholders reduced `7 -> 6`; next: Slice 40 workflow coverage expansion for selected route)
+- Slice 40 -> Workflow coverage expansion for `test_connection|n/a` readiness path input (completed; added governed cell `test_connection|n/a` to `project/workflow-coverage-index.json` with parity `CLI-TESTJF-001`; characterization coverage advanced `configured/validated: 2/2 -> 3/3`; workflow open debts remain `0`; readiness claims unchanged at `1/1`; routes remain all `v0`; next: Slice 41 second readiness claim activation)
 
 After Slice 9, subsequent slices remain iterative. Governance-coverage slices
 (starting with COV-01b) take precedence before route-fence flip planning.
