@@ -41,7 +41,7 @@
                      "mode":  "n/a",
                      "route":  "v0",
                      "owner_slice":  "Slice-39",
-                     "parity_status":  "pending"
+                     "parity_status":  "ready"
                  },
                  {
                      "command":  "config_init",
