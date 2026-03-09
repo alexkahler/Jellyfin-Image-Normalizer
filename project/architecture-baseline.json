@@ -25,7 +25,7 @@
       "builtins_exit_calls": 0,
       "sys_exit_calls": 0,
       "sys_import_exit_calls": 0,
-      "system_exit_raises": 5
+      "system_exit_raises": 2
     }
   },
   "v1_root": "src/jfin",

@@ -52,6 +52,9 @@ Theme C iteration status (Route-Readiness Activation and Accountability):
 Theme D iteration status (Workflow Readiness Coverage Expansion, post-activation):
 - Slice 37 -> Theme D minimal second-cell workflow-readiness coverage expansion (completed; workflow coverage expanded from `configured_cells=1`/`validated_cells=1` to `2/2` via `restore|logo|thumb|backdrop|profile`; intended claim path `run|backdrop` preserved at `claimed_rows=1`, `validated_rows=1`; no route flips or owner rewrites; Theme D closed; carry-forward non-fatal warning: architecture ratchet `src/jfin/pipeline.py.system_exit_raises`)
 
+Post-Theme-D route-readiness scaling status:
+- Slice 38 -> Governance hygiene and roadmap refresh (completed; post-Theme-D roadmap narrative refreshed; architecture ratchet baseline synced so `--check architecture` warning drift is removed; route fence preserved at all `v0`; next: Slice 39 ownership completion for one additional non-backdrop route)
+
 After Slice 9, subsequent slices remain iterative. Governance-coverage slices
 (starting with COV-01b) take precedence before route-fence flip planning.
 Route-fence flips must not be planned/executed until Slice 7 Surface Coverage Gate,
