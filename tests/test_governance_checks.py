@@ -66,7 +66,10 @@ def _contract_text(
         "./.venv/bin/python -m pip_audit",
     ]
     jobs = required_ci_jobs or ["test", "security", "quality", "governance"]
-    runtime_targets = runtime_gate_targets or ["tests/characterization/safety_contract"]
+    runtime_targets = runtime_gate_targets or [
+        "tests/characterization/safety_contract",
+        "tests/characterization/cli_contract/test_cli_contract_characterization.py::test_cli_test_jf_blocks_operational_flags",
+    ]
     lines = [
         "version: 1",
         f'python_version: "{python_version}"',
