@@ -17,6 +17,6 @@ Readiness semantics:
 | restore | logo\|thumb\|backdrop\|profile | v0 | WI-00X | pending |
 | test_connection | n/a | v1 | Slice-39 | ready |
 | config_init | n/a | v0 | WI-00X | pending |
-| config_validate | n/a | v0 | Slice-49 | pending |
+| config_validate | n/a | v0 | Slice-49 | ready |
 <!-- ROUTE_FENCE_TABLE_END -->
 
