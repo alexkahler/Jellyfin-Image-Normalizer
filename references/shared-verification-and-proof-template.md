@@ -56,6 +56,7 @@ Do **not** use this reference as a substitute for:
   - CI run id/url when same-SHA evidence exists,
   - per-required-job status summary for required CI jobs from `project/verification-contract.yml` (currently `test/security/quality/governance`).
 - If same-SHA CI evidence cannot be obtained, explicitly record inability, include residual risk, and do not imply same-SHA validation occurred.
+- If same-SHA evidence remains unavailable across consecutive slices for the same target row with no new external action, stop continuation slicing and run the loop-breaker flow in `project/loop-breaker-playbook.md`.
 
 ## Inputs and preconditions
 Before using this template, identify:
