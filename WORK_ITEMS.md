@@ -64,6 +64,7 @@ Post-Theme-D route-readiness scaling status:
 - Slice 46 -> One-row route flip for `test_connection|n/a` (completed; route changed `v0 -> v1` in `project/route-fence.md` and `project/route-fence.json`; parity/owner unchanged; same-SHA unavailability explicitly recorded)
 - Slice 47 -> One-row route flip for `run|backdrop` (completed; route changed `v0 -> v1` in `project/route-fence.md` and `project/route-fence.json`; parity/owner unchanged; same-SHA unavailability explicitly recorded; no `ready+v0` rows remain)
 - Slice 48 -> Route-progression completion stop + handoff record (completed; documentation-only; verified `ready_v0=0`, `ready_v1=2`, `pending_v0=6`; no governance truth mutation; same-SHA CI evidence remains unavailable for local SHA and is explicitly recorded)
+- Slice 49 -> Ownership completion for `config_validate|n/a` (completed; owner changed `WI-00X -> Slice-49` in `project/route-fence.md` and `project/route-fence.json`; route preserved `v0`; parity preserved `pending`; next: workflow-coverage expansion for this row)
 
 After Slice 9, subsequent slices remain iterative. Governance-coverage slices
 (starting with COV-01b) take precedence before route-fence flip planning.
