@@ -183,6 +183,41 @@
           "min_required": 1
         }
       }
+    },
+    "run|logo": {
+      "command": "run",
+      "mode": "logo",
+      "required_parity_ids": [
+        "CLI-ASPECT-001"
+      ],
+      "required_owner_tests": [
+        "tests/characterization/cli_contract/test_cli_contract_characterization.py::test_cli_warns_for_unrecommended_aspect_ratio"
+      ],
+      "evidence_layout": {
+        "field_container": "expected_stats",
+        "ordering_container": "expected_messages"
+      },
+      "required_evidence_fields": [
+        "warnings"
+      ],
+      "required_ordering_tokens": [
+        "Unusual logo aspect ratio"
+      ],
+      "severity": {
+        "contract": "block",
+        "sequence": "warn"
+      },
+      "future_split_debt": {
+        "id": "DEBT-RUN-LOGO-CELL-001",
+        "status": "closed",
+        "readiness_blocking": false,
+        "enforcement_phase": "COV-03",
+        "closure": {
+          "type": "parity_id_count_min",
+          "cell": "run|logo",
+          "min_required": 1
+        }
+      }
     }
   }
 }
