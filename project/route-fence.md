@@ -11,7 +11,7 @@ Readiness semantics:
 | command | mode | route(v0\|v1) | owner slice | parity status |
 | --- | --- | --- | --- | --- |
 | run | logo | v0 | Slice-72 | pending |
-| run | thumb | v0 | WI-00X | pending |
+| run | thumb | v0 | Slice-73 | pending |
 | run | backdrop | v1 | Slice-35 | ready |
 | run | profile | v0 | WI-00X | pending |
 | restore | logo\|thumb\|backdrop\|profile | v0 | WI-00X | pending |
