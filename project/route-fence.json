@@ -47,7 +47,7 @@
                      "command":  "config_init",
                      "mode":  "n/a",
                      "route":  "v0",
-                     "owner_slice":  "WI-00X",
+                     "owner_slice":  "Slice-57",
                      "parity_status":  "pending"
                  },
                  {
