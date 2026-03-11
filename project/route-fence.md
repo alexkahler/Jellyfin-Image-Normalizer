@@ -12,10 +12,10 @@ Readiness semantics:
 | --- | --- | --- | --- | --- |
 | run | logo | v0 | WI-00X | pending |
 | run | thumb | v0 | WI-00X | pending |
-| run | backdrop | v0 | Slice-35 | ready |
+| run | backdrop | v1 | Slice-35 | ready |
 | run | profile | v0 | WI-00X | pending |
 | restore | logo\|thumb\|backdrop\|profile | v0 | WI-00X | pending |
-| test_connection | n/a | v0 | Slice-39 | ready |
+| test_connection | n/a | v1 | Slice-39 | ready |
 | config_init | n/a | v0 | WI-00X | pending |
 | config_validate | n/a | v0 | WI-00X | pending |
 <!-- ROUTE_FENCE_TABLE_END -->

@@ -18,7 +18,7 @@
                  {
                      "command":  "run",
                      "mode":  "backdrop",
-                     "route":  "v0",
+                     "route":  "v1",
                      "owner_slice":  "Slice-35",
                      "parity_status":  "ready"
                  },
@@ -39,7 +39,7 @@
                  {
                      "command":  "test_connection",
                      "mode":  "n/a",
-                     "route":  "v0",
+                     "route":  "v1",
                      "owner_slice":  "Slice-39",
                      "parity_status":  "ready"
                  },
