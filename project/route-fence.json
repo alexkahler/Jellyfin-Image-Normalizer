@@ -53,7 +53,7 @@
                  {
                      "command":  "config_validate",
                      "mode":  "n/a",
-                     "route":  "v0",
+                     "route":  "v1",
                      "owner_slice":  "Slice-49",
                      "parity_status":  "ready"
                  }
