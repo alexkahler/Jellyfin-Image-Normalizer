@@ -114,6 +114,41 @@
         }
       }
     },
+    "config_init|n/a": {
+      "command": "config_init",
+      "mode": "n/a",
+      "required_parity_ids": [
+        "CLI-GENCFG-001"
+      ],
+      "required_owner_tests": [
+        "tests/characterization/cli_contract/test_cli_contract_characterization.py::test_cli_generate_config_blocks_operational_flags"
+      ],
+      "evidence_layout": {
+        "field_container": "expected_stats",
+        "ordering_container": "expected_messages"
+      },
+      "required_evidence_fields": [
+        "errors"
+      ],
+      "required_ordering_tokens": [
+        "--generate-config cannot be combined with other arguments"
+      ],
+      "severity": {
+        "contract": "block",
+        "sequence": "warn"
+      },
+      "future_split_debt": {
+        "id": "DEBT-CONFIG-INIT-CELL-001",
+        "status": "closed",
+        "readiness_blocking": false,
+        "enforcement_phase": "COV-03",
+        "closure": {
+          "type": "parity_id_count_min",
+          "cell": "config_init|n/a",
+          "min_required": 1
+        }
+      }
+    },
     "config_validate|n/a": {
       "command": "config_validate",
       "mode": "n/a",
