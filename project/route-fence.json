@@ -46,7 +46,7 @@
                  {
                      "command":  "config_init",
                      "mode":  "n/a",
-                     "route":  "v0",
+                     "route":  "v1",
                      "owner_slice":  "Slice-57",
                      "parity_status":  "ready"
                  },
