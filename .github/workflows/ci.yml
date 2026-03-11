@@ -2,9 +2,9 @@ name: CI
 
 on:
   pull_request:
-    branches: [ main, release-0.1.z, v1/thm-a-governance-contract-posture-recovery ]
+    branches: [ main, release-0.1.z, v1/thm-a-governance-contract-posture-recovery, feat/v1-overhaul ]
   push:
-    branches: [ main, release-0.1.z, v1/thm-a-governance-contract-posture-recovery ]
+    branches: [ main, release-0.1.z, v1/thm-a-governance-contract-posture-recovery, feat/v1-overhaul ]
 
 jobs:
   test:
