@@ -13,7 +13,7 @@ Readiness semantics:
 | run | logo | v0 | Slice-72 | pending |
 | run | thumb | v0 | Slice-73 | pending |
 | run | backdrop | v1 | Slice-35 | ready |
-| run | profile | v0 | WI-00X | pending |
+| run | profile | v0 | Slice-74 | pending |
 | restore | logo\|thumb\|backdrop\|profile | v0 | WI-00X | pending |
 | test_connection | n/a | v1 | Slice-39 | ready |
 | config_init | n/a | v1 | Slice-57 | ready |
