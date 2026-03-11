@@ -15,6 +15,7 @@ required_ci_jobs:
 characterization_runtime_gate_targets:
   - tests/characterization/safety_contract
   - tests/characterization/cli_contract/test_cli_contract_characterization.py::test_cli_test_jf_blocks_operational_flags
+  - tests/characterization/config_contract/test_config_contract_characterization.py::test_config_requires_core_fields
 characterization_runtime_gate_budget_seconds: 180
 loc_policy:
   src_max_lines: 300

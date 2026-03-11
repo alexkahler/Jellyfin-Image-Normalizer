@@ -66,6 +66,7 @@ Post-Theme-D route-readiness scaling status:
 - Slice 48 -> Route-progression completion stop + handoff record (completed; documentation-only; verified `ready_v0=0`, `ready_v1=2`, `pending_v0=6`; no governance truth mutation; same-SHA CI evidence remains unavailable for local SHA and is explicitly recorded)
 - Slice 49 -> Ownership completion for `config_validate|n/a` (completed; owner changed `WI-00X -> Slice-49` in `project/route-fence.md` and `project/route-fence.json`; route preserved `v0`; parity preserved `pending`; next: workflow-coverage expansion for this row)
 - Slice 50 -> Workflow coverage expansion for `config_validate|n/a` (completed; added governed cell in `project/workflow-coverage-index.json` with parity `CFG-CORE-001` and owner test `test_config_requires_core_fields`; coverage counters advanced from `3/3` to `4/4`; route-fence unchanged; readiness counters unchanged at `2/2`)
+- Slice 51 -> Runtime-gate scope decomposition for `config_validate|n/a` claim eligibility (completed; added config-contract owner nodeid to runtime-gate targets in verification contract + schema/default test alignment; runtime gate targets advanced `2 -> 3`; readiness counters preserved at `2/2`; next: readiness activation for `config_validate|n/a`)
 
 After Slice 9, subsequent slices remain iterative. Governance-coverage slices
 (starting with COV-01b) take precedence before route-fence flip planning.

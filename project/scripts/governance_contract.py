@@ -18,6 +18,7 @@ EXPECTED_REQUIRED_CI_JOBS = ["test", "security", "quality", "governance"]
 EXPECTED_RUNTIME_GATE_TARGETS = [
     "tests/characterization/safety_contract",
     "tests/characterization/cli_contract/test_cli_contract_characterization.py::test_cli_test_jf_blocks_operational_flags",
+    "tests/characterization/config_contract/test_config_contract_characterization.py::test_config_requires_core_fields",
 ]
 EXPECTED_RUNTIME_GATE_BUDGET_SECONDS = 180
 EXPECTED_LOC_POLICY_ANTI_EVASION_RATIONALE = "honest_loc_required_for_maintainability"
