@@ -161,8 +161,20 @@ def test_generate_config_succeeds_when_route_declares_v1_for_config_init(
     assert config_path.exists()
 
 
-def test_enforce_route_fails_closed_for_unimplemented_v1_key(monkeypatch):
-    """_enforce_route should still fail closed for v1 keys without runtime support."""
+def test_enforce_route_allows_run_logo_when_v1_implemented(monkeypatch):
+    """_enforce_route should allow run|logo when route resolves to v1."""
+    monkeypatch.setattr(cli_module, "resolve_route", lambda _command, _mode: "v1")
+    monkeypatch.setattr(
+        cli_module,
+        "route_fence_json_path",
+        lambda: Path("project/route-fence.json"),
+    )
+
+    cli_module._enforce_route("run", "logo")
+
+
+def test_enforce_route_fails_closed_for_other_unimplemented_v1_key(monkeypatch):
+    """_enforce_route should still fail closed for non-target v1 keys."""
     monkeypatch.setattr(cli_module, "resolve_route", lambda _command, _mode: "v1")
     monkeypatch.setattr(
         cli_module,
@@ -171,6 +183,6 @@ def test_enforce_route_fails_closed_for_unimplemented_v1_key(monkeypatch):
     )
 
     with pytest.raises(SystemExit) as exc:
-        cli_module._enforce_route("run", "logo")
+        cli_module._enforce_route("run", "thumb")
 
     assert exc.value.code == 1

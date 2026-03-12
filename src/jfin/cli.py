@@ -71,9 +71,7 @@ _RUNTIME_DEPS = (
 )
 
 # Explicitly listed v1 routes that now have runtime dispatch support.
-_V1_RUNTIME_IMPLEMENTED_ROUTE_KEYS = {
-    ("config_init", "n/a"),
-}
+_V1_RUNTIME_IMPLEMENTED_ROUTE_KEYS = {("config_init", "n/a"), ("run", "logo")}
 
 
 def parse_size_pair(value: str) -> tuple[int, int]:
