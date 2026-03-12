@@ -71,6 +71,7 @@ def _contract_text(
         "tests/characterization/cli_contract/test_cli_contract_characterization.py::test_cli_test_jf_blocks_operational_flags",
         "tests/characterization/config_contract/test_config_contract_characterization.py::test_config_requires_core_fields",
         "tests/characterization/cli_contract/test_cli_contract_characterization.py::test_cli_generate_config_blocks_operational_flags",
+        "tests/characterization/cli_contract/test_cli_contract_characterization.py::test_cli_warns_for_unrecommended_aspect_ratio",
     ]
     lines = [
         "version: 1",

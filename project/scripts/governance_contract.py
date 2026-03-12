@@ -20,6 +20,7 @@ EXPECTED_RUNTIME_GATE_TARGETS = [
     "tests/characterization/cli_contract/test_cli_contract_characterization.py::test_cli_test_jf_blocks_operational_flags",
     "tests/characterization/config_contract/test_config_contract_characterization.py::test_config_requires_core_fields",
     "tests/characterization/cli_contract/test_cli_contract_characterization.py::test_cli_generate_config_blocks_operational_flags",
+    "tests/characterization/cli_contract/test_cli_contract_characterization.py::test_cli_warns_for_unrecommended_aspect_ratio",
 ]
 EXPECTED_RUNTIME_GATE_BUDGET_SECONDS = 180
 EXPECTED_LOC_POLICY_ANTI_EVASION_RATIONALE = "honest_loc_required_for_maintainability"
