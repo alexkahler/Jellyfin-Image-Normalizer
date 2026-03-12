@@ -103,6 +103,7 @@ def test_runtime_gated_keys_are_covered_by_route_table():
 def test_generate_config_succeeds_when_route_fence_is_v0(tmp_path: Path, monkeypatch):
     """CLI should allow --generate-config when route resolves to v0."""
     config_path = tmp_path / "generated.toml"
+    monkeypatch.setattr(cli_module, "resolve_route", lambda _command, _mode: "v0")
     monkeypatch.setattr(
         sys,
         "argv",
@@ -141,17 +142,12 @@ def test_generate_config_fails_closed_when_route_resolution_errors(
     assert not config_path.exists()
 
 
-def test_generate_config_fails_closed_when_route_declares_v1(
+def test_generate_config_succeeds_when_route_declares_v1_for_config_init(
     tmp_path: Path, monkeypatch
 ):
-    """CLI should fail closed when route-fence declares v1 before implementation."""
+    """CLI should allow --generate-config when config_init route resolves to v1."""
     config_path = tmp_path / "generated.toml"
     monkeypatch.setattr(cli_module, "resolve_route", lambda _command, _mode: "v1")
-    monkeypatch.setattr(
-        cli_module,
-        "route_fence_json_path",
-        lambda: Path("project/route-fence.json"),
-    )
     monkeypatch.setattr(
         sys,
         "argv",
@@ -161,5 +157,20 @@ def test_generate_config_fails_closed_when_route_declares_v1(
     with pytest.raises(SystemExit) as exc:
         cli_module.main()
 
+    assert exc.value.code == 0
+    assert config_path.exists()
+
+
+def test_enforce_route_fails_closed_for_unimplemented_v1_key(monkeypatch):
+    """_enforce_route should still fail closed for v1 keys without runtime support."""
+    monkeypatch.setattr(cli_module, "resolve_route", lambda _command, _mode: "v1")
+    monkeypatch.setattr(
+        cli_module,
+        "route_fence_json_path",
+        lambda: Path("project/route-fence.json"),
+    )
+
+    with pytest.raises(SystemExit) as exc:
+        cli_module._enforce_route("run", "logo")
+
     assert exc.value.code == 1
-    assert not config_path.exists()

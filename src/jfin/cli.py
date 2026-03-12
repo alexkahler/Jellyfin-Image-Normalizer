@@ -70,6 +70,11 @@ _RUNTIME_DEPS = (
     process_single_item_api,
 )
 
+# Explicitly listed v1 routes that now have runtime dispatch support.
+_V1_RUNTIME_IMPLEMENTED_ROUTE_KEYS = {
+    ("config_init", "n/a"),
+}
+
 
 def parse_size_pair(value: str) -> tuple[int, int]:
     if not isinstance(value, str) or "x" not in value.lower():
@@ -265,6 +270,9 @@ def _enforce_route(command: str, mode: str) -> None:
         raise SystemExit(1)
 
     if route == "v0":
+        return
+
+    if route == "v1" and (command, mode) in _V1_RUNTIME_IMPLEMENTED_ROUTE_KEYS:
         return
 
     route_source = route_fence_json_path()
