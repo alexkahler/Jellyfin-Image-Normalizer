@@ -4,7 +4,7 @@
                  {
                      "command":  "run",
                      "mode":  "logo",
-                     "route":  "v0",
+                     "route":  "v1",
                      "owner_slice":  "Slice-72",
                      "parity_status":  "ready"
                  },

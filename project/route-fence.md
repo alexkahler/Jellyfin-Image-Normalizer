@@ -10,7 +10,7 @@ Readiness semantics:
 <!-- ROUTE_FENCE_TABLE_START -->
 | command | mode | route(v0\|v1) | owner slice | parity status |
 | --- | --- | --- | --- | --- |
-| run | logo | v0 | Slice-72 | ready |
+| run | logo | v1 | Slice-72 | ready |
 | run | thumb | v0 | Slice-73 | pending |
 | run | backdrop | v1 | Slice-35 | ready |
 | run | profile | v0 | Slice-74 | pending |
