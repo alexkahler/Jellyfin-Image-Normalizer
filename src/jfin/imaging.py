@@ -1,3 +1,5 @@
+"""Provide imaging helpers."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -32,6 +34,7 @@ class ScalePlan:
 
     @property
     def is_no_scale(self) -> bool:
+        """Return whether no scale."""
         return self.decision == "NO_SCALE"
 
 

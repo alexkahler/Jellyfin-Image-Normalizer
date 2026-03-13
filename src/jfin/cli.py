@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+"""Provide cli helpers."""
+
 import argparse
 import sys
 from typing import Any, cast
@@ -9,9 +11,15 @@ from .backup import (
     restore_from_backups,
     restore_single_item_from_backup,
 )
-from .cli_runtime import parse_args as _parse_args_impl
 from .cli_runtime import run_main as _run_main_impl
+from .cli_runtime_args import parse_args as _parse_args_impl
 from .client import JellyfinClient
+from .cli_validation import (
+    CliValidationError,
+    validate_generate_config_args as _validate_generate_config_args,
+    validate_restore_all_args as _validate_restore_all_args,
+    validate_test_jf_args as _validate_test_jf_args,
+)
 from .config import (
     ConfigError,
     ModeRuntimeSettings,
@@ -40,8 +48,6 @@ from .pipeline import (
     process_single_item_api,
 )
 from .route_fence import RouteFenceError, resolve_route, route_fence_json_path
-
-CONFIG_ARG = "--config"  # nosec B105
 
 # Keep runtime dependencies on this module namespace so helper execution and
 # monkeypatch-based tests can resolve them through `jfin.cli`.
@@ -74,7 +80,31 @@ _RUNTIME_DEPS = (
 _V1_RUNTIME_IMPLEMENTED_ROUTE_KEYS = {("config_init", "n/a"), ("run", "logo")}
 
 
+def _run_cli_validation_or_exit(validation_fn: Any, argv: list[str]) -> None:
+    """Run one CLI validator and map contract failures to exit code 1."""
+    try:
+        validation_fn(argv)
+    except CliValidationError as exc:
+        raise SystemExit(1) from exc
+
+
+def validate_generate_config_args(argv: list[str]) -> None:
+    """Validate generate-config argument combinations."""
+    _run_cli_validation_or_exit(_validate_generate_config_args, argv)
+
+
+def validate_restore_all_args(argv: list[str]) -> None:
+    """Validate restore-all argument combinations."""
+    _run_cli_validation_or_exit(_validate_restore_all_args, argv)
+
+
+def validate_test_jf_args(argv: list[str]) -> None:
+    """Validate test-jf argument combinations."""
+    _run_cli_validation_or_exit(_validate_test_jf_args, argv)
+
+
 def parse_size_pair(value: str) -> tuple[int, int]:
+    """Parse size pair."""
     if not isinstance(value, str) or "x" not in value.lower():
         raise argparse.ArgumentTypeError("Expected WIDTHxHEIGHT (e.g., 1000x562).")
     width_str, height_str = value.lower().split("x", 1)
@@ -91,88 +121,15 @@ def parse_size_pair(value: str) -> tuple[int, int]:
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse args."""
     return _parse_args_impl(
         default_config_name=DEFAULT_CONFIG_NAME,
         parse_size_pair_fn=parse_size_pair,
     )
 
 
-def _collect_unexpected_tokens(
-    argv: list[str], allowed: set[str], value_flags: set[str]
-) -> list[str]:
-    extras: list[str] = []
-    skip_next = False
-
-    for token in argv:
-        if skip_next:
-            skip_next = False
-            continue
-        if token in value_flags:
-            skip_next = True
-            continue
-        if any(token.startswith(f"{flag}=") for flag in value_flags):
-            continue
-        if token in allowed:
-            continue
-        extras.append(token)
-
-    return extras
-
-
-def _raise_invalid_combination(
-    command_flag: str, extras: list[str], stats_detail: str
-) -> None:
-    state.log.critical(
-        "%s cannot be combined with other arguments (found: %s).",
-        command_flag,
-        ", ".join(extras),
-    )
-    state.stats.record_error("arguments", stats_detail)
-    raise SystemExit(1)
-
-
-def validate_generate_config_args(argv: list[str]) -> None:
-    allowed = {"--generate-config", CONFIG_ARG, "--silent", "-s", "--verbose", "-v"}
-    extras = _collect_unexpected_tokens(argv, allowed, {CONFIG_ARG})
-
-    if extras:
-        _raise_invalid_combination(
-            "--generate-config", extras, "generate-config combined with other args"
-        )
-
-
-def validate_restore_all_args(argv: list[str]) -> None:
-    allowed = {"--restore-all", CONFIG_ARG, "--silent", "-s", "--verbose", "-v"}
-    extras = _collect_unexpected_tokens(argv, allowed, {CONFIG_ARG})
-
-    if extras:
-        _raise_invalid_combination(
-            "--restore-all", extras, "restore-all combined with other args"
-        )
-
-
-def validate_test_jf_args(argv: list[str]) -> None:
-    allowed = {
-        "--test-jf",
-        "--config",
-        "--silent",
-        "-s",
-        "--verbose",
-        "-v",
-        "--jf-url",
-        "--jf-api-key",
-        "--jf-delay-ms",
-    }
-    value_flags = {CONFIG_ARG, "--jf-url", "--jf-api-key", "--jf-delay-ms"}
-    extras = _collect_unexpected_tokens(argv, allowed, value_flags)
-
-    if extras:
-        _raise_invalid_combination(
-            "--test-jf", extras, "test-jf combined with other args"
-        )
-
-
 def warn_unused_cli_overrides(args: argparse.Namespace, operations: list[str]) -> None:
+    """Warn when unused cli overrides."""
     ops = set(operations)
     if getattr(args, "no_upscale", False) and getattr(args, "no_downscale", False):
         state.log.warning(
@@ -222,6 +179,7 @@ def warn_unused_cli_overrides(args: argparse.Namespace, operations: list[str]) -
 def warn_unrecommended_aspect_ratios(
     settings_by_mode: dict[str, ModeRuntimeSettings],
 ) -> None:
+    """Warn when unrecommended aspect ratios."""
     for mode, settings in settings_by_mode.items():
         recommended_canvas = RECOMMENDED_CANVAS_BY_MODE.get(mode)
         if recommended_canvas is None:
@@ -249,6 +207,7 @@ def warn_unrecommended_aspect_ratios(
 
 
 def run_preflight_check(jf_client: JellyfinClient) -> None:
+    """Run preflight check."""
     if jf_client.test_connection():
         return
 
@@ -260,6 +219,7 @@ def run_preflight_check(jf_client: JellyfinClient) -> None:
 
 
 def _enforce_route(command: str, mode: str) -> None:
+    """Run  enforce route."""
     try:
         route = resolve_route(command, mode)
     except RouteFenceError as exc:
@@ -284,6 +244,7 @@ def _enforce_route(command: str, mode: str) -> None:
 
 
 def main() -> None:
+    """Run main."""
     args = parse_args()
     exit_code = _run_main_impl(
         args=args,

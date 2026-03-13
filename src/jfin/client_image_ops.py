@@ -1,3 +1,5 @@
+"""Provide client image ops helpers."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -10,6 +12,7 @@ if TYPE_CHECKING:
 def _item_image_upload_url(
     client: JellyfinClient, item_id: str, image_type: str, backdrop_index: int | None
 ) -> str:
+    """Run  item image upload url."""
     if image_type == "Backdrop" and backdrop_index is not None:
         return f"{client.base_url}/Items/{item_id}/Images/{image_type}/{backdrop_index}"
     if image_type in ("Primary", "Thumb", "Logo"):
@@ -23,6 +26,7 @@ def get_item_image(
     image_type: str,
     index: int | None = None,
 ) -> tuple[bytes, str] | None:
+    """Get item image."""
     suffix = f"/{index}" if index is not None else ""
     resp = client._get(
         f"{client.base_url}/Items/{item_id}/Images/{image_type}{suffix}",
@@ -41,6 +45,7 @@ def get_item_image_head(
     index: int | None = None,
     retry: bool = True,
 ) -> tuple[bytes, str] | None:
+    """Get item image head."""
     suffix = f"/{index}" if index is not None else ""
     resp = client._head(
         f"{client.base_url}/Items/{item_id}/Images/{image_type}{suffix}",
@@ -54,6 +59,7 @@ def get_item_image_head(
 
 
 def get_user_image(client: JellyfinClient, user_id: str) -> tuple[bytes, str] | None:
+    """Get user image."""
     resp = client._get(
         f"{client.base_url}/UserImage",
         params={"userId": user_id},
@@ -75,6 +81,7 @@ def query_items(
     start_index: int | None = None,
     limit: int | None = None,
 ) -> dict[str, Any] | None:
+    """Run query items."""
     enable_types = (
         ",".join(enable_image_types)
         if isinstance(enable_image_types, list)
@@ -102,6 +109,7 @@ def query_items(
 
 
 def get_item(client: JellyfinClient, item_id: str) -> dict[str, Any] | None:
+    """Get item."""
     data = client._get_json(
         f"{client.base_url}/Items",
         params={"Ids": item_id},
@@ -128,6 +136,7 @@ def set_item_image_bytes(
     backdrop_index: int | None,
     failures: list[dict[str, Any]] | None = None,
 ) -> bool:
+    """Set item image bytes."""
     url = _item_image_upload_url(client, item_id, image_type, backdrop_index)
     return client._post_image(
         url=url,
@@ -151,6 +160,7 @@ def set_item_image(
     backdrop_index: int | None,
     failures: list[dict[str, Any]] | None = None,
 ) -> bool:
+    """Set item image."""
     try:
         with image_path.open("rb") as f:
             data = f.read()
@@ -189,6 +199,7 @@ def set_user_image_bytes(
     content_type: str,
     failures: list[dict[str, Any]] | None = None,
 ) -> bool:
+    """Set user image bytes."""
     return client._post_image(
         url=f"{client.base_url}/UserImage?userId={user_id}",
         headers={**client._headers(), "Content-Type": content_type},
@@ -210,6 +221,7 @@ def set_user_profile_image(
     content_type: str,
     failures: list[dict[str, Any]] | None = None,
 ) -> bool:
+    """Set user profile image."""
     if not client.delete_image(user_id, "Primary", None):
         failure_entry = {
             "user_id": user_id,

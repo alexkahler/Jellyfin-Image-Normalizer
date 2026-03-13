@@ -1,3 +1,5 @@
+"""Provide config helpers."""
+
 from __future__ import annotations
 
 import sys
@@ -120,7 +122,6 @@ def parse_operations(arg_mode: str | None, cfg_ops: Any) -> list[str]:
             '(e.g., operations = "logo|thumb" or ["logo", "thumb"]).'
         )
         sys.exit(1)
-
     if isinstance(source, str):
         raw_ops = source.replace(",", "|").split("|")
     elif isinstance(source, list):
@@ -280,8 +281,7 @@ def build_jellyfin_client_from_config(cfg: dict[str, Any]):
     jf_delay_ms = cfg.get("jf_delay_ms", 0)
     api_delay_sec = max(0.0, float(jf_delay_ms) / 1000.0)
     retry_count = int(cfg.get("api_retry_count", 3))
-    backoff_ms = int(cfg.get("api_retry_backoff_ms", 500))
-    backoff_base = max(0.0, float(backoff_ms) / 1000.0)
+    backoff_base = max(0.0, float(int(cfg.get("api_retry_backoff_ms", 500))) / 1000.0)
     fail_fast = bool(cfg.get("fail_fast", False))
     dry_run = bool(cfg.get("dry_run", True))
     version = str(cfg.get("version") or APP_VERSION)

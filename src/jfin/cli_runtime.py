@@ -1,3 +1,5 @@
+"""Provide cli runtime helpers."""
+
 from __future__ import annotations
 
 import argparse
@@ -5,10 +7,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from .client import JellyfinClient
-from .cli_runtime_args import parse_args
 from .config import ModeRuntimeSettings
-
-__all__ = ["parse_args", "run_main"]
 
 
 def run_main(
@@ -18,6 +17,7 @@ def run_main(
     cli_module: Any,
     state_module: Any,
 ) -> int:
+    """Run main."""
     config_path = (
         Path(args.config).expanduser()
         if args.config

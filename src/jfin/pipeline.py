@@ -1,3 +1,5 @@
+"""Provide pipeline helpers."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -13,7 +15,6 @@ from .client import JellyfinClient
 from .config import ModeRuntimeSettings
 from .constants import IMAGE_TYPE_TO_MODE, MODE_TO_IMAGE_TYPE
 from .discovery import DiscoveredItem
-from .imaging import ScalePlan
 from .pipeline_backdrops import (
     normalize_item_backdrops_api as _normalize_item_backdrops_api,
 )
@@ -36,66 +37,52 @@ from .pipeline_profiles import (
 )
 
 
-def _plan_and_backup_image(
+def _plan_and_backup_image(**kwargs: Any) -> Any:
+    """Run plan-and-backup via shared implementation."""
+    return _plan_and_backup_image_impl(**kwargs)
+
+
+def _normalize_image_bytes(**kwargs: Any) -> Any:
+    """Run normalize-image-bytes with pipeline state injection."""
+    kwargs["state_module"] = state
+    return _normalize_image_bytes_impl(**kwargs)
+
+
+def _process_item_image_payload(**kwargs: Any) -> Any:
+    """Run payload processing with injected normalize/state dependencies."""
+    kwargs["normalize_image_bytes_fn"] = _normalize_image_bytes
+    kwargs["state_module"] = state
+    return _process_item_image_payload_impl(**kwargs)
+
+
+def normalize_item_backdrops_api(
     *,
-    img,
-    label: str,
-    fit_mode: str,
-    settings: ModeRuntimeSettings,
-    item_id: str,
-    image_type: str,
-    raw_bytes: bytes,
-    content_type: str | None,
-    make_backup: bool,
-    backup_root: Path,
-    backup_mode: str,
-    dry_run: bool,
-    backdrop_index: int | None = None,
-) -> ScalePlan:
-    return _plan_and_backup_image_impl(**locals())
-
-
-def _normalize_image_bytes(
-    *,
-    item_id: str,
-    label: str,
-    image_type: str,
-    data: bytes,
-    content_type: str | None,
-    mode: str,
-    settings: ModeRuntimeSettings,
-    make_backup: bool,
-    backup_root: Path,
-    backup_mode: str,
-    dry_run: bool,
-    backdrop_index: int | None = None,
-) -> tuple[ScalePlan, bytes, str]:
-    params = locals()
-    params["state_module"] = state
-    return _normalize_image_bytes_impl(**params)
-
-
-def _process_item_image_payload(
-    *,
-    item_id: str,
-    label: str,
-    image_type: str,
-    data: bytes,
-    content_type: str | None,
-    mode: str,
-    settings: ModeRuntimeSettings,
+    item: DiscoveredItem,
+    settings_by_mode: dict[str, ModeRuntimeSettings],
     jf_client: JellyfinClient,
     dry_run: bool,
     force_upload_noscale: bool,
     make_backup: bool,
     backup_root: Path,
     backup_mode: str,
-    backdrop_index: int | None = None,
 ) -> bool:
-    params = locals()
-    params["normalize_image_bytes_fn"] = _normalize_image_bytes
-    params["state_module"] = state
-    return _process_item_image_payload_impl(**params)
+    """Normalize all backdrop images for one item through the API pipeline."""
+    return _normalize_item_backdrops_api(
+        item=item,
+        settings_by_mode=settings_by_mode,
+        jf_client=jf_client,
+        dry_run=dry_run,
+        force_upload_noscale=force_upload_noscale,
+        make_backup=make_backup,
+        backup_root=backup_root,
+        backup_mode=backup_mode,
+        image_type_to_mode=IMAGE_TYPE_TO_MODE,
+        normalize_image_bytes_fn=_normalize_image_bytes,
+        guess_extension_from_content_type_fn=guess_extension_from_content_type,
+        get_staging_dir_fn=get_staging_dir,
+        cleanup_staging_dir_fn=cleanup_staging_dir,
+        state_module=state,
+    )
 
 
 def normalize_item_image_api(
@@ -110,6 +97,7 @@ def normalize_item_image_api(
     backup_root: Path,
     backup_mode: str,
 ) -> bool:
+    """Normalize item image api."""
     if image_type == "Backdrop":
         return normalize_item_backdrops_api(
             item=item,
@@ -160,31 +148,6 @@ def normalize_item_image_api(
     )
 
 
-def normalize_item_backdrops_api(
-    *,
-    item: DiscoveredItem,
-    settings_by_mode: dict[str, ModeRuntimeSettings],
-    jf_client: JellyfinClient,
-    dry_run: bool,
-    force_upload_noscale: bool,
-    make_backup: bool,
-    backup_root: Path,
-    backup_mode: str,
-) -> bool:
-    params = locals()
-    params.update(
-        {
-            "image_type_to_mode": IMAGE_TYPE_TO_MODE,
-            "normalize_image_bytes_fn": _normalize_image_bytes,
-            "guess_extension_from_content_type_fn": guess_extension_from_content_type,
-            "get_staging_dir_fn": get_staging_dir,
-            "cleanup_staging_dir_fn": cleanup_staging_dir,
-            "state_module": state,
-        }
-    )
-    return _normalize_item_backdrops_api(**params)
-
-
 def process_discovered_items(
     *,
     items: list[DiscoveredItem],
@@ -197,6 +160,7 @@ def process_discovered_items(
     backup_root: Path,
     backup_mode: str,
 ) -> None:
+    """Process discovered items."""
     params = locals()
     params["normalize_item_image_api_fn"] = normalize_item_image_api
     params["state_module"] = state
@@ -215,6 +179,7 @@ def process_libraries_via_api(
     backup_root: Path,
     backup_mode: str,
 ) -> None:
+    """Process libraries via api."""
     params = locals()
     params["image_type_to_mode"] = IMAGE_TYPE_TO_MODE
     params["normalize_item_image_api_fn"] = normalize_item_image_api
@@ -232,6 +197,7 @@ def normalize_profile_user(
     backup_root: Path,
     backup_mode: str,
 ) -> bool:
+    """Normalize profile user."""
     params = locals()
     params["plan_and_backup_image_fn"] = _plan_and_backup_image
     params["state_module"] = state
@@ -248,6 +214,7 @@ def process_profiles(
     backup_root: Path,
     backup_mode: str,
 ) -> None:
+    """Process profiles."""
     params = locals()
     params["normalize_profile_user_fn"] = normalize_profile_user
     params["state_module"] = state
@@ -266,6 +233,7 @@ def process_single_item_api(
     backup_root: Path,
     backup_mode: str,
 ) -> bool:
+    """Process single item api."""
     if mode not in MODE_TO_IMAGE_TYPE:
         state.log.critical("Unsupported mode '%s' for --single item processing.", mode)
         state.stats.record_error("single", f"Unsupported mode {mode}")
@@ -290,6 +258,7 @@ def process_single_profile(
     backup_root: Path,
     backup_mode: str,
 ) -> None:
+    """Process single profile."""
     params = locals()
     params["normalize_profile_user_fn"] = normalize_profile_user
     params["state_module"] = state

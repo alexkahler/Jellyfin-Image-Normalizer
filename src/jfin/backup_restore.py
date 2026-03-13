@@ -1,32 +1,23 @@
+"""Provide backup restore helpers."""
+
 import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
+from .backup_restore_helpers import extract_backdrop_index
 from .client import JellyfinClient
-from .constants import FILENAME_CONFIG
 
 
 @dataclass(frozen=True, slots=True)
 class RestoreDeps:
+    """Represent RestoreDeps behavior and state."""
+
     state_module: Any
     image_type_from_filename_fn: Callable[[str], str | None]
     content_type_from_extension_fn: Callable[[str], str]
     image_type_to_mode: Mapping[str, str]
     mode_to_image_type: Mapping[str, str]
-
-
-def extract_backdrop_index(filename: str) -> int | None:
-    stem = Path(filename).stem
-    backdrop_stem = FILENAME_CONFIG.get("Backdrop", "backdrop")
-    if not stem.startswith(backdrop_stem):
-        return None
-    suffix = stem[len(backdrop_stem) :]
-    if suffix == "":
-        return 0
-    if suffix.isdigit():
-        return int(suffix)
-    return None
 
 
 def restore_backup_payload(
@@ -39,6 +30,7 @@ def restore_backup_payload(
     backdrop_index: int | None,
     deps: RestoreDeps,
 ) -> bool:
+    """Restore backup payload."""
     state_module = deps.state_module
     try:
         data = path.read_bytes()
@@ -92,6 +84,7 @@ def restore_single_image_group(
     dry_run: bool,
     deps: RestoreDeps,
 ) -> int:
+    """Restore single image group."""
     if not paths:
         return 0
     state_module = deps.state_module
@@ -125,6 +118,7 @@ def restore_backdrop_group(
     dry_run: bool,
     deps: RestoreDeps,
 ) -> int:
+    """Restore backdrop group."""
     if not paths:
         return 0
     state_module = deps.state_module
@@ -187,6 +181,7 @@ def restore_from_backups(
     dry_run: bool,
     deps: RestoreDeps,
 ) -> None:
+    """Restore from backups."""
     state_module = deps.state_module
     operation_set = set(operations)
     restored = 0
@@ -248,6 +243,7 @@ def restore_single_item_from_backup(
     dry_run: bool,
     deps: RestoreDeps,
 ) -> bool:
+    """Restore single item from backup."""
     state_module = deps.state_module
     image_type = deps.mode_to_image_type.get(mode)
     if not image_type:

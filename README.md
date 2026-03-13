@@ -421,15 +421,27 @@ Run tests:
 PYTHONPATH=src ./.venv/bin/python -m pytest
 ```
 
+Run the full verification contract command set:
+
+```bash
+PYTHONPATH=src ./.venv/bin/python -m pytest
+./.venv/bin/python -m ruff check .
+./.venv/bin/python project/scripts/format_policy.py --target src --mode block
+./.venv/bin/python project/scripts/format_policy.py --target tests --mode warn
+./.venv/bin/python -m mypy src
+./.venv/bin/python -m bandit -r src
+./.venv/bin/python -m pip_audit
+```
+
 Run governance checks:
 
 ```bash
 ./.venv/bin/python project/scripts/verify_governance.py --check all
 ```
 
-Track 1 note: `--check all` currently reports known pre-existing LOC failures in
-`src/jfin/*`; slice work should not introduce additional governance failures
-beyond that known baseline.
+Track 1 note: `--check all` is expected to remain green for `src/` LOC/docstring
+blocker gates; `tests/` LOC/docstring and tests-format policy remain warn-mode
+until the remediation tranches close.
 
 Run parity-only validation:
 

@@ -1,3 +1,5 @@
+"""Provide state helpers."""
+
 from dataclasses import dataclass, field
 import logging
 from secrets import token_hex
@@ -6,8 +8,7 @@ from typing import Any
 
 @dataclass
 class RunStats:
-    """
-    In-memory counters for a single JFIN run.
+    """In-memory counters for a single JFIN run.
 
     Semantics:
     - processed: count of unique items/entities processed (e.g., a movie/series id).
@@ -78,9 +79,7 @@ def latest_api_error(prev_len: int) -> str | None:
 
 
 def reset_state() -> None:
-    """
-    Reset counters and in-memory tracking. Useful in tests to isolate runs.
-    """
+    """Reset counters and in-memory tracking. Useful in tests to isolate runs."""
     global stats
     stats = RunStats()
     api_failures.clear()

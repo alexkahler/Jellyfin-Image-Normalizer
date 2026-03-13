@@ -1,3 +1,5 @@
+"""Provide cli runtime args helpers."""
+
 from __future__ import annotations
 
 import argparse
@@ -9,6 +11,7 @@ def parse_args(
     default_config_name: str,
     parse_size_pair_fn: Callable[[str], tuple[int, int]],
 ) -> argparse.Namespace:
+    """Parse args."""
     parser = argparse.ArgumentParser(
         description=(
             "Normalize Jellyfin images (logos, thumbs, profiles) via the Jellyfin API.\n\n"

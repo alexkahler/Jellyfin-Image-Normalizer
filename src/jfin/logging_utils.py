@@ -1,3 +1,5 @@
+"""Provide logging utils helpers."""
+
 import logging
 from pathlib import Path
 import sys
@@ -21,10 +23,12 @@ class _ColorFormatter(logging.Formatter):
     RESET = "\033[0m"
 
     def __init__(self, use_color: bool, *args: Any, **kwargs: Any) -> None:
+        """Initialize the instance."""
         super().__init__(*args, **kwargs)
         self.use_color = use_color
 
     def format(self, record: logging.LogRecord) -> str:
+        """Run format."""
         message = super().format(record)
         if not self.use_color:
             return message

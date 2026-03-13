@@ -5,8 +5,12 @@ from __future__ import annotations
 import argparse
 import ast
 import io
+import json
 import re
+import subprocess
+import sys
 import tokenize
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
@@ -22,6 +26,7 @@ from governance_contract import (
     check_contract_schema,
     parse_verification_contract,
 )
+from format_policy import run_format_policy
 from parity_checks import check_parity_artifacts
 from readiness_checks import check_readiness_artifacts
 
@@ -29,6 +34,8 @@ SUPPORTED_CHECKS = (
     "schema",
     "ci-sync",
     "loc",
+    "docstrings",
+    "format",
     "python-version",
     "architecture",
     "parity",
@@ -419,6 +426,170 @@ def check_loc_policy(
     return result
 
 
+@dataclass(frozen=True)
+class DocstringPolicyReport:
+    """Summary of docstring-governance violation counts by source path."""
+
+    convention: str
+    src_violations: int
+    tests_violations: int
+    src_max_violations: int
+    tests_max_violations: int
+
+
+@dataclass(frozen=True)
+class FormatPolicyReport:
+    """Summary of formatter drift/auto-format results by source path."""
+
+    src_had_drift: bool
+    tests_had_drift: bool
+    src_target: str
+    tests_target: str
+    on_check_failure: str
+
+
+def _count_docstring_violations(
+    repo_root: Path,
+    *,
+    target: str,
+    convention: str,
+) -> int:
+    """Run Ruff docstring checks and return the number of diagnostics."""
+    command = [
+        sys.executable,
+        "-m",
+        "ruff",
+        "check",
+        target,
+        "--select",
+        "D",
+        "--output-format",
+        "json",
+        "--config",
+        f'lint.pydocstyle.convention="{convention}"',
+    ]
+    completed = subprocess.run(
+        command,
+        cwd=repo_root,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if completed.returncode not in (0, 1):
+        raise GovernanceError(
+            "ruff docstring check failed for "
+            f"'{target}' with exit code {completed.returncode}."
+        )
+    try:
+        diagnostics = json.loads(completed.stdout or "[]")
+    except json.JSONDecodeError as exc:
+        raise GovernanceError(
+            f"ruff docstring check for '{target}' produced invalid JSON."
+        ) from exc
+    if not isinstance(diagnostics, list):
+        raise GovernanceError(
+            f"ruff docstring check for '{target}' returned unexpected payload type."
+        )
+    return len(diagnostics)
+
+
+def check_docstring_policy(contract: VerificationContract, repo_root: Path) -> CheckResult:
+    """Validate Ruff Google-style docstring counts against contract thresholds."""
+    result = CheckResult()
+    policy = contract.docstring_policy
+
+    try:
+        src_violations = _count_docstring_violations(
+            repo_root,
+            target=contract.format_policy.src_target,
+            convention=policy.convention,
+        )
+        tests_violations = _count_docstring_violations(
+            repo_root,
+            target=contract.format_policy.tests_target,
+            convention=policy.convention,
+        )
+    except GovernanceError as exc:
+        result.add_error(str(exc))
+        return result
+
+    if src_violations > policy.src_max_violations:
+        _mode_to_violation(
+            result,
+            policy.src_mode,
+            (
+                "docstring policy violation count for "
+                f"'{contract.format_policy.src_target}' is {src_violations} "
+                f"(max {policy.src_max_violations})."
+            ),
+        )
+    if tests_violations > policy.tests_max_violations:
+        _mode_to_violation(
+            result,
+            policy.tests_mode,
+            (
+                "docstring policy violation count for "
+                f"'{contract.format_policy.tests_target}' is {tests_violations} "
+                f"(max {policy.tests_max_violations})."
+            ),
+        )
+    setattr(
+        result,
+        "docstring_report",
+        DocstringPolicyReport(
+            convention=policy.convention,
+            src_violations=src_violations,
+            tests_violations=tests_violations,
+            src_max_violations=policy.src_max_violations,
+            tests_max_violations=policy.tests_max_violations,
+        ),
+    )
+    return result
+
+
+def check_format_policy(contract: VerificationContract, repo_root: Path) -> CheckResult:
+    """Validate path-scoped formatter checks with run-format fallback semantics."""
+    result = CheckResult()
+    policy = contract.format_policy
+
+    src_outcome = run_format_policy(
+        repo_root,
+        target=policy.src_target,
+        mode=policy.src_mode,
+    )
+    tests_outcome = run_format_policy(
+        repo_root,
+        target=policy.tests_target,
+        mode=policy.tests_mode,
+    )
+    for outcome in (src_outcome, tests_outcome):
+        if outcome.command_error is not None:
+            result.add_error(outcome.command_error)
+            continue
+        if not outcome.had_drift:
+            continue
+        _mode_to_violation(
+            result,
+            outcome.mode,
+            (
+                "format policy detected drift and auto-formatted "
+                f"'{outcome.target}' ({outcome.mode} mode)."
+            ),
+        )
+    setattr(
+        result,
+        "format_report",
+        FormatPolicyReport(
+            src_had_drift=src_outcome.had_drift,
+            tests_had_drift=tests_outcome.had_drift,
+            src_target=policy.src_target,
+            tests_target=policy.tests_target,
+            on_check_failure=policy.on_check_failure,
+        ),
+    )
+    return result
+
+
 def _extract_python_versions_from_ci(ci_text: str) -> list[str]:
     """Extract all configured Python versions from a CI workflow."""
     return re.findall(r'python-version:\s*["\']?([0-9]+\.[0-9]+)["\']?', ci_text)
@@ -758,6 +929,32 @@ def _print_check_result(check_name: str, result: CheckResult) -> None:
             print("  INFO: Characterization runtime gate OK (warn)")
         else:
             print("  INFO: Characterization runtime gate NOT OK (warn)")
+    docstring_report = getattr(result, "docstring_report", None)
+    if docstring_report is not None:
+        print(f"  INFO: Docstring convention: {docstring_report.convention}")
+        print(
+            "  INFO: Docstring src violations: "
+            f"{docstring_report.src_violations} (max {docstring_report.src_max_violations})"
+        )
+        print(
+            "  INFO: Docstring tests violations: "
+            f"{docstring_report.tests_violations} "
+            f"(max {docstring_report.tests_max_violations})"
+        )
+    format_report = getattr(result, "format_report", None)
+    if format_report is not None:
+        print(
+            "  INFO: Format policy source target drift: "
+            f"{format_report.src_had_drift} ({format_report.src_target})"
+        )
+        print(
+            "  INFO: Format policy tests target drift: "
+            f"{format_report.tests_had_drift} ({format_report.tests_target})"
+        )
+        print(
+            "  INFO: Format policy on-check-failure action: "
+            f"{format_report.on_check_failure}"
+        )
     readiness_report = getattr(result, "readiness_report", None)
     if readiness_report is not None:
         print(f"  INFO: Route readiness claims: {readiness_report.claimed_rows}")
@@ -807,6 +1004,8 @@ def run_selected_checks(
         "schema": lambda: check_contract_schema(contract),
         "ci-sync": lambda: check_ci_contract_sync(contract, ci_path),
         "loc": lambda: check_loc_policy(contract, repo_root, src_dir, tests_dir),
+        "docstrings": lambda: check_docstring_policy(contract, repo_root),
+        "format": lambda: check_format_policy(contract, repo_root),
         "python-version": lambda: check_python_version_consistency(
             contract,
             ci_path,

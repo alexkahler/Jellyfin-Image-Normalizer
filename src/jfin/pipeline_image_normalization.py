@@ -1,3 +1,5 @@
+"""Provide pipeline image normalization helpers."""
+
 from __future__ import annotations
 
 import io
@@ -37,6 +39,7 @@ def plan_and_backup_image(
     dry_run: bool,
     backdrop_index: int | None = None,
 ) -> ScalePlan:
+    """Run plan and backup image."""
     plan = make_scale_plan(
         img=img,
         target_w=settings.target_width,
@@ -100,7 +103,10 @@ def normalize_image_bytes(
     state_module: Any,
     backdrop_index: int | None = None,
 ) -> tuple[ScalePlan, bytes, str]:
+    """Normalize image bytes."""
+
     def has_pixels_above_alpha_threshold(src: Image.Image, sensitivity: float) -> bool:
+        """Return whether pixels above alpha threshold."""
         rgba = src if src.mode == "RGBA" else src.convert("RGBA")
         alpha = rgba.getchannel("A")
         mask = alpha.point([255 if a > sensitivity else 0 for a in range(256)])

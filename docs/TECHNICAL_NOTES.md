@@ -160,7 +160,7 @@ padding_remove_sensitivity = 0
 ## Development and Testing Notes
 - Dependencies (`requirements.txt`): Pillow, requests, pytest (for local testing).
 - Run tests with `PYTHONPATH=src ./.venv/bin/python -m pytest` (PowerShell: `$env:PYTHONPATH="src"; .\.venv\Scripts\python.exe -m pytest`). Tests rely on mocks/stubs; no live Jellyfin calls are performed.
-- Run governance checks with `./.venv/bin/python project/scripts/verify_governance.py --check all` to validate CI/contract sync, LOC policy, and Python version consistency. Current Track 1 baseline includes known pre-existing LOC failures in `src/jfin/*`; slice work should not introduce additional failures beyond that baseline.
+- Run governance checks with `./.venv/bin/python project/scripts/verify_governance.py --check all` to validate CI/contract sync, LOC policy, docstring policy (Ruff `D` with Google convention), format policy (path-scoped check + auto-format fallback), and Python version consistency.
 - Run architecture checks with `./.venv/bin/python project/scripts/verify_governance.py --check architecture` to validate:
   - ratcheted non-entry exit usage (`sys.exit`, `SystemExit`, `from sys import exit`, and `builtins.exit|quit`) against `project/architecture-baseline.json`
   - conditional import boundaries for `src/jfin/domain/` and `src/jfin/app/services/`

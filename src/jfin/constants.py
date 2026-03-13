@@ -1,3 +1,5 @@
+"""Provide constants helpers."""
+
 import textwrap
 
 APP_VERSION = "0.3.0"

@@ -97,7 +97,8 @@ def _write_minimum_contract(repo_root: Path) -> None:
         verification_commands:
           - PYTHONPATH=src ./.venv/bin/python -m pytest
           - ./.venv/bin/python -m ruff check .
-          - ./.venv/bin/python -m ruff format --check .
+          - ./.venv/bin/python project/scripts/format_policy.py --target src --mode block
+          - ./.venv/bin/python project/scripts/format_policy.py --target tests --mode warn
           - ./.venv/bin/python -m mypy src
           - ./.venv/bin/python -m bandit -r src
           - ./.venv/bin/python -m pip_audit
@@ -122,6 +123,19 @@ def _write_minimum_contract(repo_root: Path) -> None:
           anti_evasion_noncompliance_rule: suppression_or_packing_invalidates_loc_claim
           anti_evasion_multi_statement_max_semicolons: 0
           anti_evasion_control_flow_inline_suite_max: 0
+        docstring_policy:
+          convention: google
+          src_mode: block
+          tests_mode: warn
+          src_max_violations: 0
+          tests_max_violations: 189
+          comments_policy: targeted_inline_comments_for_non_obvious_logic
+        format_policy:
+          src_mode: block
+          tests_mode: warn
+          src_target: src
+          tests_target: tests
+          on_check_failure: run_format
         """,
     )
 

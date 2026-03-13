@@ -55,12 +55,24 @@ def _contract_text(
     ),
     anti_evasion_multi_statement_max_semicolons: int = 0,
     anti_evasion_control_flow_inline_suite_max: int = 0,
+    docstring_convention: str = "google",
+    docstring_src_mode: str = "block",
+    docstring_tests_mode: str = "warn",
+    docstring_src_max_violations: int = 0,
+    docstring_tests_max_violations: int = 189,
+    comments_policy: str = "targeted_inline_comments_for_non_obvious_logic",
+    format_src_mode: str = "block",
+    format_tests_mode: str = "warn",
+    format_src_target: str = "src",
+    format_tests_target: str = "tests",
+    format_on_check_failure: str = "run_format",
 ) -> str:
     """Create a contract YAML string using default WI-001 values."""
     commands = verification_commands or [
         "PYTHONPATH=src ./.venv/bin/python -m pytest",
         "./.venv/bin/python -m ruff check .",
-        "./.venv/bin/python -m ruff format --check .",
+        "./.venv/bin/python project/scripts/format_policy.py --target src --mode block",
+        "./.venv/bin/python project/scripts/format_policy.py --target tests --mode warn",
         "./.venv/bin/python -m mypy src",
         "./.venv/bin/python -m bandit -r src",
         "./.venv/bin/python -m pip_audit",
@@ -105,6 +117,19 @@ def _contract_text(
             f"{anti_evasion_multi_statement_max_semicolons}",
             "  anti_evasion_control_flow_inline_suite_max: "
             f"{anti_evasion_control_flow_inline_suite_max}",
+            "docstring_policy:",
+            f"  convention: {docstring_convention}",
+            f"  src_mode: {docstring_src_mode}",
+            f"  tests_mode: {docstring_tests_mode}",
+            f"  src_max_violations: {docstring_src_max_violations}",
+            f"  tests_max_violations: {docstring_tests_max_violations}",
+            f"  comments_policy: {comments_policy}",
+            "format_policy:",
+            f"  src_mode: {format_src_mode}",
+            f"  tests_mode: {format_tests_mode}",
+            f"  src_target: {format_src_target}",
+            f"  tests_target: {format_tests_target}",
+            f"  on_check_failure: {format_on_check_failure}",
         ]
     )
     return "\n".join(lines) + "\n"
@@ -114,7 +139,7 @@ def _ci_text(
     python_version: str = "3.13",
     include_governance_job: bool = True,
     include_pull_request: bool = True,
-    include_ruff_format_command: bool = True,
+    include_format_policy_commands: bool = True,
     include_venv_bootstrap: bool = True,
     include_governance_install: bool = True,
 ) -> str:
@@ -167,8 +192,13 @@ def _ci_text(
             "          ./.venv/bin/python -m ruff check .",
         ]
     )
-    if include_ruff_format_command:
-        lines.append("          ./.venv/bin/python -m ruff format --check .")
+    if include_format_policy_commands:
+        lines.append(
+            "          ./.venv/bin/python project/scripts/format_policy.py --target src --mode block"
+        )
+        lines.append(
+            "          ./.venv/bin/python project/scripts/format_policy.py --target tests --mode warn"
+        )
     lines.append("          ./.venv/bin/python -m mypy src")
     if include_governance_job:
         lines.extend(
@@ -279,6 +309,39 @@ def test_contract_schema_fails_for_anti_evasion_drift(
 
 
 @pytest.mark.parametrize(
+    ("contract_kwargs", "expected_message"),
+    [
+        (
+            {"docstring_convention": "numpy"},
+            "docstring_policy.convention must be 'google'.",
+        ),
+        (
+            {"docstring_src_max_violations": 1},
+            "docstring_policy.src_max_violations must be 0.",
+        ),
+        (
+            {"format_on_check_failure": "ignore"},
+            "format_policy.on_check_failure must be 'run_format'.",
+        ),
+    ],
+)
+def test_contract_schema_fails_for_docstring_and_format_policy_drift(
+    governance_module,
+    tmp_path: Path,
+    contract_kwargs: dict[str, object],
+    expected_message: str,
+):
+    """Schema should fail when docstring/format policy values drift."""
+    contract_path = tmp_path / "verification-contract.yml"
+    _write_file(contract_path, _contract_text(**contract_kwargs))
+
+    contract = governance_module.parse_verification_contract(contract_path)
+    result = governance_module.check_contract_schema(contract)
+
+    assert expected_message in result.errors
+
+
+@pytest.mark.parametrize(
     ("contract_content", "expected_message"),
     [
         (
@@ -292,6 +355,19 @@ def test_contract_schema_fails_for_anti_evasion_drift(
               src_mode: block
               tests_max_lines: 300
               tests_mode: warn
+            docstring_policy:
+              convention: google
+              src_mode: block
+              tests_mode: warn
+              src_max_violations: 0
+              tests_max_violations: 189
+              comments_policy: targeted_inline_comments_for_non_obvious_logic
+            format_policy:
+              src_mode: block
+              tests_mode: warn
+              src_target: src
+              tests_target: tests
+              on_check_failure: run_format
             """,
             "required block: required_ci_jobs",
         ),
@@ -313,6 +389,19 @@ def test_contract_schema_fails_for_anti_evasion_drift(
               src_max_lines: 300
               src_mode: block
               tests_max_lines: 300
+            docstring_policy:
+              convention: google
+              src_mode: block
+              tests_mode: warn
+              src_max_violations: 0
+              tests_max_violations: 189
+              comments_policy: targeted_inline_comments_for_non_obvious_logic
+            format_policy:
+              src_mode: block
+              tests_mode: warn
+              src_target: src
+              tests_target: tests
+              on_check_failure: run_format
             """,
             "loc_policy missing required key: tests_mode",
         ),
@@ -334,6 +423,19 @@ def test_contract_schema_fails_for_anti_evasion_drift(
               src_mode: block
               tests_max_lines: 300
               tests_mode: warn
+            docstring_policy:
+              convention: google
+              src_mode: block
+              tests_mode: warn
+              src_max_violations: 0
+              tests_max_violations: 189
+              comments_policy: targeted_inline_comments_for_non_obvious_logic
+            format_policy:
+              src_mode: block
+              tests_mode: warn
+              src_target: src
+              tests_target: tests
+              on_check_failure: run_format
             """,
             "required key: characterization_runtime_gate_budget_seconds",
         ),
@@ -361,13 +463,14 @@ def test_ci_sync_fails_when_contract_command_missing(
     contract_path = tmp_path / "verification-contract.yml"
     ci_path = tmp_path / "ci.yml"
     _write_file(contract_path, _contract_text())
-    _write_file(ci_path, _ci_text(include_ruff_format_command=False))
+    _write_file(ci_path, _ci_text(include_format_policy_commands=False))
 
     contract = governance_module.parse_verification_contract(contract_path)
     result = governance_module.check_ci_contract_sync(contract, ci_path)
 
     assert any(
-        "./.venv/bin/python -m ruff format --check ." in error
+        "./.venv/bin/python project/scripts/format_policy.py --target src --mode block"
+        in error
         for error in result.errors
     )
 
@@ -573,6 +676,81 @@ def test_supported_checks_include_architecture_and_characterization(governance_m
     )
     assert "architecture" in check_action.choices
     assert "characterization" in check_action.choices
+    assert "docstrings" in check_action.choices
+    assert "format" in check_action.choices
+
+
+def test_docstring_policy_blocks_src_regression(governance_module, tmp_path: Path):
+    """Docstring checks should block when src violations exceed configured max."""
+    contract_path = tmp_path / "verification-contract.yml"
+    _write_file(contract_path, _contract_text(docstring_src_max_violations=0))
+    _write_file(tmp_path / "src" / "module.py", "def f():\n    return 1\n")
+    _write_file(tmp_path / "tests" / "test_ok.py", "def test_ok():\n    assert True\n")
+
+    contract = governance_module.parse_verification_contract(contract_path)
+    result = governance_module.check_docstring_policy(contract, tmp_path)
+
+    assert any(
+        "docstring policy violation count for 'src'" in error for error in result.errors
+    )
+
+
+def test_docstring_policy_warns_for_tests_regression(governance_module, tmp_path: Path):
+    """Docstring checks should warn when tests violations exceed configured max."""
+    contract_path = tmp_path / "verification-contract.yml"
+    _write_file(contract_path, _contract_text(docstring_tests_max_violations=0))
+    _write_file(
+        tmp_path / "src" / "module.py",
+        '"""Do module work."""\n\n\ndef f():\n    """Do work."""\n    return 1\n',
+    )
+    _write_file(
+        tmp_path / "tests" / "test_bad.py", "def test_bad():\n    assert True\n"
+    )
+
+    contract = governance_module.parse_verification_contract(contract_path)
+    result = governance_module.check_docstring_policy(contract, tmp_path)
+
+    assert not result.errors
+    assert any(
+        "docstring policy violation count for 'tests'" in warning
+        for warning in result.warnings
+    )
+
+
+def test_format_policy_blocks_src_drift(governance_module, tmp_path: Path):
+    """Format policy should block on src drift even after auto-formatting."""
+    contract_path = tmp_path / "verification-contract.yml"
+    _write_file(contract_path, _contract_text())
+    _write_file(tmp_path / "src" / "bad.py", "x=1\n")
+    _write_file(tmp_path / "tests" / "test_ok.py", "def test_ok():\n    assert True\n")
+
+    contract = governance_module.parse_verification_contract(contract_path)
+    result = governance_module.check_format_policy(contract, tmp_path)
+
+    assert any(
+        "format policy detected drift and auto-formatted 'src'" in error
+        for error in result.errors
+    )
+
+
+def test_format_policy_warns_for_tests_drift(governance_module, tmp_path: Path):
+    """Format policy should warn on tests drift and keep src clean."""
+    contract_path = tmp_path / "verification-contract.yml"
+    _write_file(contract_path, _contract_text())
+    _write_file(
+        tmp_path / "src" / "good.py",
+        '"""Do module work."""\n\n\ndef f() -> int:\n    """Return one."""\n    return 1\n',
+    )
+    _write_file(tmp_path / "tests" / "test_bad.py", "x=1\n")
+
+    contract = governance_module.parse_verification_contract(contract_path)
+    result = governance_module.check_format_policy(contract, tmp_path)
+
+    assert not result.errors
+    assert any(
+        "format policy detected drift and auto-formatted 'tests'" in warning
+        for warning in result.warnings
+    )
 
 
 def test_print_check_result_includes_collectability_ok_signal(

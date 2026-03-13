@@ -1,3 +1,5 @@
+"""Provide imaging ops helpers."""
+
 from __future__ import annotations
 
 import io
@@ -46,8 +48,7 @@ def get_palette_color_count(img: Image.Image) -> int | None:
 def remove_padding_from_logo(
     img: Image.Image, sensitivity: int | float = 0
 ) -> tuple[Image.Image, bool]:
-    """
-    Crop transparent border padding from a logo image based on alpha values.
+    """Crop transparent border padding from a logo image based on alpha values.
 
     Pixels with alpha <= sensitivity are treated as padding. The returned image
     is cropped to the bounding box of pixels whose alpha > sensitivity.
@@ -125,8 +126,8 @@ def cover_and_crop_image(
     new_height: int,
     mode: Optional[Literal["RGB", "RGBA", "rgb", "rgba"]] = None,
 ) -> Image.Image:
-    """
-    Generic cover + center crop with optional final mode.
+    """Generic cover + center crop with optional final mode.
+
     - If mode="RGB": tolerate grayscale input ("L") and ensure RGB output.
     - If mode="RGBA": always convert to RGBA and preserve alpha.
     - If mode=None: keep the image's current mode (no conversions).

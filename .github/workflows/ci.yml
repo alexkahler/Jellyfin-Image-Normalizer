@@ -83,9 +83,13 @@ jobs:
           ./.venv/bin/python -m pip install --upgrade pip
           ./.venv/bin/python -m pip install -r requirements.txt mypy ruff
 
-      - name: Run ruff format check
+      - name: Run source format policy
         run: |
-          ./.venv/bin/python -m ruff format --check .
+          ./.venv/bin/python project/scripts/format_policy.py --target src --mode block
+
+      - name: Run tests format policy
+        run: |
+          ./.venv/bin/python project/scripts/format_policy.py --target tests --mode warn
 
       - name: Run ruff lint
         run: |

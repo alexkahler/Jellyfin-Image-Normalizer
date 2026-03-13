@@ -1,3 +1,5 @@
+"""Provide pipeline profiles helpers."""
+
 from __future__ import annotations
 
 import io
@@ -29,6 +31,7 @@ def normalize_profile_user(
     plan_and_backup_image_fn: Callable[..., Any],
     state_module: Any,
 ) -> bool:
+    """Normalize profile user."""
     user_id = user.get("Id")
     if not user_id:
         state_module.log.warning("[API-SKIP] Missing user Id in user record, skipping.")
@@ -76,6 +79,7 @@ def normalize_profile_user(
             )
 
             def upload_original_profile() -> tuple[bool, str | None]:
+                """Run upload original profile."""
                 before_failures = len(state_module.api_failures)
                 upload_ok = jf_client.set_user_profile_image(
                     user_id=user_id,
@@ -156,6 +160,7 @@ def process_profiles(
     normalize_profile_user_fn: Callable[..., bool],
     state_module: Any,
 ) -> None:
+    """Process profiles."""
     users = jf_client.list_users(is_disabled=False)
     if not users:
         state_module.log.warning(
@@ -193,6 +198,7 @@ def process_single_profile(
     normalize_profile_user_fn: Callable[..., bool],
     state_module: Any,
 ) -> int | None:
+    """Process single profile."""
     if is_restore:
         state_module.log.warning(
             "Restore is not supported for profile images; skipping."

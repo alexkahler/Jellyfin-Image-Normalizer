@@ -67,7 +67,8 @@ Run the verification contract command set via the `.venv` interpreter:
 ```bash
 PYTHONPATH=src ./.venv/bin/python -m pytest
 ./.venv/bin/python -m ruff check .
-./.venv/bin/python -m ruff format --check .
+./.venv/bin/python project/scripts/format_policy.py --target src --mode block
+./.venv/bin/python project/scripts/format_policy.py --target tests --mode warn
 ./.venv/bin/python -m mypy src
 ./.venv/bin/python -m bandit -r src
 ./.venv/bin/python -m pip_audit
@@ -78,7 +79,8 @@ PowerShell equivalent:
 ```powershell
 $env:PYTHONPATH='src'; .\.venv\Scripts\python.exe -m pytest
 .\.venv\Scripts\python.exe -m ruff check .
-.\.venv\Scripts\python.exe -m ruff format --check .
+.\.venv\Scripts\python.exe project/scripts/format_policy.py --target src --mode block
+.\.venv\Scripts\python.exe project/scripts/format_policy.py --target tests --mode warn
 .\.venv\Scripts\python.exe -m mypy src
 .\.venv\Scripts\python.exe -m bandit -r src
 .\.venv\Scripts\python.exe -m pip_audit
@@ -130,6 +132,15 @@ Contract values (from `project/verification-contract.yml`):
 
 - `src_max_lines: 300` with `src_mode: block`
 - `tests_max_lines: 300` with `tests_mode: warn`
+- docstring governance:
+  - Ruff `D` rules with Google convention
+  - `src` docstring policy mode: `block`
+  - `tests` docstring policy mode: `warn`
+- format governance:
+  - path-scoped formatter checks (`src`, `tests`)
+  - on drift, `ruff format` is executed
+  - `src` format policy mode: `block`
+  - `tests` format policy mode: `warn`
 - anti-evasion policy is contract-bound:
   - `# fmt: off` / `# fmt: on` cannot be used to claim LOC compliance.
   - Multi-statement semicolon packing cannot be used to claim LOC compliance.

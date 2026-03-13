@@ -9,7 +9,8 @@ from pathlib import Path
 EXPECTED_VERIFICATION_COMMANDS = [
     "PYTHONPATH=src ./.venv/bin/python -m pytest",
     "./.venv/bin/python -m ruff check .",
-    "./.venv/bin/python -m ruff format --check .",
+    "./.venv/bin/python project/scripts/format_policy.py --target src --mode block",
+    "./.venv/bin/python project/scripts/format_policy.py --target tests --mode warn",
     "./.venv/bin/python -m mypy src",
     "./.venv/bin/python -m bandit -r src",
     "./.venv/bin/python -m pip_audit",
@@ -27,6 +28,15 @@ EXPECTED_LOC_POLICY_ANTI_EVASION_RATIONALE = "honest_loc_required_for_maintainab
 EXPECTED_LOC_POLICY_ANTI_EVASION_NONCOMPLIANCE_RULE = (
     "suppression_or_packing_invalidates_loc_claim"
 )
+DOCSTRING_POLICY_REQUIRED_SRC_MAX_VIOLATIONS = 0
+DOCSTRING_POLICY_MAX_BASELINE_TESTS = 189
+EXPECTED_DOCSTRING_POLICY_CONVENTION = "google"
+EXPECTED_DOCSTRING_POLICY_COMMENTS = (
+    "targeted_inline_comments_for_non_obvious_logic"
+)
+EXPECTED_FORMAT_POLICY_SRC_TARGET = "src"
+EXPECTED_FORMAT_POLICY_TESTS_TARGET = "tests"
+EXPECTED_FORMAT_POLICY_ON_CHECK_FAILURE = "run_format"
 
 
 class GovernanceError(Exception):
@@ -60,6 +70,29 @@ class RuntimeGatePolicy:
 
 
 @dataclass(frozen=True)
+class DocstringPolicy:
+    """Docstring governance policy parsed from the verification contract."""
+
+    convention: str
+    src_mode: str
+    tests_mode: str
+    src_max_violations: int
+    tests_max_violations: int
+    comments_policy: str
+
+
+@dataclass(frozen=True)
+class FormatPolicy:
+    """Formatting governance policy parsed from the verification contract."""
+
+    src_mode: str
+    tests_mode: str
+    src_target: str
+    tests_target: str
+    on_check_failure: str
+
+
+@dataclass(frozen=True)
 class VerificationContract:
     """Parsed verification-contract values used by governance checks."""
 
@@ -69,6 +102,8 @@ class VerificationContract:
     required_ci_jobs: list[str]
     loc_policy: LocPolicy
     runtime_gate: RuntimeGatePolicy
+    docstring_policy: DocstringPolicy
+    format_policy: FormatPolicy
 
 
 @dataclass
@@ -272,6 +307,58 @@ def parse_verification_contract(contract_path: Path) -> VerificationContract:
         targets=runtime_gate_targets,
         budget_seconds=runtime_gate_budget_seconds,
     )
+    docstring_policy_map = _parse_map_block(
+        _extract_indented_block(text, "docstring_policy"),
+        "docstring_policy",
+    )
+    required_docstring_policy_keys = (
+        "convention",
+        "src_mode",
+        "tests_mode",
+        "src_max_violations",
+        "tests_max_violations",
+        "comments_policy",
+    )
+    for required_key in required_docstring_policy_keys:
+        if required_key not in docstring_policy_map:
+            raise GovernanceError(
+                f"docstring_policy missing required key: {required_key}"
+            )
+    docstring_policy = DocstringPolicy(
+        convention=docstring_policy_map["convention"],
+        src_mode=docstring_policy_map["src_mode"],
+        tests_mode=docstring_policy_map["tests_mode"],
+        src_max_violations=_parse_non_negative_int(
+            docstring_policy_map["src_max_violations"],
+            "docstring_policy.src_max_violations",
+        ),
+        tests_max_violations=_parse_non_negative_int(
+            docstring_policy_map["tests_max_violations"],
+            "docstring_policy.tests_max_violations",
+        ),
+        comments_policy=docstring_policy_map["comments_policy"],
+    )
+    format_policy_map = _parse_map_block(
+        _extract_indented_block(text, "format_policy"),
+        "format_policy",
+    )
+    required_format_policy_keys = (
+        "src_mode",
+        "tests_mode",
+        "src_target",
+        "tests_target",
+        "on_check_failure",
+    )
+    for required_key in required_format_policy_keys:
+        if required_key not in format_policy_map:
+            raise GovernanceError(f"format_policy missing required key: {required_key}")
+    format_policy = FormatPolicy(
+        src_mode=format_policy_map["src_mode"],
+        tests_mode=format_policy_map["tests_mode"],
+        src_target=format_policy_map["src_target"],
+        tests_target=format_policy_map["tests_target"],
+        on_check_failure=format_policy_map["on_check_failure"],
+    )
 
     return VerificationContract(
         version=version,
@@ -280,6 +367,8 @@ def parse_verification_contract(contract_path: Path) -> VerificationContract:
         required_ci_jobs=required_ci_jobs,
         loc_policy=loc_policy,
         runtime_gate=runtime_gate,
+        docstring_policy=docstring_policy,
+        format_policy=format_policy,
     )
 
 
@@ -355,6 +444,58 @@ def check_contract_schema(contract: VerificationContract) -> CheckResult:
         result.add_error(
             "characterization_runtime_gate_budget_seconds must be "
             f"{EXPECTED_RUNTIME_GATE_BUDGET_SECONDS}."
+        )
+    if contract.docstring_policy.convention != EXPECTED_DOCSTRING_POLICY_CONVENTION:
+        result.add_error(
+            "docstring_policy.convention must be "
+            f"'{EXPECTED_DOCSTRING_POLICY_CONVENTION}'."
+        )
+    if contract.docstring_policy.src_mode != "block":
+        result.add_error("docstring_policy.src_mode must be 'block'.")
+    if contract.docstring_policy.tests_mode != "warn":
+        result.add_error("docstring_policy.tests_mode must be 'warn'.")
+    if (
+        contract.docstring_policy.src_max_violations
+        != DOCSTRING_POLICY_REQUIRED_SRC_MAX_VIOLATIONS
+    ):
+        result.add_error(
+            "docstring_policy.src_max_violations must be "
+            f"{DOCSTRING_POLICY_REQUIRED_SRC_MAX_VIOLATIONS}."
+        )
+    if (
+        contract.docstring_policy.tests_max_violations
+        > DOCSTRING_POLICY_MAX_BASELINE_TESTS
+    ):
+        result.add_error(
+            "docstring_policy.tests_max_violations must be <= "
+            f"{DOCSTRING_POLICY_MAX_BASELINE_TESTS}."
+        )
+    if contract.docstring_policy.comments_policy != EXPECTED_DOCSTRING_POLICY_COMMENTS:
+        result.add_error(
+            "docstring_policy.comments_policy must be "
+            f"'{EXPECTED_DOCSTRING_POLICY_COMMENTS}'."
+        )
+    if contract.format_policy.src_mode != "block":
+        result.add_error("format_policy.src_mode must be 'block'.")
+    if contract.format_policy.tests_mode != "warn":
+        result.add_error("format_policy.tests_mode must be 'warn'.")
+    if contract.format_policy.src_target != EXPECTED_FORMAT_POLICY_SRC_TARGET:
+        result.add_error(
+            "format_policy.src_target must be "
+            f"'{EXPECTED_FORMAT_POLICY_SRC_TARGET}'."
+        )
+    if contract.format_policy.tests_target != EXPECTED_FORMAT_POLICY_TESTS_TARGET:
+        result.add_error(
+            "format_policy.tests_target must be "
+            f"'{EXPECTED_FORMAT_POLICY_TESTS_TARGET}'."
+        )
+    if (
+        contract.format_policy.on_check_failure
+        != EXPECTED_FORMAT_POLICY_ON_CHECK_FAILURE
+    ):
+        result.add_error(
+            "format_policy.on_check_failure must be "
+            f"'{EXPECTED_FORMAT_POLICY_ON_CHECK_FAILURE}'."
         )
 
     return result

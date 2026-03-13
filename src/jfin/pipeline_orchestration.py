@@ -1,3 +1,5 @@
+"""Provide pipeline orchestration helpers."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -27,6 +29,7 @@ def process_discovered_items(
     normalize_item_image_api_fn: Callable[..., bool],
     state_module: Any,
 ) -> None:
+    """Process discovered items."""
     enabled_set = set(enabled_image_types)
 
     total_images = 0
@@ -87,6 +90,7 @@ def process_libraries_via_api(
     normalize_item_image_api_fn: Callable[..., bool],
     state_module: Any,
 ) -> None:
+    """Process libraries via api."""
     discovery = build_discovery_settings(cfg, operations)
     enabled_image_types = [
         image_type
@@ -148,6 +152,7 @@ def process_single_item_api(
     normalize_item_image_api_fn: Callable[..., bool],
     state_module: Any,
 ) -> bool:
+    """Process single item api."""
     image_type = mode_to_image_type.get(mode)
     if not image_type:
         state_module.log.critical(

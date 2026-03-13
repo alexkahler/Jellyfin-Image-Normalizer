@@ -1,3 +1,5 @@
+"""Provide client http helpers."""
+
 from __future__ import annotations
 
 import base64
@@ -5,15 +7,13 @@ from typing import TYPE_CHECKING, Any, Callable
 
 import requests
 
+from .http_error import http_error
+
 if TYPE_CHECKING:
     from .client import JellyfinClient
 
 SleepFn = Callable[[float], Any]
 RequestFn = Callable[..., requests.Response]
-
-
-def _http_error(resp: requests.Response) -> str:
-    return f"HTTP {resp.status_code} {(resp.text or '')[:200].replace('\n', ' ')}"
 
 
 def _request_with_retry(
@@ -27,6 +27,7 @@ def _request_with_retry(
     sleep_fn: SleepFn,
     allow_retry: bool,
 ) -> requests.Response | None:
+    """Run  request with retry."""
     attempts = 1 if not allow_retry else max(1, int(client.retry_count))
     backoff = 0.0 if not allow_retry else max(0.0, float(client.backoff_base))
     last_error = None
@@ -45,7 +46,7 @@ def _request_with_retry(
         else:
             if resp.ok:
                 return resp
-            last_error = _http_error(resp)
+            last_error = http_error(resp)
         client.logger.error(
             "[API-ERROR] Attempt %s/%s failed for %s: %s",
             attempt,
@@ -69,6 +70,7 @@ def get_response(
     label: str,
     sleep_fn: SleepFn,
 ) -> requests.Response | None:
+    """Get response."""
     return _request_with_retry(
         client,
         request_fn=request_fn,
@@ -92,6 +94,7 @@ def head_response(
     sleep_fn: SleepFn,
     allow_retry: bool,
 ) -> requests.Response | None:
+    """Run head response."""
     return _request_with_retry(
         client,
         request_fn=request_fn,
@@ -107,6 +110,7 @@ def head_response(
 def test_connection(
     client: JellyfinClient, *, request_fn: RequestFn, sleep_fn: SleepFn
 ) -> bool:
+    """Run test connection."""
     url = f"{client.base_url}/System/Info"
     attempts = max(1, int(client.retry_count))
     backoff = max(0.0, float(client.backoff_base))
@@ -137,7 +141,7 @@ def test_connection(
             if status == 503:
                 last_error = "HTTP 503 Service Unavailable (server starting or temporarily unavailable). Try again later."
             elif not resp.ok:
-                last_error = _http_error(resp)
+                last_error = http_error(resp)
             else:
                 try:
                     payload = resp.json()
@@ -185,6 +189,7 @@ def post_image(
     failure_entry: dict[str, Any],
     fail_fast_prefix: str,
 ) -> bool:
+    """Run post image."""
     if not client._writes_allowed(action_label):
         client.logger.debug(
             "DRY RUN - Would upload normalized image for %s.", action_label
@@ -214,7 +219,7 @@ def post_image(
                 if client.delay > 0:
                     sleep_fn(client.delay)
                 return True
-            last_error_msg = _http_error(resp)
+            last_error_msg = http_error(resp)
         client.logger.error(
             "[API-ERROR] Attempt %s/%s failed for %s: %s",
             attempt,
@@ -242,6 +247,7 @@ def delete_image(
     image_type: str,
     image_index: int | None,
 ) -> bool:
+    """Run delete image."""
     if image_type == "Primary":
         url = f"{client.base_url}/UserImage?userId={uuid}"
     elif image_type == "Backdrop":
@@ -273,7 +279,7 @@ def delete_image(
                 if client.delay > 0:
                     sleep_fn(client.delay)
                 return True
-            last_error_msg = _http_error(resp)
+            last_error_msg = http_error(resp)
         client.logger.debug(
             "  -> Attempt %s/%s failed at deleting image for uuid %s: %s",
             attempt,

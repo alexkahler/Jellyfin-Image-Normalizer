@@ -1,3 +1,5 @@
+"""Provide pipeline image payload helpers."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -27,6 +29,7 @@ def process_item_image_payload(
     state_module: Any,
     backdrop_index: int | None = None,
 ) -> bool:
+    """Process item image payload."""
     try:
         plan, payload, normalized_content_type = normalize_image_bytes_fn(
             item_id=item_id,
@@ -44,6 +47,7 @@ def process_item_image_payload(
         )
 
         def upload_original() -> tuple[bool, str | None]:
+            """Run upload original."""
             before_failures = len(state_module.api_failures)
             upload_ok = jf_client.set_item_image_bytes(
                 item_id=item_id,
